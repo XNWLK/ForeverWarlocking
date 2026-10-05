@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "cecbb63",
-    "subject":  "Add spell ranges to the data",
+    "commit":  "189e098",
+    "subject":  "Patch notes: Hellfire and Rain of Fire ticks can crit",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-05 18:15",
+    "synced":  "2026-10-05 20:33",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
