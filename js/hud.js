@@ -137,15 +137,22 @@ export function createHud(WL, handlers) {
   function fillPickers() {
     const builds = byId('buildOptions'), races = byId('raceOptions');
     builds.textContent = ''; races.textContent = '';
-    WL.BUILDS.forEach(function (b) {
+    // Listed in the order of their DPS in the DPS sim (data/build-order.js); a build the list does not know comes last.
+    const ranking = (window.FW_BUILD_ORDER && window.FW_BUILD_ORDER.order) || [], rank = {};
+    ranking.forEach(function (r, i) { rank[r.key] = { place: i, dps: r.dps, race: r.race }; });
+    const listed = WL.BUILDS.slice().sort(function (a, b) {
+      return (rank[a.key] ? rank[a.key].place : 999) - (rank[b.key] ? rank[b.key].place : 999);
+    });
+    listed.forEach(function (b) {
       const button = document.createElement('button');
       button.type = 'button';
       if (b.pet && WL.ICONS['pet_' + b.pet]) { const img = document.createElement('img'); img.src = WL.ICONS['pet_' + b.pet]; img.alt = ''; button.appendChild(img); }
       else { const gap = document.createElement('span'); gap.className = 'no-icon'; button.appendChild(gap); }
       button.appendChild(document.createTextNode(b.short));
-      const pet = document.createElement('small');
-      pet.textContent = b.pet === 'imp' ? 'Imp' : b.pet === 'succubus' ? 'Succubus' : 'no pet';
-      button.appendChild(pet);
+      const dps = document.createElement('small'), r = rank[b.key];
+      dps.textContent = r ? Math.round(r.dps) + ' DPS' : '';
+      if (r) button.title = 'In the DPS sim: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs';
+      button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
       button.addEventListener('click', function () { showPanel(null); handlers.onBuild(b.key); });
       builds.appendChild(button);
