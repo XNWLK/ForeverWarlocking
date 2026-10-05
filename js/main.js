@@ -25,6 +25,10 @@ const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
 const FULL_DETAIL = Math.min(window.devicePixelRatio || 1, 2);
 renderer.setPixelRatio(FULL_DETAIL);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.25;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 
@@ -219,7 +223,7 @@ function askSimAverage() {
 // What you see when something happens. A spell that flies is drawn as a bolt: its number and the dummy's flinch
 // wait until the bolt arrives (the damage itself is already counted, exactly as the rules say).
 const boltsAt = [0, 0, 0, 0], deathWaiting = [false, false, false, false];
-const spot = new THREE.Vector3();
+const spot = new THREE.Vector3(), staffAt = new THREE.Vector3();
 function hitSound(e) { sound.play(e.school === 'fire' ? 'hitFire' : 'hitShadow'); if (e.crit) sound.play('crit'); }
 function onCombatEvent(e) {
   const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
@@ -241,15 +245,19 @@ function onCombatEvent(e) {
   else if (e.type === 'hit' && !e.pet && !(fx && fx.bolt)) hitSound(e);
   if (lands && fx && fx.bolt) sound.play('bolt');
 
+  // Where your staff's crystal is right now (life drawn from the target flows back to it).
+  warlock.orbPosition(staffAt);
+  const where = { at: dummy.chestAt, caster: staffAt, color: fx && fx.color, crit: !!e.crit && e.type === 'hit' };
+
   if (lands && fx && fx.bolt) {
     hud.event(e, anchor, true);
-    if (e.pet) spot.set(pet.state.x, 0.75, pet.state.z); else warlock.orbPosition(spot);
+    if (e.pet) spot.set(pet.state.x, 0.85, pet.state.z); else spot.copy(staffAt);
     boltsAt[ti]++;
     effects.bolt(spot, dummy.chestAt, fx.bolt, function () {
       boltsAt[ti]--;
-      if (e.type === 'hit') { effects.burst(dummy.chestAt, fx.land); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); hitSound(e); }
+      if (e.type === 'hit') { warlock.orbPosition(staffAt); effects.play(fx.land, where); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); hitSound(e); }
       hud.floatFor(e, anchor);
-      if (deathWaiting[ti] && boltsAt[ti] === 0) { deathWaiting[ti] = false; dummy.setDead(true); }
+      if (deathWaiting[ti] && boltsAt[ti] === 0) { deathWaiting[ti] = false; dummy.setDead(true); effects.play('death', where); }
     });
     return;
   }
@@ -257,18 +265,19 @@ function onCombatEvent(e) {
   hud.event(e, anchor);
   if (e.type === 'hit') {
     dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1);
-    if (fx && fx.land) effects.burst(dummy.chestAt, fx.land);
+    if (fx && fx.land) effects.play(fx.land, where);
   } else if (e.type === 'tick') {
     dummy.hit(0.25);
-    if (fx && fx.land && combat.spells[e.key] && combat.spells[e.key].kind === 'channel') effects.burst(dummy.chestAt, fx.land);
+    if (fx && fx.tick) effects.play(fx.tick, where);
   } else if (e.type === 'havoc') {
     dummy.hit(0.2);
+    effects.play('brand', where);
   } else if (e.type === 'apply') {
-    if (fx && fx.land) effects.burst(dummy.chestAt, fx.land);
+    if (fx && fx.apply) effects.play(fx.apply, where);
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
-    effects.burst(spot.set(controls.player.x, 1.2, controls.player.z), { color: 0xff4a5a, size: 1.3, ring: true });
+    effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2, controls.player.z) });
   } else if (e.type === 'death') {
-    if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else dummy.setDead(true); }
+    if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
     if (e.last) window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself
   }
 }
@@ -283,6 +292,25 @@ function startingBuild() {
     if (build) return build;
   }
   return WL.BUILDS[0];
+}
+
+// What you are buffed with before the fight starts, as the DPS sim's settings have it: Demonic Sacrifice, the raid
+// buffs that are switched on, and the consumables that last the whole fight (your Spellstone or Firestone, elixirs).
+function standingBuffs(build, stats) {
+  const list = [];
+  if (stats.sacrificeActive && build.sacrifice) {
+    const what = build.sacrifice === 'imp' ? 'Imp' : build.sacrifice === 'succubus' ? 'Succubus' : build.sacrifice;
+    list.push({ key: 'sacrifice', icon: 'demonicSacrifice', name: 'Demonic Sacrifice (' + what + ')', desc: 'You sacrificed your ' + what + ' before the fight; its gift lasts the whole fight.' });
+  }
+  Object.keys(config.buffs).forEach(function (k) {
+    const b = config.buffs[k];
+    if (b.on) list.push({ key: 'buff_' + k, icon: 'buff_' + k, name: b.name, desc: b.desc || '' });
+  });
+  Object.keys(config.consumables).forEach(function (k) {
+    const c = config.consumables[k];
+    if (c.on) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '' });
+  });
+  return list;
 }
 
 // Builds the character from the chosen build and race, sets up the dummies and starts a fresh fight.
@@ -306,6 +334,7 @@ function newCharacter() {
     builds: allBuilds(), timed: fight.timed,
     maxRange: Math.max.apply(null, ranges.concat([0]))
   };
+  character.standing = standingBuffs(build, combat.stats);
   hud.setCharacter(character);
 
   // The dummies in the room, and what you cannot walk through.
@@ -471,7 +500,7 @@ function frame() {
   warlock.root.rotation.y = player.yaw;
   warlock.update(dt, time, player.moving, player.height, school);
   for (let i = 1; i <= targets; i++) {
-    dummies[i].update(dt);
+    dummies[i].update(dt, time);
     dummies[i].setSelected(i === S.target);
   }
   rings.position.set(SPOTS[S.target].x, 0, SPOTS[S.target].z);
@@ -481,8 +510,8 @@ function frame() {
   warlock.root.updateMatrixWorld();
   if (casting) {
     const fx = SPELL_FX[casting.key];
-    effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, S.cast ? (S.t - S.cast.start) / (S.cast.end - S.cast.start) : 0.6, time);
-  } else effects.casting(null);
+    effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, S.cast ? (S.t - S.cast.start) / (S.cast.end - S.cast.start) : 0.6, time, player, dt);
+  } else effects.casting(null, 0, 0, time, player, dt);
   for (let i = 1; i <= targets; i++) {
     effects.setMarks(i, SPOTS[i], combat.alive(i) ? {
       immolate: combat.dotLeft('immolate', i) > 0, corruption: combat.dotLeft('corruption', i) > 0, siphonLife: combat.dotLeft('siphonLife', i) > 0,
@@ -490,7 +519,7 @@ function frame() {
       coe: combat.debuff(i, 'coe'), havoc: combat.havocOn() === i
     } : {}, time);
   }
-  effects.update(dt);
+  effects.update(dt, camera.position);
 
   // A channel on one dummy draws a beam to it; an area channel rains fire around its dummy, or burns around you.
   const area = S.channel && combat.spells[S.channel.key].aoe ? combat.table[S.channel.key] : null;
@@ -502,12 +531,15 @@ function frame() {
     areaPulse -= dt;
     if (areaPulse <= 0) {
       if (area.range) {                                    // Rain of Fire
-        areaPulse = 0.07;
+        areaPulse = 0.11;
         const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * area.radius, at = SPOTS[S.channel.target];
-        effects.burst(rain.set(at.x + Math.cos(a) * r, 0.3, at.z + Math.sin(a) * r), { color: 0xff8a2a, size: 0.9, sparks: 3 });
+        effects.meteor(rain.set(at.x + Math.cos(a) * r, 0.15, at.z + Math.sin(a) * r));
       } else {                                             // Hellfire
         areaPulse = 0.45;
-        effects.burst(rain.set(player.x, 0.2, player.z), { color: 0xff5a1a, size: area.radius * 0.72, ring: true, life: 0.5 });
+        rain.set(player.x, 0.1, player.z);
+        effects.ring(rain, 0xff5a1a, 1, area.radius, 0.55, false);
+        effects.ring(rain, 0xffc23d, 0.6, area.radius * 0.7, 0.45, true);
+        for (let k = 0; k < 5; k++) { const a = Math.random() * Math.PI * 2, r = 2 + Math.random() * (area.radius - 2); effects.play('burn', { at: head.set(player.x + Math.cos(a) * r, 1.0, player.z + Math.sin(a) * r) }); }
       }
     }
   } else areaPulse = 0;

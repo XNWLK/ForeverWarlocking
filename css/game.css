@@ -291,3 +291,6 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 
 /* Anything marked hidden stays hidden, whatever layout its panel has. */
 [hidden] { display: none !important; }
+
+/* The buff row holds the standing buffs too: let it wrap instead of running off. */
+#playerBuffs { flex-wrap: wrap; max-width: 330px; justify-content: flex-end; }

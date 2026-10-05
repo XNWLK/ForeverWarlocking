@@ -388,7 +388,7 @@ export function createHud(WL, handlers) {
     if (combat.debuff(ti, 'brand') && cur.brandCharges > 0) debuffs.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + cur.brandCharges });
     if (combat.havocOn() === ti) debuffs.push({ key: 'havoc', icon: 'baneOfHavoc', name: 'Bane of Havoc', text: seconds(S.havoc.expires - S.t) });
     auraList(el.debuffs, 'debuffs', debuffs);
-    const buffs = [];
+    const buffs = (c.standing || []).map(function (b) { return { key: b.key, icon: b.icon, name: b.desc ? b.name + '\n' + b.desc : b.name, text: '' }; });
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
       if (combat.buff(k)) buffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) });
     });
