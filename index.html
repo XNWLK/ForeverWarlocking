@@ -79,7 +79,7 @@
       <button type="button" id="btnFight" title="How the fight ends, movement, hits taken">Fight</button>
     </div>
     <div class="panel row">
-      <button type="button" id="btnKeys">Keys</button>
+      <button type="button" id="btnKeys" title="See and change every key">Keybinds</button>
       <button type="button" id="btnEdit" title="Move spells and change keys">Edit bar</button>
       <button type="button" id="btnRings" class="on" aria-pressed="true">Range rings</button>
       <button type="button" id="btnSound" aria-pressed="false" title="Sounds on or off">Sound</button>
@@ -116,21 +116,11 @@
       <div class="options" id="raceOptions"></div>
     </div>
     <div class="panel keys" id="keysPanel" hidden>
-      <h2>Keys</h2>
-      <dl>
-        <dt>W / S</dt><dd>Walk forward / back</dd>
-        <dt>A / D</dt><dd>Turn left / right</dd>
-        <dt>Q / E</dt><dd>Step left / right</dd>
-        <dt>Space</dt><dd>Jump</dd>
-        <dt>Right mouse, held</dt><dd>Steer with the mouse (A / D then step sideways)</dd>
-        <dt>Left mouse, held</dt><dd>Look around without turning</dd>
-        <dt>Both mouse buttons</dt><dd>Walk forward</dd>
-        <dt>Mouse wheel</dt><dd>Zoom</dd>
-        <dt>The keys on the slots</dt><dd>Cast that spell (or click it). Edit bar changes keys and places.</dd>
-        <dt>Tab, or click a dummy</dt><dd>Change your target</dd>
-        <dt>Escape</dt><dd>Stop casting (or close a panel)</dd>
-        <dt>Attack / Follow</dt><dd>Buttons under your pet's bars; it attacks by itself when you start</dd>
-      </dl>
+      <h2>Keybinds</h2>
+      <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places.</p>
+      <div class="binds"><div id="bindsLeft"></div><div id="bindsRight"></div></div>
+      <p class="hint">Mouse: hold right to steer, hold left to look around, both buttons walk forward, the wheel zooms. Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots.</p>
+      <button type="button" id="bindsReset" class="wide">All keys back to default</button>
     </div>
   </section>
 

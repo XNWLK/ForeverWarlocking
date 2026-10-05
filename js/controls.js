@@ -18,7 +18,9 @@ function wrapAngle(a) {
   return a;
 }
 
-// world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional) }
+// world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional),
+//          binds: { forward, back, turnLeft, turnRight, strafeLeft, strafeRight, jump } - key codes, may change any time }
+// The arrow keys always move you as well.
 export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
   const player = { x: start.x, z: start.z, yaw: start.yaw, height: 0, fall: 0, moving: false };
@@ -32,12 +34,16 @@ export function createControls(canvas, camera, world) {
   }
 
   // --- Keyboard -------------------------------------------------------------
-  const USED = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  const B = world.binds, ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  function isMoveKey(code) {
+    return ARROWS.indexOf(code) >= 0 || code === B.forward || code === B.back || code === B.turnLeft || code === B.turnRight ||
+      code === B.strafeLeft || code === B.strafeRight || code === B.jump;
+  }
   window.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;   // typing must not walk the character
     if (e.target instanceof HTMLButtonElement && e.code === 'Space') e.target.blur();
-    if (USED.indexOf(e.code) >= 0) { keys.add(e.code); e.preventDefault(); }
+    if (isMoveKey(e.code)) { keys.add(e.code); e.preventDefault(); }
   });
   window.addEventListener('keyup', function (e) { keys.delete(e.code); });
   window.addEventListener('blur', function () { keys.clear(); mouse.left = mouse.right = false; showCursor(); });
@@ -103,10 +109,10 @@ export function createControls(canvas, camera, world) {
   const target = new THREE.Vector3(), dir = new THREE.Vector3();
 
   function update(dt) {
-    const left = down('KeyA', 'ArrowLeft'), right = down('KeyD', 'ArrowRight');
-    let forward = down('KeyW', 'ArrowUp') - down('KeyS', 'ArrowDown');
+    const left = down(B.turnLeft, 'ArrowLeft'), right = down(B.turnRight, 'ArrowRight');
+    let forward = down(B.forward, 'ArrowUp') - down(B.back, 'ArrowDown');
     if (mouse.left && mouse.right) forward = 1;
-    let sideways = (keys.has('KeyE') ? 1 : 0) - (keys.has('KeyQ') ? 1 : 0);
+    let sideways = (keys.has(B.strafeRight) ? 1 : 0) - (keys.has(B.strafeLeft) ? 1 : 0);
     if (mouse.right) sideways += right - left;            // while steering, A and D step sideways
     else player.yaw = wrapAngle(player.yaw + (left - right) * TURN_SPEED * dt);
     sideways = Math.max(-1, Math.min(1, sideways));
@@ -122,7 +128,7 @@ export function createControls(canvas, camera, world) {
     }
     collide();
 
-    if (keys.has('Space') && player.height === 0) player.fall = JUMP_SPEED;
+    if (keys.has(B.jump) && player.height === 0) player.fall = JUMP_SPEED;
     if (player.height > 0 || player.fall > 0) {
       player.height += player.fall * dt;
       player.fall -= GRAVITY * dt;

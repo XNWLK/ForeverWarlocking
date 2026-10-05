@@ -294,3 +294,24 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 
 /* The buff row holds the standing buffs too: let it wrap instead of running off. */
 #playerBuffs { flex-wrap: wrap; max-width: 330px; justify-content: flex-end; }
+
+/* ======================================================================
+   Round 13: keybinds panel, DoT icons over the dummies
+   ====================================================================== */
+.keys { width: 470px; display: grid; gap: 8px; }
+.binds { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.bind { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 0; font-size: 12px; }
+.bind span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bind button { flex: none; min-width: 58px; padding: 1px 6px; font-weight: 600; color: var(--gold); }
+.bind button.waiting { color: var(--fel); border-color: var(--fel); }
+.bind button.unset { color: var(--ink-dim); font-weight: 400; }
+
+/* What is on each dummy, right above its head: icons with the seconds left. */
+.plate { width: auto; min-width: 0; padding: 0; background: none; border: 0; overflow: visible; }
+.plate .auras { justify-content: center; gap: 2px; min-height: 0; margin-bottom: 2px; }
+.plate .aura { width: 26px; height: 26px; border-color: rgba(0, 0, 0, 0.8); box-shadow: 0 0 3px #000; }
+.plate .aura b { font-size: 12px; line-height: 13px; }
+.plate .tag { display: block; width: 110px; margin: 0 auto; padding: 2px 4px 3px; border-radius: 4px; background: rgba(14, 11, 22, 0.72); border: 1px solid var(--panel-line); overflow: hidden; text-overflow: ellipsis; }
+.plate.current .tag { border-color: #ffd76a; }
+.plate.solo .tag { display: none; }
+.plate.solo { pointer-events: none; }

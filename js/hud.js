@@ -8,6 +8,8 @@ export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', '
 function plainLabel(code) {
   const m = /^(?:Key|Digit)(.)$/.exec(code);
   if (m) return m[1];
+  const named = { Space: 'Space', Escape: 'Esc', Tab: 'Tab', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', CapsLock: 'Caps', Backspace: 'Back' };
+  if (named[code]) return named[code];
   return code.replace('Numpad', 'N').replace('Arrow', '').replace('Bracket', '').replace('Backquote', '`').replace('Minus', '-').replace('Equal', '=').slice(0, 4);
 }
 const LOG_LINES = 9;
@@ -68,14 +70,18 @@ export function createHud(WL, handlers) {
   // A small plate above every dummy when there is more than one: name and health. Click it to target that dummy.
   const plates = [null];
   for (let i = 1; i <= 3; i++) {
-    const plate = document.createElement('div'), name = document.createElement('span'), bar = document.createElement('i'), fill = document.createElement('b');
+    const plate = document.createElement('div'), auras = document.createElement('span'), tag = document.createElement('span');
+    const name = document.createElement('span'), bar = document.createElement('i'), fill = document.createElement('b');
     plate.className = 'plate';
     plate.hidden = true;
+    auras.className = 'auras';
+    tag.className = 'tag';
     bar.appendChild(fill);
-    plate.append(name, bar);
+    tag.append(name, bar);
+    plate.append(auras, tag);
     plate.addEventListener('click', function () { handlers.onTarget(i); });
     byId('plates').appendChild(plate);
-    plates.push({ box: plate, name: name, fill: fill });
+    plates.push({ box: plate, name: name, fill: fill, auras: auras });
   }
 
   // Desktop only, but keep the frames from overlapping in a small window.
@@ -85,7 +91,7 @@ export function createHud(WL, handlers) {
 
   // The letters printed on the slots follow the keyboard in use (the keys themselves are chosen by position).
   if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
-    navigator.keyboard.getLayoutMap().then(function (map) { layout = map; showKeyLabels(); }).catch(function () {});
+    navigator.keyboard.getLayoutMap().then(function (map) { layout = map; showKeyLabels(); if (character) showBinds(); }).catch(function () {});
   }
 
   // ---------- combat log ----------
@@ -211,6 +217,41 @@ export function createHud(WL, handlers) {
   function setSound(on) { soundButton.classList.toggle('on', on); soundButton.setAttribute('aria-pressed', String(on)); }
   soundButton.addEventListener('click', function () { soundButton.blur(); const on = !soundButton.classList.contains('on'); setSound(on); handlers.onSound(on); });
 
+  // Keybinds: every key in one list. Click a key, press the new one.
+  const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'],
+    ['strafeLeft', 'Step left'], ['strafeRight', 'Step right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
+    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow']];
+  let binds = {}, capture = null;                          // capture = the key we are waiting for: { id, button }
+  function bindRow(holder, id, text, code) {
+    const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');
+    row.className = 'bind';
+    label.textContent = text;
+    button.type = 'button';
+    button.textContent = code ? labelFor(code) : 'none';
+    if (!code) button.className = 'unset';
+    button.addEventListener('click', function () {
+      if (capture) showBinds();
+      capture = { id: id, button: button };
+      button.textContent = 'press a key';
+      button.className = 'waiting';
+      button.blur();
+    });
+    row.append(label, button);
+    holder.appendChild(row);
+  }
+  function showBinds() {
+    capture = null;
+    const left = byId('bindsLeft'), right = byId('bindsRight');
+    left.textContent = ''; right.textContent = '';
+    BIND_ROWS.forEach(function (r) { bindRow(left, r[0], r[1], binds[r[0]]); });
+    slots.forEach(function (slot, i) {
+      if (!slot.key) return;
+      const name = slot.key === 'racial' ? character.racial.name : character.spells[slot.key].name;
+      bindRow(right, i, name, codes[i]);
+    });
+  }
+  byId('bindsReset').addEventListener('click', function () { handlers.onKeysReset(); });
+
   // Edit bar: click two slots to swap what is in them; click a slot and press a key to give it that key.
   let editing = false, picked = -1;
   const editButton = byId('btnEdit'), editStrip = byId('editStrip');
@@ -231,8 +272,17 @@ export function createHud(WL, handlers) {
   editButton.addEventListener('click', function () { editButton.blur(); setEditing(!editing); });
   byId('editDone').addEventListener('click', function () { setEditing(false); });
   byId('editReset').addEventListener('click', function () { handlers.onBarReset(); });
-  window.addEventListener('keydown', function (e) {       // while editing, a key press is a new key for the picked slot
-    if (!editing || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  window.addEventListener('keydown', function (e) {       // a key press that is meant as a new key, not as an action
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (capture) {                                         // the Keybinds panel is waiting for a key
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const id = capture.id;
+      capture = null;
+      if (e.code === 'Escape') showBinds(); else handlers.onRebind(id, e.code);
+      return;
+    }
+    if (!editing) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if (e.code === 'Escape') { setEditing(false); return; }
@@ -298,9 +348,11 @@ export function createHud(WL, handlers) {
       el.bar.appendChild(button);
       return slot;
     });
-    lastMeter = -1; lastAuras = { debuffs: '', buffs: '' };
+    lastMeter = -1;
+    [el.debuffs, el.buffs].concat(plates.slice(1).map(function (p) { return p.auras; })).forEach(function (h) { h._ids = null; h.textContent = ''; });
     picked = -1;
     el.bar.classList.toggle('editing', editing);
+    showBinds();
   }
 
   function tooltip(key, name, c) {
@@ -321,8 +373,8 @@ export function createHud(WL, handlers) {
 
   function auraList(holder, which, list) {
     const id = list.map(function (a) { return a.key; }).join(',');
-    if (lastAuras[which] !== id) {
-      lastAuras[which] = id;
+    if (holder._ids !== id) {
+      holder._ids = id;
       holder.textContent = '';
       list.forEach(function (a) {
         const box = document.createElement('span');
@@ -339,6 +391,18 @@ export function createHud(WL, handlers) {
   }
   function seconds(left) { return left === Infinity ? '' : left >= 60 ? Math.ceil(left / 60) + 'm' : left >= 9.5 ? String(Math.round(left)) : left.toFixed(1); }
 
+  // The DoTs and debuffs on dummy i, with the seconds (or charges) left.
+  function aurasOn(combat, i) {
+    const S = combat.state, c = character, t = S.targets[i];
+    const list = Object.keys(t.dots).filter(function (k) { return combat.dotLeft(k, i) > 0; }).map(function (k) {
+      return { key: k, icon: k, name: c.spells[k].name, text: seconds(combat.dotLeft(k, i)) };
+    });
+    ['coe', 'isb'].forEach(function (k) { if (combat.debuff(i, k)) list.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(t.deb[k] - S.t) }); });
+    if (combat.debuff(i, 'brand') && t.brandCharges > 0) list.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + t.brandCharges });
+    if (combat.havocOn() === i) list.push({ key: 'havoc', icon: 'baneOfHavoc', name: 'Bane of Havoc', text: seconds(S.havoc.expires - S.t) });
+    return list;
+  }
+
   // combat: the object from createCombat; ctx: { distances, moving }; now: seconds since the page started;
   // anchors: where each dummy's head is on the screen ([, a1, a2, a3], each { x, y, visible }).
   function render(combat, ctx, now, anchors) {
@@ -353,12 +417,14 @@ export function createHud(WL, handlers) {
     if (!nameButton.hidden) setText(nameButton, getName('dummy'));
 
     for (let i = 1; i <= 3; i++) {
-      const plate = plates[i], a = anchors && anchors[i], show = c.targets > 1 && i <= c.targets && !!a && a.visible;
+      const plate = plates[i], a = anchors && anchors[i], show = i <= c.targets && !!a && a.visible;
       if (plate.box.hidden !== !show) plate.box.hidden = !show;
       if (!show) continue;
       const t = S.targets[i], left = Math.round(a.x) + 'px', top = Math.round(a.y - 14) + 'px';
       if (plate.box._left !== left) { plate.box._left = left; plate.box.style.left = left; }
       if (plate.box._top !== top) { plate.box._top = top; plate.box.style.top = top; }
+      setClass(plate.box, 'solo', c.targets === 1);
+      auraList(plate.auras, 'plate', aurasOn(combat, i));
       setText(plate.name, dummyName(i));
       setWidth(plate.fill, 100 * t.health / t.maxHealth);
       setClass(plate.box, 'current', i === ti);
@@ -381,12 +447,7 @@ export function createHud(WL, handlers) {
     setClass(el.targetFrame, 'execute', !cur.dead && combat.executePhase());
 
     // Debuffs on the dummy, then your own buffs.
-    const debuffs = Object.keys(cur.dots).filter(function (k) { return combat.dotLeft(k) > 0; }).map(function (k) {
-      return { key: k, icon: k, name: c.spells[k].name, text: seconds(combat.dotLeft(k)) };
-    });
-    ['coe', 'isb'].forEach(function (k) { if (combat.debuff(ti, k)) debuffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(cur.deb[k] - S.t) }); });
-    if (combat.debuff(ti, 'brand') && cur.brandCharges > 0) debuffs.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + cur.brandCharges });
-    if (combat.havocOn() === ti) debuffs.push({ key: 'havoc', icon: 'baneOfHavoc', name: 'Bane of Havoc', text: seconds(S.havoc.expires - S.t) });
+    const debuffs = aurasOn(combat, ti);
     auraList(el.debuffs, 'debuffs', debuffs);
     const buffs = (c.standing || []).map(function (b) { return { key: b.key, icon: b.icon, name: b.desc ? b.name + '\n' + b.desc : b.name, text: '' }; });
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
@@ -526,7 +587,7 @@ export function createHud(WL, handlers) {
       if (age >= FLOAT_LIFE) { fl.node.remove(); floats.splice(i, 1); continue; }
       if (!fl.anchor.visible) { fl.node.style.opacity = '0'; continue; }
       const pop = fl.crit ? 1 + 0.9 * Math.max(0, 1 - age / 0.18) : 1 + 0.25 * Math.max(0, 1 - age / 0.12);
-      const rise = 26 + 64 * (1 - Math.pow(1 - age / FLOAT_LIFE, 2));
+      const rise = 62 + 64 * (1 - Math.pow(1 - age / FLOAT_LIFE, 2));
       fl.node.style.transform = 'translate(' + (fl.anchor.x + fl.dx).toFixed(1) + 'px,' + (fl.anchor.y - rise).toFixed(1) + 'px) translate(-50%, -50%) scale(' + pop.toFixed(3) + ')';
       fl.node.style.opacity = age > FLOAT_LIFE - 0.4 ? Math.max(0, (FLOAT_LIFE - age) / 0.4).toFixed(2) : '1';
     }
@@ -602,7 +663,9 @@ export function createHud(WL, handlers) {
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
     setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound,
-    setKeys: function (list) { codes = list.slice(); showKeyLabels(); },
+    setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
+    setBinds: function (map) { binds = map; if (character) showBinds(); },
+    anyPanelOpen: function () { return Object.keys(panels).some(function (k) { return !panels[k].hidden; }); },
     closePanels: function () { let any = false; Object.keys(panels).forEach(function (k) { if (!panels[k].hidden) any = true; }); showPanel(null); return any; },
     simAverage: function () { return simAverage; }, dummyName: dummyName,
     petName: function () { return character && character.build.pet ? getName(character.build.pet) : ''; }

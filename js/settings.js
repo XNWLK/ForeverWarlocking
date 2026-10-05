@@ -5,7 +5,8 @@ const DEFAULTS = {
   build: null, race: 'human', dummyHealth: 50000, rings: true, dummies: 1, sound: false,
   fight: { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 },   // how the fight ends, movement, hits taken
   buildCode: '', settingsCode: '',     // imported from the DPS sim
-  homes: {}, keys: null                // your own places for spells on the bar, and your own keys
+  homes: {}, keys: null,               // your own places for spells on the bar, and your own keys for the slots
+  binds: null                          // your own keys for walking, jumping, targeting, the pet, stopping a cast
 };
 
 let saved = {};

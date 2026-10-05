@@ -50,14 +50,18 @@ scene.add(beam.mesh);
 const pet = createPet(scene);
 const effects = createEffects(scene);
 
+// Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
+const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
+                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '' };
+const binds = Object.assign({}, DEFAULT_BINDS, getSetting('binds') || {});
+
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
-const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene });
+const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds });
 
 // ---------- the character and the fight ----------
 let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
 let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
 const sound = createSound(getSetting('sound') === true);   // off until you switch it on (Xn)
-const MOVE_CODES = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Escape'];
 let keyCodes = ACTION_CODES.slice();
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -134,13 +138,25 @@ const hud = createHud(WL, {
     setSetting('homes', homes);
     newCharacter();
   },
-  onRebind: function (slot, code) {
-    if (MOVE_CODES.indexOf(code) >= 0) { hud.showError('That key is used for moving or targeting'); return; }
-    const other = keyCodes.indexOf(code);
-    if (other >= 0) keyCodes[other] = keyCodes[slot];      // the two slots trade keys
-    keyCodes[slot] = code;
+  // A new key for a slot (id = its number) or for another action (id = its name). A key that is in use trades places.
+  onRebind: function (id, code) {
+    if (/^Arrow/.test(code)) { hud.showError('The arrow keys always move you'); hud.setBinds(binds); return; }
+    const old = typeof id === 'number' ? keyCodes[id] : binds[id];
+    keyCodes.forEach(function (c, i) { if (c === code && i !== id) keyCodes[i] = old; });
+    Object.keys(binds).forEach(function (k) { if (binds[k] === code && k !== id) binds[k] = old; });
+    if (typeof id === 'number') keyCodes[id] = code; else binds[id] = code;
     setSetting('keys', keyCodes.slice());
+    setSetting('binds', Object.assign({}, binds));
     hud.setKeys(keyCodes);
+    hud.setBinds(binds);
+  },
+  onKeysReset: function () {
+    setSetting('keys', null); setSetting('binds', null);
+    keyCodes = ACTION_CODES.slice();
+    Object.keys(DEFAULT_BINDS).forEach(function (k) { binds[k] = DEFAULT_BINDS[k]; });
+    hud.setKeys(keyCodes);
+    hud.setBinds(binds);
+    hud.log('All keys are back to their defaults.');
   },
   onBarReset: function () {
     setSetting('homes', {}); setSetting('keys', null);
@@ -397,14 +413,14 @@ function clickScene(x, y) {
   if (best) setTarget(best);
 }
 
-// Action keys by their place on the keyboard; Escape closes what is open or stops a cast; Tab changes target.
+// Keys: Escape closes what is open; the rest is whatever the Keybinds panel says.
 window.addEventListener('keydown', function (e) {
   if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-  if (e.code === 'Escape') {
-    if (panels.reviewOpen()) panels.hideReview(); else if (!hud.closePanels()) combat.cancel();
-    return;
-  }
-  if (e.code === 'Tab') { e.preventDefault(); nextTarget(); return; }
+  if (e.code === 'Escape' && (panels.reviewOpen() || hud.anyPanelOpen())) { if (panels.reviewOpen()) panels.hideReview(); else hud.closePanels(); return; }
+  if (e.code === binds.cancel) { combat.cancel(); return; }
+  if (e.code === binds.nextTarget) { e.preventDefault(); nextTarget(); return; }
+  if (binds.petAttack && e.code === binds.petAttack) { e.preventDefault(); combat.update(fightClock, ctx); combat.petCommand('attack'); return; }
+  if (binds.petFollow && e.code === binds.petFollow) { e.preventDefault(); combat.update(fightClock, ctx); combat.petCommand('follow'); return; }
   const slot = keyCodes.indexOf(e.code);
   if (slot < 0) return;
   e.preventDefault();
@@ -424,6 +440,7 @@ if (Array.isArray(savedKeys) && savedKeys.length === ACTION_CODES.length) keyCod
 readCustomBuild();
 newCharacter();
 hud.setKeys(keyCodes);
+hud.setBinds(binds);
 hud.setSound(sound.isOn());
 panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), [], false);
 hud.setRings(getSetting('rings'));
