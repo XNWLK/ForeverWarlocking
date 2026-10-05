@@ -28,7 +28,7 @@ renderer.setPixelRatio(FULL_DETAIL);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;     // keeps purple purple (the filmic one turned it blue)
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.1;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 
