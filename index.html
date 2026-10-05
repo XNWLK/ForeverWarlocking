@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forever Warlocking</title>
 <link rel="stylesheet" href="css/game.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" } }
+</script>
+<!-- Fetch the 3D library and every game file at once instead of one after the other. List new js/ files here too. -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.min.js">
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/chamber.js">
+<link rel="modulepreload" href="js/models.js">
+<link rel="modulepreload" href="js/controls.js">
+<link rel="modulepreload" href="js/hud.js">
+<link rel="modulepreload" href="js/names.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -125,9 +138,6 @@ window.addEventListener('error', function (e) {
   box.hidden = false;
   box.textContent = 'Forever Warlocking could not start: ' + (e.message || 'a file did not load') + '. Check your connection and reload.';
 }, true);
-</script>
-<script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" } }
 </script>
 <script type="module" src="js/main.js"></script>
 </body>
