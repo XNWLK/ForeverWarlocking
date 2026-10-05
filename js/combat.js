@@ -7,8 +7,11 @@
 //
 // No drawing and no page access in this file, so it also runs in Node for the check.
 //
-// Not carried over (all off in the default settings, or for later steps): pets and Demonic Brand, a second and third
-// target, Bane of Havoc, potions and runes, explosives, Power Infusion, Mana Tide, Innervate, damage taken (pushback).
+// Not carried over (all off in the default settings, or for later steps): a second and third target, Bane of Havoc,
+// potions and runes, explosives, Power Infusion, Mana Tide, Innervate, damage taken (pushback).
+//
+// Pets follow the engine's pet rules. What is added here is only when they attack: in the engine the pet attacks from
+// the first second to the last; here it attacks while it is told to and stands in range of the target.
 
 const EPS = 1e-9;
 
@@ -28,7 +31,7 @@ export const FAIL_TEXT = {
   noRacial: 'Your race has nothing to use'
 };
 
-// opts: WL, build, raceKey, config, dummyHealth, seed (optional), onEvent (optional),
+// opts: WL, build, raceKey, config, dummyHealth, seed (optional), onEvent (optional), petMeleeRange (yards),
 //       linearDuration (check mode: the target's health falls with time over this many seconds and it never dies).
 export function createCombat(opts) {
   const WL = opts.WL, cfg = opts.config, build = opts.build, raceKey = opts.raceKey;
@@ -40,6 +43,8 @@ export function createCombat(opts) {
   const linear = opts.linearDuration || 0;
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
+  const armorRed = WL.armorReduction(cfg);
+  const petMeleeRange = opts.petMeleeRange || 5;
 
   const tvCache = {};
   function tv(key, field) {
@@ -49,23 +54,26 @@ export function createCombat(opts) {
   }
   function racialOf(effect) { return race.racials.filter(function (r) { return r.effect === effect; })[0] || null; }
 
-  let S, R, res, events, order, inst, queued, maxHealth = opts.dummyHealth || 10000;
+  let S, R, P, res, events, order, inst, queued, maxHealth = opts.dummyHealth || 10000;
 
   function reset(seed) {
     const seed0 = seed != null ? seed : (opts.seed != null ? opts.seed : Math.floor(Math.random() * 4294967296));
     // One random stream per kind of roll, with the engine's own constants.
     R = { hit: WL.makeRng(seed0 ^ 0x1B873593), crit: WL.makeRng(seed0 ^ 0x85EBCA6B), proc: WL.makeRng(seed0 ^ 0xC2B2AE35),
-          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), isb: WL.makeRng(seed0 ^ 0x9E3779B9) };
+          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), isb: WL.makeRng(seed0 ^ 0x9E3779B9),
+          pet: WL.makeRng(seed0 ^ 0x165667B1) };
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, shards: cfg.fight.startingShards,
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
-      cds: {}, dots: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0,
+      cds: {}, dots: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, brandCharges: 0, petSent: false,
       health: maxHealth, maxHealth: maxHealth, targetHpPct: 100,
       fightStart: null, fightEnd: null, over: false, presses: []
     };
     if (coeFromOthers) S.buffs.coe = Infinity;
     res = { total: 0, bySpell: {} };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
+    P = makePet(build.pet);
+    S.decideSeq = order++;
   }
 
   // ---------- small helpers (same meaning as in the engine) ----------
@@ -145,7 +153,7 @@ export function createCombat(opts) {
     return m;
   }
 
-  function deal(key, amount, crit, isTick) {
+  function deal(key, amount, crit, isTick, extra) {
     const r = row(key);
     r.dmg += amount; res.total += amount;
     if (isTick) { r.ticks++; if (crit) r.tickCrits++; } else { r.hits++; if (crit) r.crits++; }
@@ -153,20 +161,22 @@ export function createCombat(opts) {
       S.health = Math.max(0, S.health - amount);
       S.targetHpPct = 100 * S.health / S.maxHealth;
     }
-    emit({ type: isTick ? 'tick' : 'hit', key: key, amount: amount, crit: crit, school: SPELLS[key] ? SPELLS[key].school : 'shadow' });
+    emit(Object.assign({ type: isTick ? 'tick' : 'hit', key: key, amount: amount, crit: crit, school: SPELLS[key] ? SPELLS[key].school : 'shadow' }, extra));
     if (!linear && S.health <= 0) die();
   }
 
   function die() {
     S.over = true; S.fightEnd = S.t;
+    if (P) { P.active = false; P.gen++; P.casting = null; }
     S.cast = null; S.channel = null; S.dots = {}; events.length = 0; queued = null;
     S.eurekaPending = 0;
     const seconds = Math.max(S.fightEnd - S.fightStart, 0);
     emit({ type: 'death', seconds: seconds, total: res.total, dps: seconds > 0 ? res.total / seconds : 0 });
   }
 
-  function jowProc() {
+  function jowProc(pet) {
     if (!JOW || R.jow() * 100 >= JOW.chancePct) return;
+    if (pet) { if (!P) return; petRegen(); P.mana = Math.min(P.maxMana, P.mana + JOW.mana); return; }
     const before = S.mana;
     S.mana = Math.min(stats.maxMana, S.mana + JOW.mana);
     emit({ type: 'mana', source: 'Judgement of Wisdom', amount: S.mana - before });
@@ -234,6 +244,11 @@ export function createCombat(opts) {
     if (isSB(key) && crit && tv('improvedShadowBolt')) {
       if (R.isb() * 100 < stats.hitPct) { S.buffs.isb = S.t + 12; emit({ type: 'apply', key: 'isb' }); }
     }
+    if (key === 'searingPain' && tv('demonicBrand') && P) {            // Demonic Brand: the pet's next attacks add damage
+      if (!(buff('brand') && S.brandCharges > 0)) emit({ type: 'apply', key: 'brand' });
+      S.buffs.brand = S.t + cfg.demonicBrand.duration;
+      S.brandCharges = tv('demonicBrand', 'charges');
+    }
     if (key === 'conflagrate') {
       if (tv('shadowAndFlame')) S.buffs.snfShadow = S.t + 20;
       if (!(tv('shadowAndFlame') && R.proc() * 100 < tv('shadowAndFlame', 'procPct'))) { delete S.dots.immolate; emit({ type: 'consume', key: 'immolate' }); }
@@ -246,6 +261,115 @@ export function createCombat(opts) {
     if (s.kind === 'hybrid') applyDot(key, { baseMult: baseMult || 1 });
     touchOfTheGrave();
     if (!S.over) jowProc();
+    return true;
+  }
+
+  // ---------- the pet ----------
+  // Its spell power is a share of yours plus Demonic Knowledge; it uses your hit chance and your crit chance.
+  function makePet(key) {
+    if (!key || !cfg.options.includePetDamage) return null;
+    const pc = cfg.pets[key], maxMana = pc.mana * (1 + tv('felVitality', 'manaPct') / 100);
+    return { key: key, c: pc, maxMana: maxMana, mana: maxMana, lastRegen: 0, lashReady: 0, swingReady: 0, gen: 0,
+             mode: 'follow', active: false, casting: null,
+             range: pc.melee ? petMeleeRange : pc.spell.range };
+  }
+  function petRegen() { P.mana = Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)); P.lastRegen = S.t; }
+  function petSchool() { return build.pet === 'imp' ? 'fire' : 'shadow'; }
+  function petMult(school) {
+    let m = (1 + tv('unholyPower', 'petDmgPct') / 100) * stats.mult.all;
+    if ((build.pet === 'succubus' && school === 'shadow') || (build.pet === 'imp' && school === 'fire')) m *= 1 + tv('masterDemonologist', 'schoolPct') / 100;
+    if (school !== 'physical' && buff('coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
+    return m;
+  }
+  function warlockSpNow() { return stats.sp * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
+  function petSp() { return warlockSpNow() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
+
+  function petSpellHit(sp) {
+    const key = 'pet:' + sp.key, r = row(key);
+    P.casting = null;
+    r.casts++;
+    if (R.pet() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, pet: true }); return; }
+    r.landed++;
+    jowProc(true);
+    const base = sp.base * (sp.key === 'lashOfPain' ? 1 + tv('improvedSayaad', 'lashPct') / 100 : 1);
+    let amount = (base + sp.coef * petSp()) * petMult(sp.school);
+    if (sp.key === 'firebolt') amount *= 1 + tv('improvedImp', 'firebolt') / 100;
+    const crit = R.pet() * 100 < stats.critPct;
+    if (crit) amount *= cb.critMultiplier;
+    deal(key, amount, crit, false, { pet: true, school: sp.school });
+    if (!S.over) brandProc();
+  }
+  // Demonic Brand: a pet attack that lands on a branded target uses a charge and adds damage (cannot miss or crit).
+  function brandProc() {
+    if (!buff('brand') || !(S.brandCharges > 0)) return;
+    S.brandCharges--;
+    const db = cfg.demonicBrand, school = petSchool();
+    const amount = ((db.baseMin + db.baseMax) / 2 + db.shadowSpCoef * (warlockSpNow() + (stats.schoolSp.shadow || 0))) * petMult(school);
+    row('pet:brand').casts++;
+    deal('pet:brand', amount, false, false, { pet: true, school: school });
+  }
+  function petEvent(t, o, type) { push({ t: t, o: o, type: type, gen: P.gen }); }
+  function petAct() {                       // its spell: Firebolt again and again, Lash of Pain whenever it is ready
+    if (!P.c.spell || (linear && S.t >= linear - EPS)) return;
+    petRegen();
+    const sp = P.c.spell;
+    if (sp.cd && P.lashReady > S.t + EPS) { petEvent(P.lashReady, 2, 'petAct'); return; }
+    if (P.mana < sp.cost) { petEvent(S.t + Math.max(0.1, (sp.cost - P.mana) / P.c.manaRegen), 2, 'petAct'); return; }
+    P.mana -= sp.cost;
+    if (sp.cd) P.lashReady = S.t + sp.cd;
+    if (sp.cast) {
+      P.casting = { start: S.t, end: S.t + sp.cast };
+      emit({ type: 'petCast', key: 'pet:' + sp.key, castTime: sp.cast });
+      petEvent(S.t + sp.cast, 1, 'petLand');
+      petEvent(S.t + sp.cast, 2, 'petAct');
+    } else {
+      petSpellHit(sp);
+      if (!S.over) petEvent(P.lashReady || S.t + 1.5, 2, 'petAct');
+    }
+  }
+  function petSwing() {                     // the Succubus's melee: one roll decides miss, dodge, glancing, crit or hit
+    if (linear && S.t >= linear - EPS) return;
+    const m = P.c.melee, r = row('pet:melee'), tb = cb.petMelee;
+    r.casts++;
+    const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
+    const miss = Math.max(0, tb.missPct - hitBonus), roll = R.pet() * 100;
+    const critChance = Math.max(0, m.critPct + (m.inheritMeleeCrit ? stats.meleeCritPct : 0) - tb.critSuppressionPct);
+    P.swingReady = S.t + m.swing;
+    if (roll >= miss + tb.dodgePct) {
+      r.landed++;
+      jowProc(true);
+      const dps = m.baseDps + m.apPerSp * warlockSpNow() / m.apPerDps;
+      let amount = dps * m.swing * (1 - armorRed) * petMult('physical');
+      const glance = roll < miss + tb.dodgePct + tb.glancePct;
+      const crit = !glance && roll < miss + tb.dodgePct + tb.glancePct + critChance;
+      if (glance) amount *= tb.glanceDmgPct / 100;
+      if (crit) amount *= 2;
+      deal('pet:melee', amount, crit, false, { pet: true, school: 'physical', glance: glance });
+      if (!S.over) brandProc();
+    } else {
+      r.misses++;
+      emit({ type: 'miss', key: 'pet:melee', pet: true, dodge: roll >= miss });
+    }
+    if (!S.over) petEvent(S.t + m.swing, 0, 'petSwing');
+  }
+  // The pet attacks while it is told to and stands in range. ctx.petDistance = its distance to the target in yards.
+  function syncPet(ctx) {
+    if (!P || S.over) return;
+    const distance = ctx && ctx.petDistance != null ? ctx.petDistance : 0;
+    const wanted = P.mode === 'attack' && distance <= P.range + EPS;
+    if (wanted === P.active) return;
+    P.active = wanted;
+    P.gen++;                                // whatever it had planned is dropped
+    P.casting = null;
+    if (!wanted) return;
+    if (S.fightStart === null) S.fightStart = S.t;
+    if (P.c.melee) petEvent(Math.max(S.t, P.swingReady), 0, 'petSwing');
+    if (P.c.spell) petEvent(S.t, 2, 'petAct');
+  }
+  function petCommand(mode) {
+    if (!P || S.over) return false;
+    P.mode = mode;
+    emit({ type: 'petMode', mode: mode });
     return true;
   }
 
@@ -274,7 +398,10 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
-    if (S.fightStart === null && key !== 'lifeTap') S.fightStart = S.t;
+    if (key !== 'lifeTap') {
+      if (S.fightStart === null) S.fightStart = S.t;
+      if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack'); }   // the pet joins in by itself
+    }
     S.presses.push({ t: S.t, k: key });
     S.gcdStart = S.t; S.gcdReady = S.t + gcdT;
     emit({ type: 'cast', key: key, castTime: castT, channel: s.kind === 'channel' ? s.duration : 0 });
@@ -285,6 +412,11 @@ export function createCombat(opts) {
       S.mana = Math.min(stats.maxMana, S.mana + gain);
       row('lifeTap').casts++;
       emit({ type: 'mana', source: 'Life Tap', amount: S.mana - before });
+      if (P && tv('demonicEnergies')) {     // Demonic Energies: the pet gains a share of the mana you gained
+        petRegen();
+        P.mana = Math.min(P.maxMana, P.mana + (S.mana - before) * tv('demonicEnergies', 'tapPct') / 100);
+      }
+      S.decideSeq = order++;
       return;
     }
 
@@ -315,6 +447,7 @@ export function createCombat(opts) {
       land(key, spent.baseMult);
       if (spent.eurekaUsed) eurekaRelease();
     }
+    S.decideSeq = order++;
   }
 
   // Stops a cast bar or a channel (you moved, pressed Escape, or cast something else over a channel).
@@ -416,6 +549,12 @@ export function createCombat(opts) {
       if (!c || c.inst !== ev.inst) return;              // stopped
       periodicTick(ev.key, c.snap, ev.i);
       if (!S.over && ev.i === table[ev.key].ticks - 1) { if (c.eurekaHeld) eurekaRelease(); S.channel = null; }
+    } else if (ev.type === 'petAct') {
+      if (P && P.active && ev.gen === P.gen) petAct();
+    } else if (ev.type === 'petLand') {
+      if (P && P.active && ev.gen === P.gen) petSpellHit(P.c.spell);
+    } else if (ev.type === 'petSwing') {
+      if (P && P.active && ev.gen === P.gen) petSwing();
     } else if (ev.type === 'eurekaEnd') {
       if (ev.pop === S.cds.racial && eurekaUp()) { S.eurekaCharges = 0; S.eurekaPending = 0; emit({ type: 'expire', name: 'eureka' }); }
     }
@@ -423,11 +562,16 @@ export function createCombat(opts) {
 
   // Moves the clock to `now` (seconds since the last reset), letting everything due happen in order.
   // A remembered press goes off at the exact moment you are free, not at the next picture, so no time is lost.
+  // When your next action and the pet's next decision fall on the same instant, the engine takes them in the order
+  // they were planned. S.decideSeq marks the place in that line your next action has (set when your last one began).
   function update(now, ctx) {
+    syncPet(ctx);
     while (!S.over) {
-      const eventAt = events.length ? events[0].t : Infinity;
+      const first = events[0];
       const queueAt = queued ? readyAt() : Infinity;
-      if (eventAt <= now + EPS && eventAt <= queueAt + EPS) {
+      const limit = Math.min(now, queueAt);
+      const due = !!first && (first.t < limit - EPS || (first.t <= limit + EPS && (first.o < 2 || first.seq < S.decideSeq)));
+      if (due) {
         const ev = events.shift();
         if (linear && ev.t > linear + EPS) { events.length = 0; break; }
         advance(ev.t);
@@ -450,6 +594,9 @@ export function createCombat(opts) {
     get state() { return S; },
     get result() { return res; },
     get queuedKey() { return queued ? queued.key : null; },
+    get pet() { return P; },
+    petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : 0; },
+    petCommand: petCommand,
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },

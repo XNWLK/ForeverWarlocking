@@ -2,7 +2,7 @@
 //
 // For every ready build and every race the engine plays one fight by its priority list. The casts it made are then
 // replayed as button presses through js/combat.js with the same random seed. Both must deal the same damage, spell by
-// spell. Pets are left out on both sides (they are not in the game yet).
+// spell, the pet's attacks included. The pet attacks from the first moment, as it does in the engine.
 //
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
@@ -12,18 +12,19 @@ const require = createRequire(import.meta.url);
 const WL = require('./load-sim.js').load();
 
 const DURATION = 120, SEEDS = [1, 2, 3];
-const ctx = { distance: 10, moving: false };
+const ctx = { distance: 10, moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
 
 for (const build of WL.BUILDS) {
   for (const raceKey of WL.RACE_KEYS) {
     for (const seed of SEEDS) {
       const cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
-      cfg.options.includePetDamage = false;
       const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
 
       const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION });
       const problems = [];
+      combat.petCommand('attack');
+      combat.update(0, ctx);
       for (const entry of sim.log) {
         if (entry.type !== 'cast' && entry.type !== 'racial') continue;
         // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when a
