@@ -6,8 +6,8 @@ time and see how your rotation does.
 **Play it in the browser: https://xnwlk.github.io/ForeverWarlocking/** (desktop, keyboard and mouse)
 
 **Status: early, playable.** Pick a build and a race, walk around the fel chamber and cast your rotation on the
-dummy: cast bar, global cooldown, DoTs, procs, execute phase, mana, a combat log and a damage meter. Pets and more
-dummies are not built yet.
+dummy with your Imp or Succubus: cast bar, global cooldown, DoTs, procs, execute phase, mana, a combat log and a
+damage meter that also shows what the DPS sim reaches on the same dummy. More than one dummy is not built yet.
 
 It uses the same spell values, talents and mechanics as Xn's Forever Warlock Sim, the DPS simulator; a copy of that
 sim's data and engine lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).

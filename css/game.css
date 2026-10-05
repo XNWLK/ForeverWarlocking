@@ -203,3 +203,16 @@ button.soon { color: var(--ink-dim); border-style: dashed; }
   70% { opacity: 1; }
   100% { opacity: 0; margin-top: -90px; }
 }
+
+/* ======================================================================
+   Step 3: pets
+   ====================================================================== */
+#petFrame { width: 190px; }
+.pet .bar.health i { background: var(--health); }
+.pet-buttons { display: flex; gap: 4px; margin-top: 2px; }
+.pet-buttons button { flex: 1; padding: 2px 0; font-size: 11px; }
+.pet.none .bar, .pet.none .pet-buttons { display: none; }
+.float.pet { font-size: 14px; color: #f3e9ff; }
+.float.pet.crit { font-size: 19px; color: #ffe27a; }
+.meter li.pet i { background: rgba(110, 170, 120, 0.45); }
+.meter dt[title] { cursor: help; }

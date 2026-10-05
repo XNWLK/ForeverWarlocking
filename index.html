@@ -20,6 +20,7 @@
 <link rel="modulepreload" href="js/names.js">
 <link rel="modulepreload" href="js/combat.js">
 <link rel="modulepreload" href="js/settings.js">
+<link rel="modulepreload" href="js/pets.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -47,8 +48,12 @@
   <section id="petFrame" class="panel unit pet">
     <div class="unit-body">
       <div class="unit-name"><button type="button" class="name" id="petName"></button><span class="unit-sub" id="petSub"></span></div>
-      <div class="bar health empty"><i></i></div>
-      <div class="bar mana empty"><i></i></div>
+      <div class="bar health" id="petHealthBar"><i></i></div>
+      <div class="bar mana" id="petManaBar"><i id="petManaFill"></i></div>
+      <div class="pet-buttons" id="petButtons">
+        <button type="button" id="btnPetAttack" title="Send your pet at the dummy">Attack</button>
+        <button type="button" id="btnPetFollow" title="Call your pet back to your side">Follow</button>
+      </div>
     </div>
   </section>
 
@@ -95,6 +100,7 @@
         <dt>Mouse wheel</dt><dd>Zoom</dd>
         <dt>1 to 8, R, F, Z, X</dt><dd>Cast the spell in that slot (or click it)</dd>
         <dt>Escape</dt><dd>Stop casting</dd>
+        <dt>Attack / Follow</dt><dd>Buttons under your pet's bars; it attacks by itself when you start</dd>
       </dl>
     </div>
   </section>
@@ -119,6 +125,7 @@
     <dl>
       <dt>Damage</dt><dd id="meterDamage">0</dd>
       <dt>Time</dt><dd id="meterTime">0:00</dd>
+      <dt title="What the DPS sim's priority list reaches on this dummy with the same character">Sim average</dt><dd id="meterSim">&ndash;</dd>
     </dl>
     <ol id="meterSpells"></ol>
   </section>

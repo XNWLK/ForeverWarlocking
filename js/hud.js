@@ -26,8 +26,11 @@ const AURA_INFO = {
   berserking: { icon: 'racial_berserking', name: 'Berserking' },
   eureka: { icon: 'racial_eureka', name: 'Eureka!' },
   snfShadow: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Shadow)' },
-  snfFire: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Fire)' }
+  snfFire: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Fire)' },
+  brand: { icon: 'talent_demonicBrand', name: 'Demonic Brand' }
 };
+const PET_KIND = { imp: 'Imp', succubus: 'Succubus' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
 const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
 export function createHud(WL, handlers) {
@@ -38,7 +41,9 @@ export function createHud(WL, handlers) {
     debuffs: byId('targetDebuffs'), buffs: byId('playerBuffs'),
     castBar: byId('castBar'), castFill: byId('castFill'), castText: byId('castText'), error: byId('errorText'),
     bar: byId('actionBar'), dps: byId('meterDps'), damage: byId('meterDamage'), time: byId('meterTime'), spells: byId('meterSpells'),
-    buildLabel: byId('buildLabel')
+    buildLabel: byId('buildLabel'), sim: byId('meterSim'),
+    petFrame: byId('petFrame'), petSub: byId('petSub'), petManaFill: byId('petManaFill'),
+    petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow')
   };
   let labels = DEFAULT_LABELS.slice(), slots = [], character = null;
 
@@ -167,6 +172,8 @@ export function createHud(WL, handlers) {
   ringsButton.addEventListener('click', function () { setRings(!ringsButton.classList.contains('on')); handlers.onRings(ringsButton.classList.contains('on')); });
   function setRings(on) { ringsButton.classList.toggle('on', on); ringsButton.setAttribute('aria-pressed', String(on)); }
   byId('btnReset').addEventListener('click', function () { handlers.onReset(); });
+  el.petAttack.addEventListener('click', function () { el.petAttack.blur(); handlers.onPet('attack'); });
+  el.petFollow.addEventListener('click', function () { el.petFollow.blur(); handlers.onPet('follow'); });
 
   // ---------- the character on screen ----------
   // c: { build, raceKey, stats, table, spells, bar: [spell keys], racial, dummyHealth, executePct }
@@ -180,14 +187,16 @@ export function createHud(WL, handlers) {
     el.executeMark.style.left = c.executePct + '%';
 
     const petName = byId('petName');
+    el.petFrame.classList.toggle('none', !c.build.pet);
     if (c.build.pet) {
       petName.dataset.name = c.build.pet;
       petName.hidden = false;
-      byId('petSub').textContent = (c.build.pet === 'imp' ? 'Imp' : 'Succubus') + ', arrives later';
     } else {
       petName.hidden = true;
-      byId('petSub').textContent = 'No pet in this build';
+      el.petSub._text = null;
+      el.petSub.textContent = 'No pet in this build';
     }
+    setSimAverage(null);
     showNames();
     fillPickers();
 
@@ -274,6 +283,7 @@ export function createHud(WL, handlers) {
       return { key: k, icon: k, name: c.spells[k].name, text: seconds(combat.dotLeft(k)) };
     });
     ['coe', 'isb'].forEach(function (k) { if (combat.buff(k)) debuffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) }); });
+    if (combat.buff('brand') && S.brandCharges > 0) debuffs.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + S.brandCharges });
     auraList(el.debuffs, 'debuffs', debuffs);
     const buffs = [];
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
@@ -281,6 +291,16 @@ export function createHud(WL, handlers) {
     });
     if (combat.eurekaUp()) buffs.push({ key: 'eureka', icon: AURA_INFO.eureka.icon, name: AURA_INFO.eureka.name, text: 'x' + S.eurekaCharges });
     auraList(el.buffs, 'buffs', buffs);
+
+    // The pet: what it is doing, and its mana.
+    const pet = combat.pet;
+    if (pet) {
+      const doing = S.over ? 'idle' : pet.active ? 'attacking' : pet.mode === 'attack' ? 'running in' : 'following';
+      setText(el.petSub, PET_KIND[pet.key] + ', ' + doing);
+      setWidth(el.petManaFill, 100 * combat.petMana() / pet.maxMana);
+      setClass(el.petAttack, 'on', pet.mode === 'attack');
+      setClass(el.petFollow, 'on', pet.mode !== 'attack');
+    }
 
     // Cast bar: fills for a cast, drains for a channel.
     const cast = S.cast, channel = S.channel;
@@ -343,11 +363,28 @@ export function createHud(WL, handlers) {
       rows.forEach(function (k, i) {
         const li = el.spells.children[i], dmg = res.bySpell[k].dmg, s = c.spells[k];
         setClass(li, 'fire', !!s && s.school === 'fire');
+        setClass(li, 'pet', k.indexOf('pet:') === 0);
         setWidth(li.children[0], 100 * dmg / top);
-        setText(li.children[1], s ? s.name : 'Touch of the Grave');
+        setText(li.children[1], s ? s.name : label(k));
         setText(li.children[2], whole(dmg) + '  ' + Math.round(100 * dmg / res.total) + '%');
       });
     }
+  }
+
+  // What to call damage that is not one of your own spells: the pet's attacks carry the pet's name.
+  function label(key) {
+    if (key === 'touchOfTheGrave') return 'Touch of the Grave';
+    if (key === 'pet:brand') return 'Demonic Brand';
+    if (PET_ATTACK[key]) return getName(character.build.pet) + ': ' + PET_ATTACK[key].charAt(0).toUpperCase() + PET_ATTACK[key].slice(1);
+    return key;
+  }
+
+  // The DPS sim's result for this dummy: null while it is being worked out.
+  let simAverage = null;
+  function setSimAverage(result) {
+    simAverage = result;
+    el.sim.textContent = result ? whole(result.dps) + ' DPS' : '\u2026';
+    el.sim.title = result ? 'The sim kills this dummy in ' + result.seconds.toFixed(1) + ' s on average (' + result.fights + ' fights)' : 'Calculating';
   }
 
   // ---------- things that happen ----------
@@ -372,7 +409,20 @@ export function createHud(WL, handlers) {
     const c = character, dummy = getName('dummy');
     const name = e.key && c.spells[e.key] ? c.spells[e.key].name : e.key === 'touchOfTheGrave' ? 'Touch of the Grave' : e.key === 'isb' ? 'Improved Shadow Bolt' : e.name || '';
     const school = e.school === 'fire' ? 'fire' : '';
-    if (e.type === 'hit') {
+    if (e.pet && (e.type === 'hit' || e.type === 'miss')) {
+      const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
+      const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
+      if (e.type === 'miss') {
+        log(e.dodge ? dummy + ' dodges ' + petName + '.' : who + ' misses ' + dummy + '.', 'miss');
+      } else {
+        log(who + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.glance ? ' (glancing).' : e.crit ? '!' : '.'), e.crit ? 'crit' : '');
+        float(whole(e.amount), 'pet' + (e.crit ? ' crit' : ''), anchor);
+      }
+    } else if (e.type === 'petMode') {
+      log(getName(c.build.pet) + (e.mode === 'attack' ? ' attacks.' : ' follows you.'), 'proc');
+    } else if (e.type === 'petCast') {
+      // shown by the Imp itself
+    } else if (e.type === 'hit') {
       log(name + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.crit ? '!' : '.'), e.crit ? 'crit' : '');
       float(whole(e.amount), school + (e.crit ? ' crit' : ''), anchor);
     } else if (e.type === 'tick') {
@@ -382,7 +432,7 @@ export function createHud(WL, handlers) {
       log(name + ' misses ' + dummy + '.', 'miss');
       float('Miss', 'miss', anchor);
     } else if (e.type === 'apply') {
-      log(dummy + ' is afflicted by ' + name + '.');
+      log(dummy + ' is afflicted by ' + (e.key === 'brand' ? 'Demonic Brand' : name) + '.');
     } else if (e.type === 'mana') {
       if (e.amount >= 0.5) log('+' + whole(e.amount) + ' mana (' + e.source + ').', 'gain');
     } else if (e.type === 'proc') {
@@ -401,11 +451,13 @@ export function createHud(WL, handlers) {
       showError(e.text);
     } else if (e.type === 'death') {
       log(dummy + ' dies. ' + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
+      if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
       log('Press Reset to fight again.');
     }
   }
 
   return {
-    log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError
+    log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
+    setSimAverage: setSimAverage
   };
 }

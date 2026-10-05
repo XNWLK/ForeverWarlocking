@@ -6,6 +6,7 @@ import { createControls } from './controls.js';
 import { createHud, ACTION_CODES } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
 import { getSetting, setSetting } from './settings.js';
+import { createPet } from './pets.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -26,6 +27,7 @@ const warlock = makeWarlock();
 scene.add(warlock.root);
 const beam = makeBeam();
 scene.add(beam.mesh);
+const pet = createPet(scene);
 
 const colliders = chamber.colliders.concat([{ x: 0, z: 0, r: dummy.radius }]);
 const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders });
@@ -33,7 +35,7 @@ const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, co
 // ---------- the character and the fight ----------
 const config = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
 let combat = null, character = null, rings = null;
-const ctx = { distance: 0, moving: false };               // what the casting rules need to know about you
+const ctx = { distance: 0, moving: false, petDistance: 0 };   // what the casting rules need to know about you and the pet
 const anchor = { x: 0, y: 0, visible: false };            // where the dummy's head is on the screen
 let fightClock = 0;                                       // seconds since the last reset
 
@@ -43,13 +45,32 @@ const hud = createHud(WL, {
   onRace: function (key) { setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
   onDummyHealth: function (health) { setSetting('dummyHealth', health); newCharacter(); hud.log('The dummy now has ' + health.toLocaleString('en-US') + ' health.'); },
   onRings: function (on) { setSetting('rings', on); rings.visible = on; },
-  onReset: function () { resetFight(); hud.log('Fight reset.'); }
+  onReset: function () { resetFight(); hud.log('Fight reset.'); },
+  onPet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); }
 });
+
+// The DPS sim's average for this character on this dummy, worked out on another processor core.
+let simWorker = null, simJob = 0;
+function askSimAverage() {
+  hud.setSimAverage(null);
+  try {
+    if (!simWorker) {
+      simWorker = new Worker('js/sim-worker.js');
+      simWorker.onmessage = function (e) { if (e.data.id === simJob) hud.setSimAverage(e.data); };
+      simWorker.onerror = function () { simWorker = null; };
+    }
+    simWorker.postMessage({ id: ++simJob, build: character.build.key, race: character.raceKey, health: character.dummyHealth });
+  } catch (e) {
+    simWorker = null;                                     // no workers here: the meter just keeps showing a dash
+  }
+}
 
 function onCombatEvent(e) {
   hud.event(e, anchor);
   if (e.type === 'hit') dummy.hit(e.crit ? 1.6 : 1);
   else if (e.type === 'tick') dummy.hit(0.25);
+  else if (e.type === 'miss' && e.pet) pet.strike();
+  if (e.pet && e.type === 'hit' && e.key !== 'pet:brand') pet.strike();
   else if (e.type === 'death') dummy.setDead(true);
 }
 
@@ -58,7 +79,8 @@ function newCharacter() {
   const build = WL.BUILDS.filter(function (b) { return b.key === getSetting('build'); })[0] || WL.BUILDS[0];
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
   const dummyHealth = getSetting('dummyHealth');
-  combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, onEvent: onCombatEvent });
+  combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE });
+  pet.setKind(build.pet || null);
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length);
   const ranges = bar.filter(function (k) { return combat.table[k]; }).map(function (k) { return combat.table[k].range; });
   character = {
@@ -77,12 +99,14 @@ function newCharacter() {
   rings.visible = getSetting('rings');
   scene.add(rings);
   resetFight();
+  askSimAverage();
 }
 
 function resetFight() {
   combat.reset();
   fightClock = 0;
   dummy.setDead(false);
+  pet.sendHome();
 }
 
 function press(key) {
@@ -161,6 +185,14 @@ function frame() {
   ctx.distance = Math.hypot(player.x, player.z);
   ctx.moving = player.moving;
 
+  // The pet walks first, so the casting rules know whether it is in range.
+  const P = combat.pet;
+  if (P) {
+    const petCast = P.casting ? Math.min(1, (combat.state.t - P.casting.start) / (P.casting.end - P.casting.start)) : 0;
+    pet.update(dt, time, player, P.mode, P.range, petCast, combat.state.over);
+    ctx.petDistance = pet.state.distance;
+  }
+
   // The fight's own clock stands still while the page is hidden (a long gap counts as a quarter second at most).
   fightClock += Math.min(0.25, elapsed);
   combat.update(fightClock, ctx);
@@ -193,5 +225,6 @@ renderer.setAnimationLoop(frame);
 window.FW = {
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press,
+  pet: pet, ctx: ctx,
   get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
 };
