@@ -4,7 +4,12 @@ import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
 
 export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG', 'KeyC', 'KeyV', 'KeyB'];
-const DEFAULT_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'T', 'G', 'C', 'V', 'B'];
+// What to print on a slot for a key, when the browser cannot tell us the letter on the keyboard in use.
+function plainLabel(code) {
+  const m = /^(?:Key|Digit)(.)$/.exec(code);
+  if (m) return m[1];
+  return code.replace('Numpad', 'N').replace('Arrow', '').replace('Bracket', '').replace('Backquote', '`').replace('Minus', '-').replace('Equal', '=').slice(0, 4);
+}
 const LOG_LINES = 9;
 
 function byId(id) { return document.getElementById(id); }
@@ -13,7 +18,14 @@ function whole(n) { return Math.round(n).toLocaleString('en-US'); }
 // Only touch the page when something really changed (this runs every picture).
 function setText(el, text) { if (el._text !== text) { el._text = text; el.textContent = text; } }
 function setWidth(el, pct) { const w = pct.toFixed(1) + '%'; if (el._width !== w) { el._width = w; el.style.width = w; } }
-function setHeight(el, pct) { const h = pct.toFixed(0) + '%'; if (el._height !== h) { el._height = h; el.style.height = h; } }
+// How much of a cooldown is left (0..1): drawn as a clock-hand sweep.
+function setLeft(el, left) {
+  const v = left <= 0 ? '0' : left.toFixed(3);
+  if (el._left === v) return;
+  el._left = v;
+  el.style.setProperty('--left', v);
+  el.classList.toggle('none', left <= 0);
+}
 function setClass(el, name, on) { if (el['_c' + name] !== on) { el['_c' + name] = on; el.classList.toggle(name, on); } }
 
 // Buffs and debuffs that are not spells of their own: which picture and name to show.
@@ -29,7 +41,7 @@ const AURA_INFO = {
   snfFire: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Fire)' },
   brand: { icon: 'talent_demonicBrand', name: 'Demonic Brand' }
 };
-const PET_KIND = { imp: 'Imp', succubus: 'Succubus' };
+const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
 const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
 const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
@@ -46,7 +58,9 @@ export function createHud(WL, handlers) {
     petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow'),
     targetSub: byId('targetSub'), perDummy: byId('meterDummies'), perDummyLabel: byId('meterDummiesLabel')
   };
-  let labels = DEFAULT_LABELS.slice(), slots = [], character = null, currentTarget = 1;
+  let codes = ACTION_CODES.slice(), layout = null, slots = [], character = null, currentTarget = 1;
+  function labelFor(code) { const k = layout && layout.get(code); return k ? k.toUpperCase() : plainLabel(code); }
+  function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = labelFor(codes[i]); }); }
 
   // With several dummies each gets a number after its name.
   function dummyName(ti) { return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : ''); }
@@ -71,10 +85,7 @@ export function createHud(WL, handlers) {
 
   // The letters printed on the slots follow the keyboard in use (the keys themselves are chosen by position).
   if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
-    navigator.keyboard.getLayoutMap().then(function (map) {
-      labels = ACTION_CODES.map(function (code, i) { const k = map.get(code); return k ? k.toUpperCase() : DEFAULT_LABELS[i]; });
-      slots.forEach(function (slot, i) { slot.kbd.textContent = labels[i]; });
-    }).catch(function () {});
+    navigator.keyboard.getLayoutMap().then(function (map) { layout = map; showKeyLabels(); }).catch(function () {});
   }
 
   // ---------- combat log ----------
@@ -134,14 +145,15 @@ export function createHud(WL, handlers) {
   wireNames();
 
   editable(el.targetHealth, function () { return String(character ? character.dummyHealth : ''); }, function (value) {
+    if (character && character.timed) { showError('This is a timed fight: change it under Fight'); return; }
     const health = parseHealth(value);
     if (health === null) { showError('Health must be a number from 100 to 100,000,000'); return; }
     handlers.onDummyHealth(health);
   });
 
   // ---------- pickers ----------
-  const panels = { build: byId('buildPanel'), race: byId('racePanel'), keys: byId('keysPanel') };
-  const panelButtons = { build: byId('btnBuild'), race: byId('btnRace'), keys: byId('btnKeys') };
+  const panels = { build: byId('buildPanel'), race: byId('racePanel'), keys: byId('keysPanel'), fight: byId('fightPanel'), import: byId('importPanel') };
+  const panelButtons = { build: byId('btnBuild'), race: byId('btnRace'), keys: byId('btnKeys'), fight: byId('btnFight'), import: byId('btnImport') };
   function showPanel(which) {
     Object.keys(panels).forEach(function (k) {
       const open = k === which && panels[k].hidden;
@@ -157,17 +169,16 @@ export function createHud(WL, handlers) {
     // Listed in the order of their DPS in the DPS sim (data/build-order.js); a build the list does not know comes last.
     const ranking = (window.FW_BUILD_ORDER && window.FW_BUILD_ORDER.order) || [], rank = {};
     ranking.forEach(function (r, i) { rank[r.key] = { place: i, dps: r.dps, race: r.race }; });
-    const listed = WL.BUILDS.slice().sort(function (a, b) {
-      return (rank[a.key] ? rank[a.key].place : 999) - (rank[b.key] ? rank[b.key].place : 999);
-    });
+    function place(b) { return b.custom ? -1 : rank[b.key] ? rank[b.key].place : 999; }      // an imported build comes first
+    const listed = (character ? character.builds : WL.BUILDS).slice().sort(function (a, b) { return place(a) - place(b); });
     listed.forEach(function (b) {
       const button = document.createElement('button');
       button.type = 'button';
       if (b.pet && WL.ICONS['pet_' + b.pet]) { const img = document.createElement('img'); img.src = WL.ICONS['pet_' + b.pet]; img.alt = ''; button.appendChild(img); }
       else { const gap = document.createElement('span'); gap.className = 'no-icon'; button.appendChild(gap); }
       button.appendChild(document.createTextNode(b.short));
-      const dps = document.createElement('small'), r = rank[b.key];
-      dps.textContent = r ? Math.round(r.dps) + ' DPS' : '';
+      const dps = document.createElement('small'), r = b.custom ? null : rank[b.key];
+      dps.textContent = b.custom ? 'imported' : r ? Math.round(r.dps) + ' DPS' : '';
       if (r) button.title = 'In the DPS sim: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs';
       button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
@@ -196,6 +207,41 @@ export function createHud(WL, handlers) {
   ringsButton.addEventListener('click', function () { setRings(!ringsButton.classList.contains('on')); handlers.onRings(ringsButton.classList.contains('on')); });
   function setRings(on) { ringsButton.classList.toggle('on', on); ringsButton.setAttribute('aria-pressed', String(on)); }
   byId('btnReset').addEventListener('click', function () { handlers.onReset(); });
+  const soundButton = byId('btnSound');
+  function setSound(on) { soundButton.classList.toggle('on', on); soundButton.setAttribute('aria-pressed', String(on)); }
+  soundButton.addEventListener('click', function () { soundButton.blur(); const on = !soundButton.classList.contains('on'); setSound(on); handlers.onSound(on); });
+
+  // Edit bar: click two slots to swap what is in them; click a slot and press a key to give it that key.
+  let editing = false, picked = -1;
+  const editButton = byId('btnEdit'), editStrip = byId('editStrip');
+  function setEditing(on) {
+    editing = on; picked = -1;
+    editStrip.hidden = !on;
+    el.bar.classList.toggle('editing', on);
+    editButton.classList.toggle('on', on);
+    slots.forEach(function (slot) { slot.button.classList.remove('picked'); });
+  }
+  function pickSlot(i) {
+    if (picked === i) { picked = -1; slots[i].button.classList.remove('picked'); return; }
+    if (picked < 0) { picked = i; slots[i].button.classList.add('picked'); return; }
+    const a = picked;
+    picked = -1;
+    handlers.onSwap(a, i);
+  }
+  editButton.addEventListener('click', function () { editButton.blur(); setEditing(!editing); });
+  byId('editDone').addEventListener('click', function () { setEditing(false); });
+  byId('editReset').addEventListener('click', function () { handlers.onBarReset(); });
+  window.addEventListener('keydown', function (e) {       // while editing, a key press is a new key for the picked slot
+    if (!editing || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.code === 'Escape') { setEditing(false); return; }
+    if (picked < 0 || e.repeat) return;
+    const slot = picked;
+    slots[slot].button.classList.remove('picked');
+    picked = -1;
+    handlers.onRebind(slot, e.code);
+  }, true);
   el.petAttack.addEventListener('click', function () { el.petAttack.blur(); handlers.onPet('attack'); });
   el.petFollow.addEventListener('click', function () { el.petFollow.blur(); handlers.onPet('follow'); });
 
@@ -228,7 +274,7 @@ export function createHud(WL, handlers) {
     fillPickers();
 
     el.bar.textContent = '';
-    slots = ACTION_CODES.map(function (code, i) {
+    slots = codes.map(function (code, i) {
       const key = c.bar[i] || null;
       const button = document.createElement('button');
       button.type = 'button';
@@ -245,14 +291,16 @@ export function createHud(WL, handlers) {
         slot.count = document.createElement('span'); slot.count.className = 'count';
         button.append(img, slot.cool, slot.secs, slot.count);
         button.title = tooltip(key, name, c);
-        button.addEventListener('click', function () { button.blur(); handlers.onPress(key); });
       }
-      slot.kbd.textContent = labels[i];
+      button.addEventListener('click', function () { button.blur(); if (editing) pickSlot(i); else if (key) handlers.onPress(key); });
+      slot.kbd.textContent = labelFor(code);
       button.appendChild(slot.kbd);
       el.bar.appendChild(button);
       return slot;
     });
     lastMeter = -1; lastAuras = { debuffs: '', buffs: '' };
+    picked = -1;
+    el.bar.classList.toggle('editing', editing);
   }
 
   function tooltip(key, name, c) {
@@ -320,7 +368,15 @@ export function createHud(WL, handlers) {
     const mana = Math.min(S.mana, c.stats.maxMana);
     setText(el.mana, whole(mana) + ' / ' + whole(c.stats.maxMana));
     setWidth(el.manaFill, 100 * mana / c.stats.maxMana);
-    setText(el.targetHealth, whole(Math.ceil(cur.health)) + ' / ' + whole(cur.maxHealth));
+    if (combat.timed) {
+      const left = combat.timeLeft();
+      setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');
+    } else setText(el.targetHealth, whole(Math.ceil(cur.health)) + ' / ' + whole(cur.maxHealth));
+    const phase = combat.movePhase(), banner = moveBanner;
+    if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
+    else if (phase && phase.next != null && phase.next <= 3) { banner.hidden = false; setClass(banner, 'soon', true); setText(banner, 'Move in ' + phase.next.toFixed(1)); }
+    else if (!banner.hidden) banner.hidden = true;
+    moveFloats(now);
     setWidth(el.targetFill, 100 * cur.health / cur.maxHealth);
     setClass(el.targetFrame, 'execute', !cur.dead && combat.executePhase());
 
@@ -378,7 +434,7 @@ export function createHud(WL, handlers) {
       let frac = 0, text = '';
       if (own > gcdLeft && span) { frac = own / span; text = own >= 60 ? Math.ceil(own / 60) + 'm' : String(Math.ceil(own)); }
       else if (!offGcd && gcdLeft > 0) frac = gcdLeft / gcdSpan;
-      setHeight(slot.cool, 100 * Math.min(1, frac));
+      setLeft(slot.cool, Math.min(1, frac));
       setText(slot.secs, text);
       const why = key === 'racial' || S.over ? null : combat.blocked(key, ctx);
       setClass(slot.button, 'no-mana', why === 'mana');
@@ -449,22 +505,37 @@ export function createHud(WL, handlers) {
     errorUntil = clock + 1.6;
   }
 
+  // Damage numbers, like the game's: gold for your spells, white for the pet, large with a pop for a crit. Each one
+  // is tied to its dummy and placed anew every picture, so it stays over the dummy when the camera moves.
+  const floats = [], FLOAT_LIFE = 1.5, LANES = [0, -40, 40, -20, 20];
+  let lane = 0;
+  const moveBanner = byId('moveBanner');
   function float(text, classes, anchor) {
-    if (!anchor || !anchor.visible) return;
+    if (!anchor) return;
     const node = document.createElement('div');
     node.className = 'float ' + classes;
     node.textContent = text;
-    node.style.left = (anchor.x + (Math.random() * 90 - 45)) + 'px';
-    node.style.top = (anchor.y + (Math.random() * 30 - 15)) + 'px';
-    node.addEventListener('animationend', function () { node.remove(); });
+    node.style.opacity = '0';
     floaters.appendChild(node);
+    floats.push({ node: node, anchor: anchor, born: clock, dx: LANES[lane++ % LANES.length], crit: classes.indexOf('crit') >= 0 });
+    if (floats.length > 40) { floats[0].node.remove(); floats.shift(); }
+  }
+  function moveFloats(now) {
+    for (let i = floats.length - 1; i >= 0; i--) {
+      const fl = floats[i], age = now - fl.born;
+      if (age >= FLOAT_LIFE) { fl.node.remove(); floats.splice(i, 1); continue; }
+      if (!fl.anchor.visible) { fl.node.style.opacity = '0'; continue; }
+      const pop = fl.crit ? 1 + 0.9 * Math.max(0, 1 - age / 0.18) : 1 + 0.25 * Math.max(0, 1 - age / 0.12);
+      const rise = 26 + 64 * (1 - Math.pow(1 - age / FLOAT_LIFE, 2));
+      fl.node.style.transform = 'translate(' + (fl.anchor.x + fl.dx).toFixed(1) + 'px,' + (fl.anchor.y - rise).toFixed(1) + 'px) translate(-50%, -50%) scale(' + pop.toFixed(3) + ')';
+      fl.node.style.opacity = age > FLOAT_LIFE - 0.4 ? Math.max(0, (FLOAT_LIFE - age) / 0.4).toFixed(2) : '1';
+    }
   }
 
   // The number that floats up for a hit, a tick or a miss.
   function floatFor(e, anchor) {
     if (e.type === 'miss') { if (!e.pet) float('Miss', 'miss', anchor); return; }
-    const school = e.school === 'fire' ? 'fire' : '';
-    float(whole(e.amount), (e.pet ? 'pet' : e.type === 'tick' ? 'tick ' + school : school) + (e.crit ? ' crit' : ''), anchor);
+    float(whole(e.amount), (e.pet ? 'pet' : e.type === 'tick' ? 'small' : '') + (e.crit ? ' crit' : ''), anchor);
   }
 
   // e: an event from the casting rules; anchor: where the dummy's head is on the screen { x, y, visible };
@@ -484,7 +555,7 @@ export function createHud(WL, handlers) {
     } else if (e.type === 'petMode') {
       log(getName(c.build.pet) + (e.mode === 'attack' ? ' attacks' + (c.targets > 1 ? ' ' + dummy : '') + '.' : ' follows you.'), 'proc');
     } else if (e.type === 'havoc') {
-      float(whole(e.amount), 'tick', anchor);
+      float(whole(e.amount), 'small', anchor);
     } else if (e.type === 'target') {
       if (c.targets > 1) log((e.auto ? 'New target: ' : 'Target: ') + dummy + '.');
     } else if (e.type === 'petCast') {
@@ -514,18 +585,26 @@ export function createHud(WL, handlers) {
       log('Shadow and Flame returns the Soul Shard.', 'proc');
     } else if (e.type === 'interrupt') {
       if (e.reason !== 'clipped' && e.reason !== 'dead') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
+    } else if (e.type === 'pushback') {
+      log(name + (e.channel ? ' cut short by ' : ' pushed back ') + e.lost.toFixed(1) + ' s.', 'miss');
+    } else if (e.type === 'pushResist') {
+      log('You keep casting through the hit.');
     } else if (e.type === 'fail') {
       showError(e.text);
     } else if (e.type === 'death') {
       if (!e.last) { log(dummy + ' dies.', 'crit'); return; }
-      log(dummy + ' dies. ' + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
+      log((e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
       if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
-      log('Press Reset to fight again.');
+      log('Reset starts a new fight. "Review the fight" shows where the time went.');
     }
   }
 
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
-    setSimAverage: setSimAverage, floatFor: floatFor
+    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound,
+    setKeys: function (list) { codes = list.slice(); showKeyLabels(); },
+    closePanels: function () { let any = false; Object.keys(panels).forEach(function (k) { if (!panels[k].hidden) any = true; }); showPanel(null); return any; },
+    simAverage: function () { return simAverage; }, dummyName: dummyName,
+    petName: function () { return character && character.build.pet ? getName(character.build.pet) : ''; }
   };
 }

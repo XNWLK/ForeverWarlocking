@@ -230,3 +230,64 @@ button.soon { color: var(--ink-dim); border-style: dashed; }
 .plate.dead { opacity: 0.45; }
 .plate[hidden] { display: none; }
 #meterDummies { font-size: 11px; }
+
+/* ======================================================================
+   Round 11: damage numbers, cooldown sweep, panels, review, edit bar
+   ====================================================================== */
+
+/* --- Damage numbers: placed every picture above their dummy, so they stay with it when the camera moves --- */
+.float { animation: none; left: 0; top: 0; will-change: transform, opacity; font: 700 24px/1 "Friz Quadrata TT", "Friz Quadrata", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; color: #ffd100; -webkit-text-stroke: 1px #000; paint-order: stroke fill; text-shadow: 0 0 2px #000, 1px 2px 0 #000, 0 0 5px rgba(0, 0, 0, 0.9); letter-spacing: 0.5px; }
+.float.crit { font-size: 38px; color: #ffd100; }
+.float.small { font-size: 18px; }
+.float.small.crit { font-size: 25px; }
+.float.pet { font-size: 17px; color: #ffffff; }
+.float.pet.crit { font-size: 24px; color: #ffffff; }
+.float.miss { font-size: 20px; color: #ffffff; }
+.float.fire, .float.tick { color: #ffd100; }
+
+/* --- The global cooldown and spell cooldowns sweep round the button like a clock hand, as in the game --- */
+.slot .cool { inset: 0; height: auto; background: conic-gradient(transparent calc((1 - var(--left, 0)) * 360deg), rgba(6, 4, 12, 0.74) 0); }
+.slot .cool.none { display: none; }
+
+/* --- Rows of buttons, forms, wide buttons --- */
+#hud input, #hud textarea, #hud label, #hud form { pointer-events: auto; }
+#hud input, #hud textarea { user-select: text; font: inherit; font-size: 12px; color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--panel-line); border-radius: 4px; padding: 2px 5px; }
+#hud input[type="number"] { width: 62px; }
+#hud input:focus, #hud textarea:focus { outline: 1px solid var(--fel); }
+#hud textarea { display: block; width: 100%; margin-top: 3px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+.form, #importPanel { display: grid; gap: 8px; }
+.form label, #importPanel label { display: block; font-size: 12px; }
+.hint { margin: 0; font-size: 11px; color: var(--ink-dim); }
+.hint.bad { color: #ff9c92; }
+.buttons { display: flex; gap: 6px; }
+button.wide { display: block; width: 100%; margin-top: 8px; }
+#topRight .row { flex-wrap: wrap; justify-content: flex-end; max-width: 430px; }
+
+/* --- "Move!" --- */
+#moveBanner { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); padding: 6px 18px; border-radius: 6px; background: rgba(120, 20, 16, 0.85); border: 1px solid #ff6a5e; color: #fff; font: 700 22px/1.2 "Segoe UI", system-ui, sans-serif; text-shadow: 0 1px 2px #000; pointer-events: none; }
+#moveBanner.soon { background: rgba(14, 11, 22, 0.8); border-color: var(--panel-line-bright); font-size: 14px; font-weight: 600; color: var(--ink-dim); }
+#moveBanner[hidden] { display: none; }
+
+/* --- Edit bar --- */
+.edit-strip { position: static; display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; }
+.edit-strip[hidden] { display: none; }
+.editing .slot { border-style: dashed; border-color: var(--panel-line-bright); cursor: grab; }
+.editing .slot.picked { border-style: solid; border-color: #ffd76a; box-shadow: 0 0 0 2px #ffd76a inset; }
+
+/* --- Fight review --- */
+.review { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(640px, 92vw); max-height: 84vh; overflow: auto; padding: 14px 16px; background: rgba(14, 11, 22, 0.96); border: 1px solid var(--panel-line-bright); border-radius: 8px; color: var(--ink); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; }
+.review[hidden] { display: none; }
+.review header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.review h2 { margin: 0; font-size: 16px; color: var(--gold); }
+.review h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.03em; }
+.review-head { margin: 0; font-size: 14px; }
+.review-head b { font-size: 20px; }
+.review table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.review th { text-align: left; font-weight: 600; color: var(--ink-dim); padding: 2px 6px; border-bottom: 1px solid var(--panel-line); }
+.review td { padding: 2px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.review .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.review tr.behind td { color: #ffb3a8; }
+.review .hint { margin-top: 12px; }
+
+/* Anything marked hidden stays hidden, whatever layout its panel has. */
+[hidden] { display: none !important; }

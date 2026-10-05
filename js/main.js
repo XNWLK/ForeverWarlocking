@@ -8,6 +8,8 @@ import { createCombat, actionBarFor } from './combat.js';
 import { getSetting, setSetting } from './settings.js';
 import { createPet } from './pets.js';
 import { createEffects, SPELL_FX } from './effects.js';
+import { createPanels } from './panels.js';
+import { createSound } from './sound.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -48,8 +50,61 @@ const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
 const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene });
 
 // ---------- the character and the fight ----------
-const config = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
-let combat = null, character = null, rings = null, targets = 1;
+let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
+let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
+const sound = createSound(getSetting('sound') === true);   // off until you switch it on (Xn)
+const MOVE_CODES = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Escape'];
+let keyCodes = ACTION_CODES.slice();
+
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+// The settings of the fight: the DPS sim's defaults, then an imported settings code, then the fight options.
+// Things a code switches on that you would have to press during the fight (potions, runes, explosives, Power
+// Infusion, Mana Tide, Innervate) are not playable here, so they are switched off - for you and for the sim average.
+function buildConfig() {
+  const cfg = clone(WL.DEFAULT_CONFIG), base = clone(WL.DEFAULT_CONFIG.fight);
+  leftOut = [];
+  const code = getSetting('settingsCode');
+  if (code) {
+    try {
+      WL.applySettings(cfg, WL.decodeSettings(code));
+      ['duration', 'durationVarPct', 'iterations', 'weightIterations', 'seed', 'targets', 'multiDot', 'moveEvery', 'moveDuration',
+       'hitEvery', 'latencyMs', 'travelMs', 'lifeTapWhileMoving'].forEach(function (k) { cfg.fight[k] = base[k]; });
+    } catch (e) { /* a code that no longer decodes is ignored */ }
+  }
+  Object.keys(cfg.consumables).forEach(function (k) {
+    const c = cfg.consumables[k];
+    if (c.on && (c.spPotion || c.manaRestore || c.explosive)) { c.on = false; leftOut.push(c.name); }
+  });
+  Object.keys(cfg.buffs).forEach(function (k) {
+    const b = cfg.buffs[k];
+    if (b.on && (b.tide || b.innervate || b.spellDmgPct)) { b.on = false; leftOut.push(b.name); }
+  });
+  const fight = fightOptions();
+  cfg.fight.moveEvery = fight.moveEvery > 0 && fight.moveDuration > 0 ? fight.moveEvery : 0;
+  cfg.fight.moveDuration = cfg.fight.moveEvery ? fight.moveDuration : 0;
+  cfg.fight.hitEvery = fight.hitEvery;
+  return cfg;
+}
+function fightOptions() { return Object.assign({ timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 }, getSetting('fight') || {}); }
+
+// An imported build code becomes one more build in the list. Returns the reasons when it cannot be played.
+function readCustomBuild() {
+  customBuild = null;
+  const code = getSetting('buildCode');
+  if (!code) return [];
+  try {
+    const b = WL.decodeBuild(code), problems = WL.validateBuild(b);
+    if (problems.length) return problems;
+    b.key = 'custom'; b.custom = true; b.name = b.short;
+    b.rotation = b.rotation.filter(function (a) { return a !== 'swapToImp' && a !== 'swapToSuccubus'; });   // no pet swap here
+    delete b.timeline;
+    customBuild = b;
+    return [];
+  } catch (e) { return [e.message]; }
+}
+function allBuilds() { return (customBuild ? [customBuild] : []).concat(WL.BUILDS); }
+
 // What the casting rules need to know about where everyone stands.
 const ctx = { moving: false, distances: [0, 0, 0, 0], gaps: GAPS, petDistance: 0 };
 const anchors = [null, { x: 0, y: 0, visible: false }, { x: 0, y: 0, visible: false }, { x: 0, y: 0, visible: false }];   // the dummies' heads on screen
@@ -64,20 +119,98 @@ const hud = createHud(WL, {
   onTarget: function (ti) { setTarget(ti); },
   onRings: function (on) { setSetting('rings', on); rings.visible = on; },
   onReset: function () { resetFight(); hud.log('Fight reset.'); },
-  onPet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); }
+  onPet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); },
+  onSound: function (on) { setSetting('sound', on); sound.setOn(on); },
+  // Edit bar: swap what is in two slots, give a slot another key, or go back to the default.
+  onSwap: function (a, b) {
+    const homes = Object.assign({}, getSetting('homes')), A = character.bar[a], B = character.bar[b];
+    if (!A && !B) return;
+    if (A) homes[A] = b;
+    if (B) homes[B] = a;
+    setSetting('homes', homes);
+    newCharacter();
+  },
+  onRebind: function (slot, code) {
+    if (MOVE_CODES.indexOf(code) >= 0) { hud.showError('That key is used for moving or targeting'); return; }
+    const other = keyCodes.indexOf(code);
+    if (other >= 0) keyCodes[other] = keyCodes[slot];      // the two slots trade keys
+    keyCodes[slot] = code;
+    setSetting('keys', keyCodes.slice());
+    hud.setKeys(keyCodes);
+  },
+  onBarReset: function () {
+    setSetting('homes', {}); setSetting('keys', null);
+    keyCodes = ACTION_CODES.slice();
+    hud.setKeys(keyCodes);
+    newCharacter();
+    hud.log('The action bar is back to its default.');
+  }
 });
+
+const panels = createPanels({
+  onFight: function (options) {
+    setSetting('fight', options);
+    hud.closePanels();
+    newCharacter();
+    hud.log(options.timed ? 'Timed fight: ' + options.seconds + ' s.' : 'The fight ends when the dummies are dead.', 'proc');
+    if (config.fight.moveEvery) hud.log('You have to move every ' + config.fight.moveEvery + ' s for ' + config.fight.moveDuration + ' s.');
+    if (config.fight.hitEvery) hud.log('You take a hit every ' + config.fight.hitEvery + ' s.');
+  },
+  // Codes from the DPS sim: a build (WFB1:...) and / or settings (WFS1:...). Empty = remove.
+  onImport: function (buildCode, settingsCode) {
+    const lines = [];
+    let bad = false, settingsInfo = null;
+    if (settingsCode) {
+      try { settingsInfo = WL.describeSettings(WL.decodeSettings(settingsCode)); }
+      catch (e) { lines.push('Settings: ' + e.message + '.'); bad = true; settingsCode = getSetting('settingsCode'); }
+    }
+    const before = getSetting('buildCode');
+    setSetting('buildCode', buildCode);
+    const problems = readCustomBuild();
+    if (problems.length) {
+      lines.push('Build not imported: ' + problems.slice(0, 3).join('; ') + '.');
+      bad = true;
+      setSetting('buildCode', before);
+      readCustomBuild();
+    } else if (buildCode) { lines.push('Build imported: ' + customBuild.short + '.'); setSetting('build', 'custom'); }
+    else if (getSetting('build') === 'custom') setSetting('build', null);
+    setSetting('settingsCode', settingsCode);
+    newCharacter();
+    if (settingsInfo) lines.push('Settings imported: ' + settingsInfo.replace(/ · \d+ s · \d+ fights$/, '') + '.');
+    if (leftOut.length) lines.push('Not playable here yet, so switched off (also for the sim average): ' + leftOut.join(', ') + '.');
+    if (!buildCode && !settingsCode) lines.push('Nothing imported: the ready builds with the default gear and buffs.');
+    panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), lines, bad);
+  },
+  onReview: function () { showReview(); }
+});
+
+function showReview() {
+  if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
+  panels.showReview({
+    seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
+    timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
+  });
+}
 
 // The DPS sim's average for this character on these dummies, worked out on another processor core.
 let simWorker = null, simJob = 0;
 function askSimAverage() {
+  simResult = null;
   hud.setSimAverage(null);
   try {
     if (!simWorker) {
       simWorker = new Worker('js/sim-worker.js');
-      simWorker.onmessage = function (e) { if (e.data.id === simJob) hud.setSimAverage(e.data); };
+      simWorker.onmessage = function (e) {
+        if (e.data.id !== simJob) return;
+        simResult = e.data;
+        hud.setSimAverage(e.data);
+        if (panels.reviewOpen()) showReview();               // the review was waiting for these numbers
+      };
       simWorker.onerror = function () { simWorker = null; };
     }
-    simWorker.postMessage({ id: ++simJob, build: character.build.key, race: character.raceKey, health: character.dummyHealth * targets, targets: targets });
+    const fight = fightOptions();
+    simWorker.postMessage({ id: ++simJob, build: clone(character.build), race: character.raceKey, config: clone(config), targets: targets,
+                            health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds });
   } catch (e) {
     simWorker = null;                                     // no workers here: the meter just keeps showing a dash
   }
@@ -87,10 +220,26 @@ function askSimAverage() {
 // wait until the bolt arrives (the damage itself is already counted, exactly as the rules say).
 const boltsAt = [0, 0, 0, 0], deathWaiting = [false, false, false, false];
 const spot = new THREE.Vector3();
+function hitSound(e) { sound.play(e.school === 'fire' ? 'hitFire' : 'hitShadow'); if (e.crit) sound.play('crit'); }
 function onCombatEvent(e) {
   const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
   if (e.pet && lands && e.key !== 'pet:brand') pet.strike();
+
+  // Sounds.
+  if (e.type === 'cast') {
+    if (e.key === 'lifeTap') sound.play('lifeTap');
+    else if (e.castTime > 0 || e.channel) sound.play(combat.spells[e.key].school === 'fire' ? 'castFire' : 'castShadow');
+  } else if (e.type === 'fail') sound.play('error');
+  else if (e.type === 'tick') sound.play('tick');
+  else if (e.type === 'apply') sound.play('apply');
+  else if (e.type === 'proc') sound.play('proc');
+  else if (e.type === 'pushback') sound.play('pushback');
+  else if (e.type === 'death') sound.play('death');
+  else if (e.type === 'miss' && !e.pet) sound.play('miss');
+  else if (e.type === 'hit' && e.pet && !(fx && fx.bolt)) sound.play('pet');
+  else if (e.type === 'hit' && !e.pet && !(fx && fx.bolt)) hitSound(e);
+  if (lands && fx && fx.bolt) sound.play('bolt');
 
   if (lands && fx && fx.bolt) {
     hud.event(e, anchor, true);
@@ -98,7 +247,7 @@ function onCombatEvent(e) {
     boltsAt[ti]++;
     effects.bolt(spot, dummy.chestAt, fx.bolt, function () {
       boltsAt[ti]--;
-      if (e.type === 'hit') { effects.burst(dummy.chestAt, fx.land); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); }
+      if (e.type === 'hit') { effects.burst(dummy.chestAt, fx.land); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); hitSound(e); }
       hud.floatFor(e, anchor);
       if (deathWaiting[ti] && boltsAt[ti] === 0) { deathWaiting[ti] = false; dummy.setDead(true); }
     });
@@ -119,11 +268,12 @@ function onCombatEvent(e) {
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
     effects.burst(spot.set(controls.player.x, 1.2, controls.player.z), { color: 0xff4a5a, size: 1.3, ring: true });
   } else if (e.type === 'death') {
-    if (boltsAt[ti] > 0) deathWaiting[ti] = true; else dummy.setDead(true);
+    if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else dummy.setDead(true); }
+    if (e.last) window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself
   }
 }
 
-function buildByKey(key) { return WL.BUILDS.filter(function (b) { return b.key === key; })[0] || null; }
+function buildByKey(key) { return allBuilds().filter(function (b) { return b.key === key; })[0] || null; }
 
 // The build you start with before you have picked one: the highest in the sim's DPS ranking.
 function startingBuild() {
@@ -141,14 +291,19 @@ function newCharacter() {
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
   const dummyHealth = getSetting('dummyHealth');
   targets = Math.max(1, Math.min(3, Number(getSetting('dummies')) || 1));
+  config = buildConfig();
+  const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
-                          onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE });
-  pet.setKind(build.pet || null);
-  const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length);
+                          timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE });
+  pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
+  const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
+  panels.setFight(fight);
+  panels.hideReview();
   const ranges = bar.filter(function (k) { return combat.table[k]; }).map(function (k) { return combat.table[k].range; });
   character = {
     build: build, raceKey: raceKey, stats: combat.stats, table: combat.table, spells: combat.spells, bar: bar,
     racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct, targets: targets,
+    builds: allBuilds(), timed: fight.timed,
     maxRange: Math.max.apply(null, ranges.concat([0]))
   };
   hud.setCharacter(character);
@@ -213,12 +368,15 @@ function clickScene(x, y) {
   if (best) setTarget(best);
 }
 
-// Action keys by their place on the keyboard; Escape stops a cast; Tab changes target.
+// Action keys by their place on the keyboard; Escape closes what is open or stops a cast; Tab changes target.
 window.addEventListener('keydown', function (e) {
-  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement) return;
-  if (e.code === 'Escape') { combat.cancel(); return; }
+  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  if (e.code === 'Escape') {
+    if (panels.reviewOpen()) panels.hideReview(); else if (!hud.closePanels()) combat.cancel();
+    return;
+  }
   if (e.code === 'Tab') { e.preventDefault(); nextTarget(); return; }
-  const slot = ACTION_CODES.indexOf(e.code);
+  const slot = keyCodes.indexOf(e.code);
   if (slot < 0) return;
   e.preventDefault();
   press(character.bar[slot]);
@@ -232,7 +390,13 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+const savedKeys = getSetting('keys');
+if (Array.isArray(savedKeys) && savedKeys.length === ACTION_CODES.length) keyCodes = savedKeys.slice();
+readCustomBuild();
 newCharacter();
+hud.setKeys(keyCodes);
+hud.setSound(sound.isOn());
+panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), [], false);
 hud.setRings(getSetting('rings'));
 hud.log('You enter the fel chamber.', 'proc');
 hud.log('Build: ' + character.build.short + '.');
@@ -275,7 +439,7 @@ function watchSpeed(seconds, time) {
 // ---------- every picture ----------
 const clock = new THREE.Clock();
 const from = new THREE.Vector3(), head = new THREE.Vector3(), rain = new THREE.Vector3();
-let areaPulse = 0;
+let areaPulse = 0, wasMoving = false;
 function frame() {
   const elapsed = clock.getDelta(), dt = Math.min(0.05, elapsed), time = clock.elapsedTime;
   watchSpeed(elapsed, time);
@@ -289,13 +453,17 @@ function frame() {
   const P = combat.pet;
   if (P) {
     const petCast = P.casting ? Math.min(1, (combat.state.t - P.casting.start) / (P.casting.end - P.casting.start)) : 0;
-    pet.update(dt, time, player, P.mode, P.range, petCast, combat.state.over || !combat.alive(P.target), SPOTS[P.target]);
+    pet.update(dt, time, player, P.mode, P.range, petCast, combat.state.over || !combat.alive(P.target), SPOTS[P.target], colliders);
     ctx.petDistance = pet.state.distance;
   }
 
   // The fight's own clock stands still while the page is hidden (a long gap counts as a quarter second at most).
   fightClock += Math.min(0.25, elapsed);
   combat.update(fightClock, ctx);
+
+  const phase = combat.movePhase(), mustMove = !!(phase && phase.moving);
+  if (mustMove && !wasMoving) sound.play('move');
+  wasMoving = mustMove;
 
   const S = combat.state, casting = S.cast || S.channel;
   const school = casting ? combat.spells[casting.key].school : null;
@@ -361,6 +529,7 @@ renderer.setAnimationLoop(frame);
 window.FW = {
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
-  pet: pet, ctx: ctx, effects: effects, dummies: dummies,
+  pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,
+  get config() { return config; }, get simResult() { return simResult; },
   get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
 };

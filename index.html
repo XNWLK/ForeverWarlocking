@@ -22,6 +22,8 @@
 <link rel="modulepreload" href="js/settings.js">
 <link rel="modulepreload" href="js/pets.js">
 <link rel="modulepreload" href="js/effects.js">
+<link rel="modulepreload" href="js/panels.js">
+<link rel="modulepreload" href="js/sound.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -72,8 +74,14 @@
       <span class="label" id="buildLabel"></span>
       <button type="button" id="btnBuild">Build</button>
       <button type="button" id="btnRace">Race</button>
+      <button type="button" id="btnImport" title="Play your own build, gear and buffs from the DPS sim">Import</button>
+      <button type="button" id="btnFight" title="How the fight ends, movement, hits taken">Fight</button>
+    </div>
+    <div class="panel row">
       <button type="button" id="btnKeys">Keys</button>
+      <button type="button" id="btnEdit" title="Move spells and change keys">Edit bar</button>
       <button type="button" id="btnRings" class="on" aria-pressed="true">Range rings</button>
+      <button type="button" id="btnSound" aria-pressed="false" title="Sounds on or off">Sound</button>
       <button type="button" id="btnReset">Reset</button>
     </div>
     <div class="panel row">
@@ -83,6 +91,24 @@
     <div class="panel picker" id="buildPanel" hidden>
       <h2>Build</h2>
       <div class="options" id="buildOptions"></div>
+    </div>
+    <div class="panel picker" id="fightPanel" hidden>
+      <h2>Fight</h2>
+      <form id="fightForm" class="form" novalidate>
+        <label><input type="radio" name="mode" value="health" checked> Ends when the dummies are dead</label>
+        <label><input type="radio" name="mode" value="timed"> Ends after <input type="number" id="fightSeconds" min="10" max="1800" step="1" value="120"> seconds</label>
+        <label>You have to move every <input type="number" id="moveEvery" min="0" max="600" step="1" value="0"> s, for <input type="number" id="moveDuration" min="0" max="60" step="0.5" value="0"> s</label>
+        <label>You take a hit every <input type="number" id="hitEvery" min="0" max="60" step="0.5" value="0"> s</label>
+        <p class="hint">0 = never. While you have to move, only instant spells work. A hit pushes back the spell you are casting. In a timed fight the dummies' health falls evenly, as in the DPS sim.</p>
+        <button type="submit">Apply and restart</button>
+      </form>
+    </div>
+    <div class="panel picker" id="importPanel" hidden>
+      <h2>Import from the DPS sim</h2>
+      <label>Build code (starts with WFB1:)<textarea id="importBuild" rows="2" spellcheck="false"></textarea></label>
+      <label>Settings code (starts with WFS1:)<textarea id="importSettings" rows="2" spellcheck="false"></textarea></label>
+      <div class="buttons"><button type="button" id="importApply">Apply</button><button type="button" id="importClear">Remove both</button></div>
+      <p class="hint" id="importStatus"></p>
     </div>
     <div class="panel picker" id="racePanel" hidden>
       <h2>Race</h2>
@@ -99,9 +125,9 @@
         <dt>Left mouse, held</dt><dd>Look around without turning</dd>
         <dt>Both mouse buttons</dt><dd>Walk forward</dd>
         <dt>Mouse wheel</dt><dd>Zoom</dd>
-        <dt>1 to 8, R, F, T, G, C, V, B</dt><dd>Cast the spell in that slot (or click it)</dd>
+        <dt>The keys on the slots</dt><dd>Cast that spell (or click it). Edit bar changes keys and places.</dd>
         <dt>Tab, or click a dummy</dt><dd>Change your target</dd>
-        <dt>Escape</dt><dd>Stop casting</dd>
+        <dt>Escape</dt><dd>Stop casting (or close a panel)</dd>
         <dt>Attack / Follow</dt><dd>Buttons under your pet's bars; it attacks by itself when you start</dd>
       </dl>
     </div>
@@ -109,6 +135,11 @@
 
   <!-- Bottom centre: cast bar and action bar -->
   <section id="bottomCentre">
+    <div id="editStrip" class="panel edit-strip" hidden>
+      <span id="editText">Click two slots to swap them. Click a slot and press a key to give it that key.</span>
+      <button type="button" id="editReset">Back to default</button>
+      <button type="button" id="editDone">Done</button>
+    </div>
     <div id="errorText" class="error-text" aria-live="polite"></div>
     <div id="castBar" class="castbar idle"><i id="castFill"></i><b id="castText"></b></div>
     <div id="actionBar" class="panel actionbar"></div>
@@ -131,9 +162,15 @@
       <dt id="meterDummiesLabel" hidden>Per dummy</dt><dd id="meterDummies" hidden></dd>
     </dl>
     <ol id="meterSpells"></ol>
+    <button type="button" id="btnReview" class="wide">Review the fight</button>
   </section>
 </div>
 
+<div id="moveBanner" hidden></div>
+<section id="review" class="review" hidden>
+  <header><h2>Fight review</h2><button type="button" id="reviewClose">Close</button></header>
+  <div id="reviewBody"></div>
+</section>
 <div id="plates"></div>
 <div id="floaters" aria-hidden="true"></div>
 <div id="fatal" hidden></div>

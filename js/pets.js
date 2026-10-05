@@ -111,8 +111,8 @@ export function createPet(scene) {
   }
 
   // player: { x, z, yaw }; mode: 'attack' or 'follow'; range: how close it must be to attack; cast: 0..1 while it is
-  // casting; dead: nothing left to attack; target: { x, z } of the dummy it is sent at.
-  function update(dt, time, player, mode, range, cast, dead, target) {
+  // casting; dead: nothing left to attack; target: { x, z } of the dummy it is sent at; colliders: [{ x, z, r }].
+  function update(dt, time, player, mode, range, cast, dead, target, colliders) {
     if (!pet.kind) return;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
     const homeX = player.x + sin * FOLLOW_BACK - cos * FOLLOW_LEFT, homeZ = player.z + cos * FOLLOW_BACK + sin * FOLLOW_LEFT;
@@ -138,6 +138,11 @@ export function createPet(scene) {
       const step = Math.min(gap, RUN_SPEED * dt);
       pet.x += dx / gap * step; pet.z += dz / gap * step;
       pet.yaw = Math.atan2(-dx, -dz);
+      (colliders || []).forEach(function (c) {             // pushed out sideways, so it slides round what is in the way
+        const ox = pet.x - c.x, oz = pet.z - c.z, d = Math.hypot(ox, oz), min = c.r + 0.45;
+        if (d >= min || d < 0.0001) return;
+        pet.x = c.x + ox / d * min; pet.z = c.z + oz / d * min;
+      });
     } else if (faceDummy) {
       pet.yaw = Math.atan2(pet.x - target.x, pet.z - target.z);   // looking at its dummy
     } else {

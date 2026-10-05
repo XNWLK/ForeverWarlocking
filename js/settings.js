@@ -1,7 +1,12 @@
 // The choices that are kept in this browser between visits: build, race, the dummies' health and number, range rings.
 
 const STORE_KEY = 'forever-warlocking.settings';
-const DEFAULTS = { build: null, race: 'human', dummyHealth: 50000, rings: true, dummies: 1 };
+const DEFAULTS = {
+  build: null, race: 'human', dummyHealth: 50000, rings: true, dummies: 1, sound: false,
+  fight: { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 },   // how the fight ends, movement, hits taken
+  buildCode: '', settingsCode: '',     // imported from the DPS sim
+  homes: {}, keys: null                // your own places for spells on the bar, and your own keys
+};
 
 let saved = {};
 try {

@@ -1,7 +1,7 @@
 // The names shown in the frames. Anyone can change them by clicking a name; a change is kept in this browser.
 
-const DEFAULTS = { warlock: 'Xn', imp: 'Yazpad', succubus: 'Rob', dummy: 'Mage dummy' };
-const MAX_LENGTH = { warlock: 12, imp: 12, succubus: 12, dummy: 20 };
+const DEFAULTS = { warlock: 'Xn', imp: 'Yazpad', succubus: 'Rob', dummy: 'Mage dummy', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
+const MAX_LENGTH = { warlock: 12, imp: 12, succubus: 12, dummy: 20, felhunter: 12, voidwalker: 12 };
 const STORE_KEY = 'forever-warlocking.names';
 
 let saved = {};

@@ -863,9 +863,11 @@ const HOME = {
 // Returns one entry per slot: a spell key, 'racial', or null for an empty slot.
 // First the spells of the build's priority list (plus Life Tap and the race's cooldown) take their own keys; those
 // whose key is taken fill the free slots from the left; then whatever else the build can cast, if its key is free.
-export function actionBarFor(build, table, race, slots) {
+// own: { spell: slot } - places you chose yourself in "Edit bar"; they come before everything else.
+export function actionBarFor(build, table, race, slots, own) {
   const bar = [];
   for (let i = 0; i < slots; i++) bar.push(null);
+  const mine = own || {};
   const wanted = [];
   function want(key) { if (wanted.indexOf(key) < 0 && (key === 'racial' || table[key])) wanted.push(key); }
   build.rotation.forEach(function (action) { (ACTION_SPELLS[action] || []).forEach(want); });
@@ -873,11 +875,13 @@ export function actionBarFor(build, table, race, slots) {
   if (race.racials.some(function (r) { return r.effect === 'cooldown'; })) want('racial');
 
   function home(key) {
-    const places = HOME[key] || [];
+    const places = mine[key] != null ? [mine[key]].concat(HOME[key] || []) : HOME[key] || [];
     for (let i = 0; i < places.length; i++) if (places[i] < slots && bar[places[i]] === null) { bar[places[i]] = key; return true; }
     return false;
   }
-  const homeless = wanted.filter(function (key) { return !home(key); });
+  const castable = wanted.concat(Object.keys(table).filter(function (key) { return !NOT_ON_BAR[key]; }));
+  castable.forEach(function (key) { if (mine[key] != null && bar.indexOf(key) < 0 && mine[key] < slots && bar[mine[key]] === null) bar[mine[key]] = key; });
+  const homeless = wanted.filter(function (key) { return bar.indexOf(key) < 0 && !home(key); });
   homeless.forEach(function (key) { const free = bar.indexOf(null); if (free >= 0) bar[free] = key; });
   Object.keys(table).forEach(function (key) { if (!NOT_ON_BAR[key] && bar.indexOf(key) < 0) home(key); });
   return bar;

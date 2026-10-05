@@ -35,7 +35,7 @@ export function createControls(canvas, camera, world) {
   const USED = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   window.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
-    if (e.target instanceof HTMLInputElement) return;     // typing a name must not walk the character
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;   // typing must not walk the character
     if (e.target instanceof HTMLButtonElement && e.code === 'Space') e.target.blur();
     if (USED.indexOf(e.code) >= 0) { keys.add(e.code); e.preventDefault(); }
   });
