@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 const RUN_SPEED = 9;            // a little faster than you, so it catches up
 const FOLLOW_BACK = 1.5, FOLLOW_LEFT = 1.7;
-const MELEE_SPOT = 2.4;         // where the Succubus stands, measured from the middle of the dummy
+const MELEE_SPOT = 2.4;         // where the Succubus stands, measured from the middle of its dummy
 
 function flat(color) { return new THREE.MeshLambertMaterial({ color: color, flatShading: true }); }
 function glow(color, extra) { return new THREE.MeshBasicMaterial(Object.assign({ color: color }, extra)); }
@@ -110,26 +110,25 @@ export function createPet(scene) {
     placed = false;
   }
 
-  // player: { x, z, yaw }; mode: 'attack' or 'follow'; range: how close it must be to attack (yards from the dummy,
-  // which stands at 0, 0); cast: 0..1 while it is casting; dead: the dummy is down.
-  function update(dt, time, player, mode, range, cast, dead) {
+  // player: { x, z, yaw }; mode: 'attack' or 'follow'; range: how close it must be to attack; cast: 0..1 while it is
+  // casting; dead: nothing left to attack; target: { x, z } of the dummy it is sent at.
+  function update(dt, time, player, mode, range, cast, dead, target) {
     if (!pet.kind) return;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
     const homeX = player.x + sin * FOLLOW_BACK - cos * FOLLOW_LEFT, homeZ = player.z + cos * FOLLOW_BACK + sin * FOLLOW_LEFT;
     if (!placed) { pet.x = homeX; pet.z = homeZ; pet.yaw = player.yaw; placed = true; }
 
     let goalX = homeX, goalZ = homeZ, slack = pet.moving ? 0.15 : 1.0, faceDummy = false;
-    const fromDummy = Math.hypot(pet.x, pet.z);
+    const offX = pet.x - target.x, offZ = pet.z - target.z, fromDummy = Math.max(Math.hypot(offX, offZ), 0.001);
     if (mode === 'attack' && !dead) {
       faceDummy = true;
       if (pet.kind === 'succubus') {            // runs up to the dummy and stays at arm's length
-        const d = Math.max(fromDummy, 0.001);
-        goalX = pet.x / d * MELEE_SPOT; goalZ = pet.z / d * MELEE_SPOT; slack = 0.15;
+        goalX = target.x + offX / fromDummy * MELEE_SPOT; goalZ = target.z + offZ / fromDummy * MELEE_SPOT; slack = 0.15;
       } else if (fromDummy <= range - 1) {       // the Imp casts from where it stands
         goalX = pet.x; goalZ = pet.z;
       } else {                                   // too far: walk in until it is in range
-        const d = Math.max(fromDummy, 0.001), stop = range - 2;
-        goalX = pet.x / d * stop; goalZ = pet.z / d * stop; slack = 0.15;
+        const stop = range - 2;
+        goalX = target.x + offX / fromDummy * stop; goalZ = target.z + offZ / fromDummy * stop; slack = 0.15;
       }
     }
 
@@ -140,11 +139,11 @@ export function createPet(scene) {
       pet.x += dx / gap * step; pet.z += dz / gap * step;
       pet.yaw = Math.atan2(-dx, -dz);
     } else if (faceDummy) {
-      pet.yaw = Math.atan2(pet.x, pet.z);        // looking at the middle of the room
+      pet.yaw = Math.atan2(pet.x - target.x, pet.z - target.z);   // looking at its dummy
     } else {
       pet.yaw = player.yaw;
     }
-    pet.distance = Math.hypot(pet.x, pet.z);
+    pet.distance = Math.hypot(pet.x - target.x, pet.z - target.z);
 
     const model = models[pet.kind];
     model.root.position.set(pet.x, 0, pet.z);

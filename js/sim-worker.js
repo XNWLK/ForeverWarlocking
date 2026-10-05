@@ -1,7 +1,8 @@
 // Runs on another processor core, so the game never stutters while this calculates.
 //
-// Works out what the DPS sim's priority list reaches on this dummy with the same character: the sim fights for a set
-// time, the dummy has a set health, so the fight length is adjusted until the sim's damage equals the dummy's health.
+// Works out what the DPS sim's priority list reaches on these dummies with the same character: the sim fights for a
+// set time, the dummies have a set health, so the fight length is adjusted until the sim's damage equals the health of
+// all dummies together. With several dummies the sim keeps its DoTs on all of them.
 self.window = self;
 
 var request = new XMLHttpRequest();
@@ -15,6 +16,8 @@ self.onmessage = function (e) {
   var build = WL.BUILDS.filter(function (b) { return b.key === job.build; })[0];
   var cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
   cfg.fight.durationVarPct = 0;
+  cfg.fight.targets = job.targets || 1;
+  cfg.fight.multiDot = cfg.fight.targets > 1;
   var seconds = job.health / 600, result = null;
   for (var round = 0; round < 5; round++) {
     cfg.fight.duration = seconds;

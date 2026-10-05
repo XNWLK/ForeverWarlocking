@@ -1,6 +1,6 @@
 // Spell animations: bolts that fly, bursts where they land, motes gathering while you cast, and what hangs on the
 // dummy while a DoT or curse is on it. Looks only - when damage happens is decided in combat.js.
-// One unit is one yard. The dummy stands at (0, 0, 0).
+// One unit is one yard.
 import * as THREE from 'three';
 
 const BALL = new THREE.IcosahedronGeometry(1, 1);
@@ -30,6 +30,9 @@ export const SPELL_FX = {
   drainLife:       { cast: 0x8dff9a, land: { color: 0x8dff9a, size: 0.6 } },
   wrack:           { cast: 0xb07cff, land: { color: 0xb07cff, size: 0.7 } },
   lifeTap:         { cast: 0xff4a5a },
+  baneOfHavoc:     { cast: 0xff5ca8, land: { color: 0xff5ca8, size: 1.9, ring: true } },
+  rainOfFire:      { cast: 0xff8a2a, land: { color: 0xff8a2a, size: 0.8 } },
+  hellfire:        { cast: 0xff5a1a, land: { color: 0xff5a1a, size: 0.8 } },
   'pet:firebolt':  { bolt: { color: 0xff8a2a, core: 0xfff0b0, size: 0.2, speed: 40 }, land: { color: 0xff8a2a, size: 1.0, sparks: 6 } },
   'pet:lashOfPain': { land: { color: 0xd06cff, size: 1.1, sparks: 6 } },
   'pet:melee':     { land: { color: 0xffffff, size: 0.6 } },
@@ -152,8 +155,16 @@ export function createEffects(scene) {
   }
 
   // ---------- what hangs on the dummy while a DoT or curse is on it ----------
-  const marks = {};
-  function mark(name, build) { const g = new THREE.Group(); g.visible = false; scene.add(g); marks[name] = { group: g, update: build(g) }; }
+  const marks = [null, {}, {}, {}];              // one set per dummy
+  function mark(name, build) {
+    for (let ti = 1; ti <= 3; ti++) {
+      const holder = new THREE.Group(), g = new THREE.Group();
+      holder.visible = false;
+      holder.add(g);
+      scene.add(holder);
+      marks[ti][name] = { holder: holder, update: build(g) };
+    }
+  }
 
   mark('immolate', function (g) {                 // flames licking up the dummy
     const flames = [];
@@ -208,6 +219,7 @@ export function createEffects(scene) {
   }
   mark('baneOfAgony', sigil(0xc04cff, 0.55, 4.05));
   mark('baneOfDoom', sigil(0xff3355, 0.8, 4.15));
+  mark('havoc', sigil(0xff5ca8, 0.68, 4.1));
   mark('coe', function (g) {                        // a violet ring on the floor around it
     const ring = new THREE.Mesh(RING, light(0x7d6bff, 0.6));
     ring.rotation.x = -Math.PI / 2;
@@ -217,12 +229,14 @@ export function createEffects(scene) {
     return function (time) { ring.material.opacity = 0.4 + Math.sin(time * 2.5) * 0.2; ring.rotation.z = time * 0.3; };
   });
 
-  // on: { immolate: true, corruption: false, ... }
-  function setMarks(on, time) {
-    for (const name in marks) {
-      const m = marks[name], show = !!on[name];
-      m.group.visible = show;
-      if (show) m.update(time);
+  // ti: which dummy (1-3); at: where it stands { x, z }; on: { immolate: true, corruption: false, ... }
+  function setMarks(ti, at, on, time) {
+    for (const name in marks[ti]) {
+      const m = marks[ti][name], show = !!on[name];
+      m.holder.visible = show;
+      if (!show) continue;
+      m.holder.position.set(at.x, 0, at.z);
+      m.update(time);
     }
   }
 

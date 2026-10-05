@@ -40,7 +40,7 @@
   <section id="targetFrame" class="panel unit hostile">
     <div class="portrait skull" aria-hidden="true">??</div>
     <div class="unit-body">
-      <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub">Boss</span></div>
+      <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub" id="targetSub">Boss</span></div>
       <div class="bar health"><i id="targetHealthFill"></i><s id="executeMark" title="Execute phase starts here"></s><button type="button" id="targetHealth" title="Click to change the dummy's health"></button></div>
       <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="auras" id="targetDebuffs"></span></div>
     </div>
@@ -63,9 +63,9 @@
     <div class="panel row">
       <span class="label">Dummies</span>
       <div class="seg">
-        <button type="button" class="on" data-dummies="1">1</button>
-        <button type="button" class="soon" data-soon="Two dummies">2</button>
-        <button type="button" class="soon" data-soon="Three dummies">3</button>
+        <button type="button" data-dummies="1">1</button>
+        <button type="button" data-dummies="2">2</button>
+        <button type="button" data-dummies="3">3</button>
       </div>
     </div>
     <div class="panel row">
@@ -99,7 +99,8 @@
         <dt>Left mouse, held</dt><dd>Look around without turning</dd>
         <dt>Both mouse buttons</dt><dd>Walk forward</dd>
         <dt>Mouse wheel</dt><dd>Zoom</dd>
-        <dt>1 to 8, R, F, T, G</dt><dd>Cast the spell in that slot (or click it)</dd>
+        <dt>1 to 8, R, F, T, G, C, V, B</dt><dd>Cast the spell in that slot (or click it)</dd>
+        <dt>Tab, or click a dummy</dt><dd>Change your target</dd>
         <dt>Escape</dt><dd>Stop casting</dd>
         <dt>Attack / Follow</dt><dd>Buttons under your pet's bars; it attacks by itself when you start</dd>
       </dl>
@@ -126,12 +127,14 @@
     <dl>
       <dt>Damage</dt><dd id="meterDamage">0</dd>
       <dt>Time</dt><dd id="meterTime">0:00</dd>
-      <dt title="What the DPS sim's priority list reaches on this dummy with the same character">Sim average</dt><dd id="meterSim">&ndash;</dd>
+      <dt title="What the DPS sim's priority list reaches on these dummies with the same character">Sim average</dt><dd id="meterSim">&ndash;</dd>
+      <dt id="meterDummiesLabel" hidden>Per dummy</dt><dd id="meterDummies" hidden></dd>
     </dl>
     <ol id="meterSpells"></ol>
   </section>
 </div>
 
+<div id="plates"></div>
 <div id="floaters" aria-hidden="true"></div>
 <div id="fatal" hidden></div>
 

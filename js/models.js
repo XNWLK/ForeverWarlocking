@@ -129,9 +129,11 @@ export function makeDummy() {
   root.add(circle);
 
   // A hit makes the dummy rock back; at zero health it falls over until the next fight.
-  let rock = 0, rockSpeed = 0, fallen = 0, dead = false;
+  // The red circle shows only under the dummy you have targeted.
+  let rock = 0, rockSpeed = 0, fallen = 0, dead = false, selected = true;
   function hit(strength) { rockSpeed -= 1.6 * strength; }
-  function setDead(value) { dead = value; circle.visible = !value; }
+  function setDead(value) { dead = value; circle.visible = selected && !dead; }
+  function setSelected(value) { selected = value; circle.visible = selected && !dead; }
   function update(dt) {
     rockSpeed += (-rock * 140 - rockSpeed * 9) * dt;       // a damped spring
     rock += rockSpeed * dt;
@@ -139,7 +141,7 @@ export function makeDummy() {
     body.rotation.x = rock - fallen * 1.45;
   }
 
-  return { root: root, radius: 1.2, hit: hit, setDead: setDead, update: update, chest: new THREE.Vector3(0, 2.2, 0), head: new THREE.Vector3(0, 3.1, 0) };
+  return { root: root, radius: 1.2, hit: hit, setDead: setDead, setSelected: setSelected, update: update, chest: new THREE.Vector3(0, 2.2, 0), head: new THREE.Vector3(0, 3.1, 0) };
 }
 
 // A beam between two points, for channelled spells.

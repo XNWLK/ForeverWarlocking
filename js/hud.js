@@ -3,8 +3,8 @@
 import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
 
-export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG'];
-const DEFAULT_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'T', 'G'];
+export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG', 'KeyC', 'KeyV', 'KeyB'];
+const DEFAULT_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'T', 'G', 'C', 'V', 'B'];
 const LOG_LINES = 9;
 
 function byId(id) { return document.getElementById(id); }
@@ -43,9 +43,26 @@ export function createHud(WL, handlers) {
     bar: byId('actionBar'), dps: byId('meterDps'), damage: byId('meterDamage'), time: byId('meterTime'), spells: byId('meterSpells'),
     buildLabel: byId('buildLabel'), sim: byId('meterSim'),
     petFrame: byId('petFrame'), petSub: byId('petSub'), petManaFill: byId('petManaFill'),
-    petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow')
+    petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow'),
+    targetSub: byId('targetSub'), perDummy: byId('meterDummies'), perDummyLabel: byId('meterDummiesLabel')
   };
-  let labels = DEFAULT_LABELS.slice(), slots = [], character = null;
+  let labels = DEFAULT_LABELS.slice(), slots = [], character = null, currentTarget = 1;
+
+  // With several dummies each gets a number after its name.
+  function dummyName(ti) { return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : ''); }
+
+  // A small plate above every dummy when there is more than one: name and health. Click it to target that dummy.
+  const plates = [null];
+  for (let i = 1; i <= 3; i++) {
+    const plate = document.createElement('div'), name = document.createElement('span'), bar = document.createElement('i'), fill = document.createElement('b');
+    plate.className = 'plate';
+    plate.hidden = true;
+    bar.appendChild(fill);
+    plate.append(name, bar);
+    plate.addEventListener('click', function () { handlers.onTarget(i); });
+    byId('plates').appendChild(plate);
+    plates.push({ box: plate, name: name, fill: fill });
+  }
 
   // Desktop only, but keep the frames from overlapping in a small window.
   function fit() { hud.style.zoom = String(Math.min(1, Math.max(0.5, window.innerWidth / 1280))); }
@@ -171,9 +188,9 @@ export function createHud(WL, handlers) {
     });
   }
 
-  document.querySelectorAll('#hud button.soon').forEach(function (button) {
-    button.title = 'Not built yet';
-    button.addEventListener('click', function () { log(button.dataset.soon + ': not built yet.'); });
+  const dummyButtons = Array.prototype.slice.call(document.querySelectorAll('#hud button[data-dummies]'));
+  dummyButtons.forEach(function (button) {
+    button.addEventListener('click', function () { button.blur(); handlers.onDummies(Number(button.dataset.dummies)); });
   });
   const ringsButton = byId('btnRings');
   ringsButton.addEventListener('click', function () { setRings(!ringsButton.classList.contains('on')); handlers.onRings(ringsButton.classList.contains('on')); });
@@ -192,6 +209,9 @@ export function createHud(WL, handlers) {
     el.buildLabel.textContent = c.build.short;
     el.buildLabel.title = c.build.name;
     el.executeMark.style.left = c.executePct + '%';
+    dummyButtons.forEach(function (button) { button.classList.toggle('on', Number(button.dataset.dummies) === c.targets); });
+    el.perDummy.hidden = el.perDummyLabel.hidden = c.targets < 2;
+    currentTarget = 1;
 
     const petName = byId('petName');
     el.petFrame.classList.toggle('none', !c.build.pet);
@@ -240,6 +260,7 @@ export function createHud(WL, handlers) {
     const e = c.table[key], s = c.spells[key], parts = [];
     parts.push(e.cost ? Math.round(e.cost) + ' mana' : 'No mana cost');
     if (e.range) parts.push(e.range + ' yd range');
+    if (e.radius) parts.push('hits everything within ' + e.radius + ' yd of ' + (e.range ? 'your target' : 'you'));
     parts.push(s.kind === 'channel' ? 'Channelled, ' + s.duration + ' s' : e.cast ? e.cast + ' s cast' : 'Instant');
     if (e.cd) parts.push(e.cd + ' s cooldown');
     if (s.shards) parts.push('1 Soul Shard');
@@ -270,27 +291,46 @@ export function createHud(WL, handlers) {
   }
   function seconds(left) { return left === Infinity ? '' : left >= 60 ? Math.ceil(left / 60) + 'm' : left >= 9.5 ? String(Math.round(left)) : left.toFixed(1); }
 
-  // combat: the object from createCombat; ctx: { distance, moving }; now: seconds since the page started.
-  function render(combat, ctx, now) {
+  // combat: the object from createCombat; ctx: { distances, moving }; now: seconds since the page started;
+  // anchors: where each dummy's head is on the screen ([, a1, a2, a3], each { x, y, visible }).
+  function render(combat, ctx, now, anchors) {
     clock = now;
-    const S = combat.state, c = character;
+    const S = combat.state, c = character, ti = S.target, cur = combat.current, distance = ctx.distances[ti];
+    currentTarget = ti;
 
-    setText(el.distance, ctx.distance.toFixed(1) + ' yd');
-    setClass(el.distance, 'far', ctx.distance > c.maxRange);
+    setText(el.distance, distance.toFixed(1) + ' yd');
+    setClass(el.distance, 'far', distance > c.maxRange);
+    setText(el.targetSub, c.targets > 1 ? 'Dummy ' + ti + ' of ' + c.targets : 'Boss');
+    const nameButton = el.targetFrame.querySelector('button.name');
+    if (!nameButton.hidden) setText(nameButton, getName('dummy'));
+
+    for (let i = 1; i <= 3; i++) {
+      const plate = plates[i], a = anchors && anchors[i], show = c.targets > 1 && i <= c.targets && !!a && a.visible;
+      if (plate.box.hidden !== !show) plate.box.hidden = !show;
+      if (!show) continue;
+      const t = S.targets[i], left = Math.round(a.x) + 'px', top = Math.round(a.y - 14) + 'px';
+      if (plate.box._left !== left) { plate.box._left = left; plate.box.style.left = left; }
+      if (plate.box._top !== top) { plate.box._top = top; plate.box.style.top = top; }
+      setText(plate.name, dummyName(i));
+      setWidth(plate.fill, 100 * t.health / t.maxHealth);
+      setClass(plate.box, 'current', i === ti);
+      setClass(plate.box, 'dead', t.dead);
+    }
 
     const mana = Math.min(S.mana, c.stats.maxMana);
     setText(el.mana, whole(mana) + ' / ' + whole(c.stats.maxMana));
     setWidth(el.manaFill, 100 * mana / c.stats.maxMana);
-    setText(el.targetHealth, whole(Math.ceil(S.health)) + ' / ' + whole(S.maxHealth));
-    setWidth(el.targetFill, 100 * S.health / S.maxHealth);
-    setClass(el.targetFrame, 'execute', !S.over && combat.executePhase());
+    setText(el.targetHealth, whole(Math.ceil(cur.health)) + ' / ' + whole(cur.maxHealth));
+    setWidth(el.targetFill, 100 * cur.health / cur.maxHealth);
+    setClass(el.targetFrame, 'execute', !cur.dead && combat.executePhase());
 
     // Debuffs on the dummy, then your own buffs.
-    const debuffs = Object.keys(S.dots).filter(function (k) { return combat.dotLeft(k) > 0; }).map(function (k) {
+    const debuffs = Object.keys(cur.dots).filter(function (k) { return combat.dotLeft(k) > 0; }).map(function (k) {
       return { key: k, icon: k, name: c.spells[k].name, text: seconds(combat.dotLeft(k)) };
     });
-    ['coe', 'isb'].forEach(function (k) { if (combat.buff(k)) debuffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) }); });
-    if (combat.buff('brand') && S.brandCharges > 0) debuffs.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + S.brandCharges });
+    ['coe', 'isb'].forEach(function (k) { if (combat.debuff(ti, k)) debuffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(cur.deb[k] - S.t) }); });
+    if (combat.debuff(ti, 'brand') && cur.brandCharges > 0) debuffs.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + cur.brandCharges });
+    if (combat.havocOn() === ti) debuffs.push({ key: 'havoc', icon: 'baneOfHavoc', name: 'Bane of Havoc', text: seconds(S.havoc.expires - S.t) });
     auraList(el.debuffs, 'debuffs', debuffs);
     const buffs = [];
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
@@ -334,16 +374,16 @@ export function createHud(WL, handlers) {
       const slot = slots[i], key = slot.key;
       if (!key) continue;
       const own = Math.max(0, (S.cds[key] || 0) - S.t);
-      const span = key === 'racial' ? c.racial.cd : c.table[key].cd || 0;
+      const span = key === 'racial' ? c.racial.cd : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'baneOfHavoc';
       let frac = 0, text = '';
       if (own > gcdLeft && span) { frac = own / span; text = own >= 60 ? Math.ceil(own / 60) + 'm' : String(Math.ceil(own)); }
-      else if (key !== 'racial' && gcdLeft > 0) frac = gcdLeft / gcdSpan;
+      else if (!offGcd && gcdLeft > 0) frac = gcdLeft / gcdSpan;
       setHeight(slot.cool, 100 * Math.min(1, frac));
       setText(slot.secs, text);
       const why = key === 'racial' || S.over ? null : combat.blocked(key, ctx);
       setClass(slot.button, 'no-mana', why === 'mana');
       setClass(slot.button, 'no-range', why === 'range');
-      setClass(slot.button, 'unusable', why === 'shards' || why === 'immolate' || S.over);
+      setClass(slot.button, 'unusable', why === 'shards' || why === 'immolate' || why === 'dead' || S.over);
       setClass(slot.button, 'active', !!((cast && cast.key === key) || (channel && channel.key === key)));
       setClass(slot.button, 'queued', combat.queuedKey === key);
       setClass(slot.button, 'proc', (key === 'shadowBolt' && combat.buff('shadowTrance')) || (key === 'soulFire' && combat.buff('decimation')));
@@ -358,23 +398,32 @@ export function createHud(WL, handlers) {
       setText(el.dps, whole(time > 0.5 ? res.total / time : 0));
       setText(el.damage, whole(res.total));
       setText(el.time, Math.floor(time / 60) + ':' + String(Math.floor(time % 60)).padStart(2, '0'));
-      const rows = Object.keys(res.bySpell).filter(function (k) { return res.bySpell[k].dmg > 0; })
-        .sort(function (a, b) { return res.bySpell[b].dmg - res.bySpell[a].dmg; }).slice(0, 7);
+      const sums = {};
+      Object.keys(res.bySpell).forEach(function (k) {
+        const base = k.replace(/^x\d:/, '');
+        if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg;
+      });
+      const rows = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; }).slice(0, 7);
       while (el.spells.children.length > rows.length) el.spells.removeChild(el.spells.lastChild);
       while (el.spells.children.length < rows.length) {
         const li = document.createElement('li');
         li.append(document.createElement('i'), document.createElement('span'), document.createElement('span'));
         el.spells.appendChild(li);
       }
-      const top = rows.length ? res.bySpell[rows[0]].dmg : 1;
+      const top = rows.length ? sums[rows[0]] : 1;
       rows.forEach(function (k, i) {
-        const li = el.spells.children[i], dmg = res.bySpell[k].dmg, s = c.spells[k];
+        const li = el.spells.children[i], dmg = sums[k], s = c.spells[k];
         setClass(li, 'fire', !!s && s.school === 'fire');
         setClass(li, 'pet', k.indexOf('pet:') === 0);
         setWidth(li.children[0], 100 * dmg / top);
         setText(li.children[1], s ? s.name : label(k));
         setText(li.children[2], whole(dmg) + '  ' + Math.round(100 * dmg / res.total) + '%');
       });
+      if (c.targets > 1) {
+        const parts = [];
+        for (let i = 1; i <= c.targets; i++) parts.push(whole(res.byTarget[i]));
+        setText(el.perDummy, parts.join(' · '));
+      }
     }
   }
 
@@ -391,7 +440,7 @@ export function createHud(WL, handlers) {
   function setSimAverage(result) {
     simAverage = result;
     el.sim.textContent = result ? whole(result.dps) + ' DPS' : '\u2026';
-    el.sim.title = result ? 'The sim kills this dummy in ' + result.seconds.toFixed(1) + ' s on average (' + result.fights + ' fights)' : 'Calculating';
+    el.sim.title = result ? 'The sim needs ' + result.seconds.toFixed(1) + ' s for the same total health (' + result.fights + ' fights)' : 'Calculating';
   }
 
   // ---------- things that happen ----------
@@ -421,7 +470,7 @@ export function createHud(WL, handlers) {
   // e: an event from the casting rules; anchor: where the dummy's head is on the screen { x, y, visible };
   // quiet: write the log line but leave the floating number for later (a bolt is still on its way).
   function event(e, anchor, quiet) {
-    const c = character, dummy = getName('dummy');
+    const c = character, dummy = dummyName(e.target);
     const name = e.key && c.spells[e.key] ? c.spells[e.key].name : e.key === 'touchOfTheGrave' ? 'Touch of the Grave' : e.key === 'isb' ? 'Improved Shadow Bolt' : e.name || '';
     if (e.pet && (e.type === 'hit' || e.type === 'miss')) {
       const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
@@ -433,14 +482,18 @@ export function createHud(WL, handlers) {
         if (!quiet) floatFor(e, anchor);
       }
     } else if (e.type === 'petMode') {
-      log(getName(c.build.pet) + (e.mode === 'attack' ? ' attacks.' : ' follows you.'), 'proc');
+      log(getName(c.build.pet) + (e.mode === 'attack' ? ' attacks' + (c.targets > 1 ? ' ' + dummy : '') + '.' : ' follows you.'), 'proc');
+    } else if (e.type === 'havoc') {
+      float(whole(e.amount), 'tick', anchor);
+    } else if (e.type === 'target') {
+      if (c.targets > 1) log((e.auto ? 'New target: ' : 'Target: ') + dummy + '.');
     } else if (e.type === 'petCast') {
       // shown by the Imp itself
     } else if (e.type === 'hit') {
       log(name + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.crit ? '!' : '.'), e.crit ? 'crit' : '');
       if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'tick') {
-      log(name + ' ticks for ' + whole(e.amount) + (e.crit ? ' (crit).' : '.'), e.crit ? 'crit' : '');
+      log(name + ' ticks ' + (c.targets > 1 ? dummy + ' ' : '') + 'for ' + whole(e.amount) + (e.crit ? ' (crit).' : '.'), e.crit ? 'crit' : '');
       floatFor(e, anchor);
     } else if (e.type === 'miss') {
       log(name + ' misses ' + dummy + '.', 'miss');
@@ -460,10 +513,11 @@ export function createHud(WL, handlers) {
     } else if (e.type === 'refund') {
       log('Shadow and Flame returns the Soul Shard.', 'proc');
     } else if (e.type === 'interrupt') {
-      if (e.reason !== 'clipped') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
+      if (e.reason !== 'clipped' && e.reason !== 'dead') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
     } else if (e.type === 'fail') {
       showError(e.text);
     } else if (e.type === 'death') {
+      if (!e.last) { log(dummy + ' dies.', 'crit'); return; }
       log(dummy + ' dies. ' + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
       if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
       log('Press Reset to fight again.');

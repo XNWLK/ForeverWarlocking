@@ -18,7 +18,7 @@ function wrapAngle(a) {
   return a;
 }
 
-// world: { half, wallHeight, colliders: [{ x, z, r }] }
+// world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional) }
 export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
   const player = { x: start.x, z: start.z, yaw: start.yaw, height: 0, fall: 0, moving: false };
@@ -48,8 +48,9 @@ export function createControls(canvas, camera, world) {
     canvas.classList.toggle('look', mouse.left && !mouse.right);
   }
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  let pressed = null;                                     // where and when the left button went down
   canvas.addEventListener('pointerdown', function (e) {
-    if (e.button === 0) mouse.left = true;
+    if (e.button === 0) { mouse.left = true; pressed = { x: e.clientX, y: e.clientY, at: performance.now() }; }
     if (e.button === 2) {
       mouse.right = true;
       player.yaw = wrapAngle(player.yaw + view.offset);   // the character turns to where the camera looks
@@ -59,7 +60,12 @@ export function createControls(canvas, camera, world) {
     showCursor();
   });
   function release(e) {
-    if (e.button === 0) mouse.left = false;
+    if (e.button === 0) {
+      mouse.left = false;
+      // A short press without dragging is a click on whatever is under the pointer (a dummy, to target it).
+      if (pressed && world.onClick && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < 5 && performance.now() - pressed.at < 400) world.onClick(e.clientX, e.clientY);
+      pressed = null;
+    }
     if (e.button === 2) mouse.right = false;
     if (!mouse.left && !mouse.right && canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
     showCursor();

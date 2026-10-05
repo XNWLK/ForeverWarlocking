@@ -216,3 +216,17 @@ button.soon { color: var(--ink-dim); border-style: dashed; }
 .float.pet.crit { font-size: 19px; color: #ffe27a; }
 .meter li.pet i { background: rgba(110, 170, 120, 0.45); }
 .meter dt[title] { cursor: help; }
+
+/* ======================================================================
+   Step 4: several dummies
+   ====================================================================== */
+.slot { width: 40px; height: 40px; }
+.log { width: 270px; }
+#plates { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.plate { position: absolute; transform: translate(-50%, -100%); width: 110px; padding: 2px 4px 3px; border-radius: 4px; background: rgba(14, 11, 22, 0.72); border: 1px solid var(--panel-line); color: #ff9c92; font: 600 11px/1.3 "Segoe UI", system-ui, sans-serif; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; pointer-events: auto; }
+.plate i { display: block; height: 5px; margin-top: 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.plate i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
+.plate.current { border-color: #ffd76a; color: #ffd76a; }
+.plate.dead { opacity: 0.45; }
+.plate[hidden] { display: none; }
+#meterDummies { font-size: 11px; }
