@@ -8,7 +8,7 @@
 // No drawing and no page access in this file, so it also runs in Node for the check.
 //
 // Not carried over (all off in the default settings): potions and runes, explosives, Power Infusion, Mana Tide,
-// Innervate, damage taken (pushback).
+// Innervate.
 //
 // Where this goes further than the engine:
 // - Pets attack only while they are told to and stand in range of their target; in the engine the pet attacks the
@@ -17,6 +17,8 @@
 //   you may cast anything at any of them. The engine has one boss and plainer extra targets; whatever it does to them
 //   happens here in the same way.
 // - Area spells hit the targets that really stand in their area; in the engine they hit every target.
+// - It keeps a record of the fight for the review afterwards: time spent not casting, how long each DoT was up, how
+//   long the pet attacked, mana that could not be regained at a full bar.
 
 const EPS = 1e-9;
 
@@ -40,8 +42,12 @@ export const FAIL_TEXT = {
 export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + key : key; }
 
 // opts: WL, build, raceKey, config, dummyHealth, targets (1-3), seed (optional), onEvent (optional),
-//       petMeleeRange (yards), linearDuration (check mode: every target's health falls with time over this many
-//       seconds and nothing dies).
+//       petMeleeRange (yards),
+//       timedDuration: a fight of this many seconds instead of a health pool - health falls evenly with time (as in
+//       the engine) and the fight ends when the time is up,
+//       linearDuration: the same health model for the check script, with the clock running from the reset.
+// From config.fight (as in the engine): moveEvery / moveDuration = every so many seconds you have to move for so
+//       long (only instants then); hitEvery = you take a hit every so many seconds, which pushes your casts back.
 // ctx (given to update, press and blocked): { moving, distances: [, d1, d2, d3] you to each target,
 //       gaps: [[..]] target to target, petDistance: the pet to its target }. Anything left out counts as "in range".
 export function createCombat(opts) {
@@ -51,7 +57,12 @@ export function createCombat(opts) {
   const SPELLS = WL.spellsFor(cfg);
   const race = WL.RACES[raceKey], cb = cfg.combat, isSB = WL.isShadowBolt;
   const emit = opts.onEvent || function () {};
-  const linear = opts.linearDuration || 0;
+  const check = !!opts.linearDuration, timed = !check && !!opts.timedDuration;
+  const linear = opts.linearDuration || opts.timedDuration || 0;
+  const MOVE = cfg.fight.moveEvery > 0 && cfg.fight.moveDuration > 0 ? { every: cfg.fight.moveEvery, dur: cfg.fight.moveDuration } : null;
+  const HIT = cfg.fight.hitEvery > 0 ? cfg.fight.hitEvery : 0;
+  const AURA_PUSH = Object.keys(cfg.buffs || {}).reduce(function (a, k) { const b = cfg.buffs[k]; return a + (b.on && b.pushbackResistPct ? b.pushbackResistPct : 0); }, 0);
+  const FEL_CONC = { drainLife: 1, drainSoul: 1, wrack: 1 };
   const N = Math.max(1, Math.min(3, opts.targets || 1));
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
@@ -74,7 +85,7 @@ export function createCombat(opts) {
     // One random stream per kind of roll, with the engine's own constants.
     R = { hit: WL.makeRng(seed0 ^ 0x1B873593), crit: WL.makeRng(seed0 ^ 0x85EBCA6B), proc: WL.makeRng(seed0 ^ 0xC2B2AE35),
           vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), isb: WL.makeRng(seed0 ^ 0x9E3779B9),
-          pet: WL.makeRng(seed0 ^ 0x165667B1) };
+          pet: WL.makeRng(seed0 ^ 0x165667B1), push: WL.makeRng(seed0 ^ 0x61C88647) };
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, shards: cfg.fight.startingShards,
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
@@ -88,7 +99,8 @@ export function createCombat(opts) {
       if (coeFromOthers && i === 1) T[i].deb.coe = Infinity;
     }
     S.targets = T;
-    res = { total: 0, bySpell: {}, byTarget: [0, 0, 0, 0] };
+    res = { total: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
+            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     P = makePet(build.pet);
     S.decideSeq = order++;
@@ -117,6 +129,23 @@ export function createCombat(opts) {
   }
   function manaCap() { return stats.maxMana + (S.cast ? S.cast.cost : 0); }
   function executePhase(ti) { return T[ti || S.target].hpPct < cfg.fight.executePct; }
+  // Seconds into the fight (the engine's clock): from the reset in the check, from your first action in play.
+  function fightTime(t) { return check ? t : S.fightStart === null ? -1 : t - S.fightStart; }
+  // When a timed fight is over (Infinity while it has not started, or when it is not timed).
+  function endAt() { return check ? linear : timed && S.fightStart !== null ? S.fightStart + linear : Infinity; }
+  // Movement phases: from `every` seconds on, every `every` seconds you have to move for `dur` seconds.
+  function forcedMove(t) {
+    if (!MOVE) return false;
+    const ft = fightTime(t == null ? S.t : t);
+    if (ft < 0) return false;
+    const k = Math.floor((ft + EPS) / MOVE.every);
+    return k >= 1 && ft + EPS - k * MOVE.every < MOVE.dur;
+  }
+  function beginFight() {
+    if (S.fightStart !== null) return;
+    S.fightStart = S.t;
+    if (HIT) push({ t: S.t + R.push() * HIT, o: 1, type: 'dmgTaken' });    // the first hit comes somewhere in the first interval
+  }
   // Distances come from the scene; without them (the check script) everything is in range.
   function distanceTo(ti, ctx) { const c = ctx || lastCtx; return c && c.distances && c.distances[ti] != null ? c.distances[ti] : 0; }
   function gap(a, b) { const c = lastCtx; return a === b ? 0 : c && c.gaps && c.gaps[a] && c.gaps[a][b] != null ? c.gaps[a][b] : 0; }
@@ -240,7 +269,7 @@ export function createCombat(opts) {
     if (tog && R.proc() * 100 < tog.chancePct) {
       const amount = stats.maxHealth * tog.maxHealthPct / 100;
       row('touchOfTheGrave').casts++;
-      const on = linear ? 1 : ti;                                     // the engine books it on the boss
+      const on = check ? 1 : ti;                                      // the engine books it on the boss
       if (alive(on)) deal('touchOfTheGrave', amount, false, false, on);
     }
   }
@@ -249,7 +278,7 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key], id = ++inst, t = T[ti];
     if (s.bane) {                                                     // one Bane per target
       delete t.dots.baneOfAgony; delete t.dots.baneOfDoom;
-      if (!linear && S.havoc && S.havoc.target === ti) S.havoc = null;
+      if (!check && S.havoc && S.havoc.target === ti) S.havoc = null;
     }
     t.dots[key] = { inst: id, applied: S.t, expires: S.t + s.duration, ticks: e.ticks, snap: snap };
     for (let i = 1; i <= e.ticks; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'dotTick', key: key, target: ti, inst: id, i: i - 1 });
@@ -277,7 +306,7 @@ export function createCombat(opts) {
     for (let ti = 1; ti <= N; ti++) {
       if (S.over) return;
       if (!alive(ti)) continue;
-      if (!linear && (s.range ? gap(aimed, ti) : distanceTo(ti)) > e.radius + EPS) continue;
+      if (!check && (s.range ? gap(aimed, ti) : distanceTo(ti)) > e.radius + EPS) continue;
       const r = row(rowKey(ti, key));
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
@@ -387,7 +416,7 @@ export function createCombat(opts) {
   }
   function petEvent(t, o, type) { push({ t: t, o: o, type: type, gen: P.gen }); }
   function petAct() {                       // its spell: Firebolt again and again, Lash of Pain whenever it is ready
-    if (!P.c.spell || (linear && S.t >= linear - EPS)) return;
+    if (!P.c.spell || (S.t >= endAt() - EPS)) return;
     petRegen();
     const sp = P.c.spell;
     if (sp.cd && P.lashReady > S.t + EPS) { petEvent(P.lashReady, 2, 'petAct'); return; }
@@ -406,7 +435,7 @@ export function createCombat(opts) {
     }
   }
   function petSwing() {                     // the Succubus's melee: one roll decides miss, dodge, glancing, crit or hit
-    if (linear && S.t >= linear - EPS) return;
+    if (S.t >= endAt() - EPS) return;
     const m = P.c.melee, ti = P.target, r = row(rowKey(ti, 'pet:melee')), tb = cb.petMelee, gen = P.gen;
     r.casts++;
     const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
@@ -441,7 +470,7 @@ export function createCombat(opts) {
     P.gen++;                                // whatever it had planned is dropped
     P.casting = null;
     if (!wanted) return;
-    if (S.fightStart === null) S.fightStart = S.t;
+    beginFight();
     if (P.c.melee) petEvent(Math.max(S.t, P.swingReady), 0, 'petSwing');
     if (P.c.spell) petEvent(S.t, 2, 'petAct');
   }
@@ -479,7 +508,7 @@ export function createCombat(opts) {
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
     if (key !== 'lifeTap') {
-      if (S.fightStart === null) S.fightStart = S.t;
+      beginFight();
       if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', ti); }   // the pet joins in by itself
     }
     S.presses.push({ t: S.t, k: key, target: ti });
@@ -491,6 +520,7 @@ export function createCombat(opts) {
       const before = S.mana;
       S.mana = Math.min(stats.maxMana, S.mana + gain);
       row('lifeTap').casts++;
+      res.track.lifeTaps++;
       emit({ type: 'mana', source: 'Life Tap', amount: S.mana - before });
       if (P && tv('demonicEnergies')) {     // Demonic Energies: the pet gains a share of the mana you gained
         petRegen();
@@ -521,7 +551,7 @@ export function createCombat(opts) {
     } else if (castT > EPS) {
       const id = ++inst;
       if (e.cd) S.cds[key] = S.t + e.cd;                 // as in the engine: the cooldown runs from the start of the cast
-      S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation') };
+      S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, full: castT, hits: 0, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation') };
       push({ t: S.t + castT, o: 1, type: 'castEnd', inst: id });
     } else {
       if (trance) delete S.buffs.shadowTrance;
@@ -533,8 +563,37 @@ export function createCombat(opts) {
     S.decideSeq = order++;
   }
 
+  // You take a hit (config.fight.hitEvery). A cast is pushed back 1.0 / 0.8 / 0.6 / 0.4 / 0.2 s, then 0.2 s for every
+  // later hit of the same cast, never further than its full length from now; a channel loses a quarter of its full
+  // length. Intensity (Destruction spells), Fel Concentration (the drains) and Concentration Aura protect: one roll.
+  function takeHit() {
+    const c = S.channel, key = c ? c.key : S.cast && S.t < S.cast.end - EPS ? S.cast.key : null;   // not a cast ending right now
+    if (!key) return;
+    let protect = AURA_PUSH;
+    if (SPELLS[key].tree === 'destruction') protect += tv('intensity', 'resistPct');
+    if (FEL_CONC[key]) protect += tv('felConcentration', 'resistPct');
+    protect = Math.min(100, protect);
+    if (protect > 0 && R.push() * 100 < protect) { emit({ type: 'pushResist', key: key }); return; }
+    let lost;
+    if (c) {
+      const end = Math.max(S.t, c.end - 0.25 * SPELLS[key].duration);
+      lost = c.end - end; c.end = end;
+      push({ t: c.end, o: 1, type: 'chanEnd', inst: c.inst });
+    } else {
+      const cs = S.cast, step = Math.max(0.2, 1 - 0.2 * cs.hits), end = Math.min(cs.end + step, S.t + cs.full);
+      lost = end - cs.end; cs.hits++;
+      if (lost <= EPS) return;
+      cs.end = end; cs.inst = ++inst;                    // the old ending no longer counts
+      push({ t: cs.end, o: 1, type: 'castEnd', inst: cs.inst });
+    }
+    res.track.pushbacks++; res.track.pushbackTime += lost;
+    emit({ type: 'pushback', key: key, lost: lost, channel: !!c });
+    S.decideSeq = order++;
+  }
+
   // Stops a cast bar or a channel (you moved, pressed Escape, cast something else over a channel, or the target died).
   function interrupt(reason) {
+    if ((S.cast || S.channel) && reason === 'moving') res.track.interrupts++;
     if (S.cast) {
       const key = S.cast.key;
       if (table[key].cd) delete S.cds[key];              // nothing was cast: no cooldown, no cost
@@ -574,7 +633,7 @@ export function createCombat(opts) {
     if (S.mana < e.cost - 1e-6) return fail('baneOfHavoc', 'mana');
     if (distanceTo(ti, ctx) > e.range + EPS) return fail('baneOfHavoc', 'range');
     S.mana -= e.cost;
-    if (!linear) { delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
+    if (!check) { delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
     S.havoc = { target: ti, expires: S.t + SPELLS.baneOfHavoc.duration };
     row('baneOfHavoc').casts++;
     S.presses.push({ t: S.t, k: 'baneOfHavoc', target: ti });
@@ -600,7 +659,7 @@ export function createCombat(opts) {
     if (s.shards && !(key === 'soulFire' && buff('decimation')) && S.shards < s.shards) return 'shards';
     if (S.mana < effectiveCost(key) - 1e-6) return 'mana';
     if (ctx && e.range > 0 && distanceTo(ti, ctx) > e.range + EPS) return 'range';
-    if (ctx && ctx.moving && (s.kind === 'channel' || castTime(key) > EPS)) return 'moving';
+    if (((ctx && ctx.moving) || forcedMove()) && (s.kind === 'channel' || castTime(key) > EPS)) return 'moving';
     return null;
   }
 
@@ -638,10 +697,42 @@ export function createCombat(opts) {
   // ---------- time ----------
   function advance(to) {
     if (to <= S.t) return;
+    const from = S.t, span = to - from, fighting = S.fightStart !== null && !S.over && !check;
+    if (fighting) {                                      // the record for the review
+      const k = res.track;
+      k.busy += Math.max(0, ((S.cast || S.channel) ? to : Math.min(to, S.gcdReady)) - from);
+      if (P && P.active) k.petActive += span;
+      if (forcedMove(from)) k.moved += span;
+      for (let i = 1; i <= N; i++) {
+        const t = T[i];
+        if (t.dead) continue;
+        for (const key in t.dots) { const left = Math.min(to, t.dots[key].expires) - from; if (left > 0) k.uptime[i + ':' + key] = (k.uptime[i + ':' + key] || 0) + left; }
+        for (const name in t.deb) {
+          if (name === 'brand' && !(t.brandCharges > 0)) continue;
+          const left = Math.min(to, t.deb[name]) - from;
+          if (left > 0) k.uptime[i + ':' + name] = (k.uptime[i + ':' + name] || 0) + left;
+        }
+      }
+    }
     // While a cast bar runs its price is already spoken for, so mana you regain is not lost at a full bar.
-    if (stats.mp5) S.mana = Math.min(manaCap(), S.mana + stats.mp5 / 5 * (to - S.t));
+    if (stats.mp5) {
+      const gained = S.mana + stats.mp5 / 5 * span, cap = manaCap();
+      if (fighting && gained > cap) res.track.wasted += gained - Math.max(cap, S.mana);
+      S.mana = Math.min(cap, gained);
+    }
     S.t = to;
-    if (linear) { const pct = 100 * (1 - S.t / linear); for (let i = 1; i <= N; i++) T[i].hpPct = pct; }
+    if (linear) {
+      const ft = fightTime(S.t), pct = ft < 0 ? 100 : Math.max(0, 100 * (1 - ft / linear));
+      for (let i = 1; i <= N; i++) { T[i].hpPct = pct; if (timed) T[i].health = T[i].maxHealth * pct / 100; }
+    }
+  }
+
+  // A timed fight is over: the clock stops, everything stops.
+  function timeUp() {
+    S.over = true; S.fightEnd = S.t;
+    S.cast = null; S.channel = null; events.length = 0; queued = null; S.eurekaPending = 0;
+    if (P) { P.active = false; P.gen++; P.casting = null; }
+    emit({ type: 'death', target: S.target, last: true, timed: true, seconds: linear, total: res.total, dps: res.total / linear });
   }
 
   function handle(ev) {
@@ -657,9 +748,18 @@ export function createCombat(opts) {
       if (!d || d.inst !== ev.inst) return;              // refreshed, consumed, or the target is dead
       periodicTick(ev.key, d.snap, ev.i, ev.target);
       if (!S.over && ev.i === d.ticks - 1 && T[ev.target].dots[ev.key] === d) delete T[ev.target].dots[ev.key];
+    } else if (ev.type === 'dmgTaken') {
+      takeHit();
+      push({ t: S.t + HIT, o: 1, type: 'dmgTaken' });
+    } else if (ev.type === 'chanEnd') {                  // a channel shortened by a hit ends early
+      const c = S.channel;
+      if (!c || c.inst !== ev.inst || c.end > S.t + EPS) return;
+      if (c.eurekaHeld) eurekaRelease();
+      S.channel = null;
     } else if (ev.type === 'chanTick') {
       const c = S.channel;
       if (!c || c.inst !== ev.inst) return;              // stopped
+      if (ev.t > c.end + EPS) return;                    // cut off by a hit; the channel's end closes it
       if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target);
       if (!S.over && S.channel === c && ev.i === table[ev.key].ticks - 1) { if (c.eurekaHeld) eurekaRelease(); S.channel = null; }
     } else if (ev.type === 'petAct') {
@@ -687,7 +787,7 @@ export function createCombat(opts) {
       const due = !!first && (first.t < limit - EPS || (first.t <= limit + EPS && (first.o < 2 || first.seq < S.decideSeq)));
       if (due) {
         const ev = events.shift();
-        if (linear && ev.t > linear + EPS) { events.length = 0; break; }
+        if (ev.t > endAt() + EPS) { events.unshift(ev); break; }
         advance(ev.t);
         handle(ev);
       } else if (queueAt <= now + EPS) {
@@ -697,8 +797,9 @@ export function createCombat(opts) {
         tryCast(q.key, ctx);
       } else break;
     }
-    advance(now);
-    if (!S.over && ctx && ctx.moving && (S.cast || S.channel)) interrupt('moving');
+    if (!S.over && timed && now >= endAt() - EPS) { advance(endAt()); timeUp(); return; }
+    advance(check ? Math.min(now, linear) : now);
+    if (!S.over && ((ctx && ctx.moving) || forcedMove()) && (S.cast || S.channel)) interrupt('moving');
   }
 
   reset(opts.seed);
@@ -717,6 +818,16 @@ export function createCombat(opts) {
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },
     castTime: castTime, gcd: gcd, cost: effectiveCost, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
     alive: alive, havocOn: havocOn, eurekaUp: eurekaUp, executePhase: executePhase,
+    timed: timed, duration: linear,
+    // { moving, left } while you are made to move; { moving: false, next } = seconds until the next phase (null = none)
+    movePhase: function () {
+      if (!MOVE) return null;
+      const ft = fightTime(S.t);
+      if (ft < 0 || S.over) return { moving: false, next: null };
+      const k = Math.floor((ft + EPS) / MOVE.every), into = ft - k * MOVE.every;
+      return k >= 1 && into < MOVE.dur ? { moving: true, left: MOVE.dur - into } : { moving: false, next: (k + 1) * MOVE.every - ft };
+    },
+    timeLeft: function () { return timed ? (S.fightStart === null ? linear : Math.max(0, endAt() - S.t)) : null; },
     racial: function () { return racialOf('cooldown'); },
     fightSeconds: function () { return S.fightStart === null ? 0 : (S.fightEnd !== null ? S.fightEnd : S.t) - S.fightStart; }
   };

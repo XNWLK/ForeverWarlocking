@@ -5,7 +5,8 @@
 // spell and target by target, the pet's attacks included. The pet attacks from the first moment, as in the engine.
 //
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
-// included where the build has it), and Rain of Fire and Hellfire as the filler on several targets.
+// included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
+// two seconds (pushback), and movement phases.
 //
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
@@ -20,7 +21,9 @@ const SCENES = [
   { name: '2 targets', targets: 2, seeds: [4] },
   { name: '3 targets', targets: 3, seeds: [5] },
   { name: '3 targets, Rain of Fire', targets: 3, seeds: [6], filler: 'rainOfFire' },
-  { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' }
+  { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' },
+  { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
+  { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
@@ -40,19 +43,28 @@ for (const scene of SCENES) {
         const cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
         cfg.fight.targets = scene.targets;
         cfg.fight.multiDot = scene.targets > 1;
+        Object.assign(cfg.fight, scene.fight || {});
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
 
         const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });
         const problems = [];
+        let freeSince = 0;                 // when the caster became free after the last cast (the engine waits from there)
         combat.petCommand('attack', 1);
         combat.update(0, ctx);
         for (const entry of sim.log) {
           if (entry.type !== 'cast' && entry.type !== 'racial') continue;
           // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when
-          // a channel was cut short for this cast) the channel tick it was cut at - whichever lies at the logged time.
+          // a channel was cut short for this cast) the channel tick it was cut at, or the end of a movement phase, or
+          // a tenth of a second later each time the engine found nothing to cast - whichever lies at the logged time.
           combat.update(entry.t - 0.001, ctx);
           let at = entry.t, off = 0.00051;
-          for (const candidate of [combat.readyAt()].concat(combat.eventTimes())) {
+          const candidates = [combat.readyAt()].concat(combat.eventTimes());
+          for (let j = 0; j <= 400; j++) candidates.push(freeSince + j * 0.1);
+          if (cfg.fight.moveEvery) {
+            const k = Math.floor(entry.t / cfg.fight.moveEvery);
+            candidates.push(k * cfg.fight.moveEvery, k * cfg.fight.moveEvery + cfg.fight.moveDuration);
+          }
+          for (const candidate of candidates) {
             if (Math.abs(candidate - entry.t) < off) { at = candidate; off = Math.abs(candidate - entry.t); }
           }
           combat.update(at, ctx);
@@ -62,6 +74,7 @@ for (const scene of SCENES) {
           combat.setTarget(key === 'baneOfHavoc' ? 2 : extra ? Number(extra[1]) : 1);
           const result = combat.press(key, ctx);
           if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
+          freeSince = Math.max(combat.readyAt(), combat.state.channel ? combat.state.channel.end : 0);
         }
         combat.update(DURATION, ctx);
 
