@@ -1,0 +1,22 @@
+# Local-only notes: reference links, source trail, anything that names other projects
+private/
+CHANGELOG.md
+TODO.md
+
+# Working notes: the briefing and the notes on the vendored sim stay local
+CLAUDE.md
+docs/
+
+# Dependencies and build output (if a bundler is ever added)
+node_modules/
+dist/
+
+# Claude Code per-machine settings (launch.json stays in the repository)
+.claude/settings.local.json
+
+# OS / editor clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
