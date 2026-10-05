@@ -11,7 +11,7 @@ export function makeWarlock() {
   root.add(rig);
   root.add(groundShadow(0.8));
 
-  const robe = flat(0x4a2a7c), robeDark = flat(0x2c1650), lining = flat(0x1c0f33), gold = flat(0xd2a83c), skin = flat(0xcfa184);
+  const robe = flat(0x6a2f96), robeDark = flat(0x42195f), lining = flat(0x241036), gold = flat(0xd2a83c), skin = flat(0xcfa184);
   const bone = flat(0xcabfa6), wood = flat(0x4a2f1a), leather = flat(0x3a2414), iron = flat(0x3b3846);
 
   // Robe: a flared skirt in two layers, a front panel with a gold edge, a hem band.

@@ -2,6 +2,7 @@
 // meter, floating damage numbers, and the pickers for build and race.
 import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
+import { setTip, initTips, refreshTips } from './tooltip.js';
 
 export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG', 'KeyC', 'KeyV', 'KeyB'];
 // What to print on a slot for a key, when the browser cannot tell us the letter on the keyboard in use.
@@ -43,6 +44,14 @@ const AURA_INFO = {
   snfFire: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Fire)' },
   brand: { icon: 'talent_demonicBrand', name: 'Demonic Brand' }
 };
+// The data's tooltip texts carry a few leftovers of the formulas they were made from.
+function tidy(text) {
+  return text.replace(/\s*\*\s*\(+1\)+/g, '').replace(/\[\(([^\[\]]*)\)\]/g, '$1').replace(/ {2,}/g, ' ');
+}
+function span(seconds) {
+  const s = Math.round(seconds * 100) / 100;
+  return s >= 60 ? (Math.round(s / 6) / 10) + ' min' : s + ' sec';
+}
 const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
 const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
 const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
@@ -60,7 +69,8 @@ export function createHud(WL, handlers) {
     petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow'),
     targetSub: byId('targetSub'), perDummy: byId('meterDummies'), perDummyLabel: byId('meterDummiesLabel')
   };
-  let codes = ACTION_CODES.slice(), layout = null, slots = [], character = null, currentTarget = 1;
+  let codes = ACTION_CODES.slice(), layout = null, slots = [], character = null, currentTarget = 1, lastCombat = null;
+  initTips();
   function labelFor(code) { const k = layout && layout.get(code); return k ? k.toUpperCase() : plainLabel(code); }
   function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = labelFor(codes[i]); }); }
 
@@ -299,7 +309,10 @@ export function createHud(WL, handlers) {
   // c: { build, raceKey, stats, table, spells, bar: [spell keys], racial, dummyHealth, executePct }
   function setCharacter(c) {
     character = c;
+    lastCombat = null;
     byId('playerPortrait').src = WL.ICONS['race_' + c.raceKey];
+    byId('petPortrait').src = c.build.pet ? WL.ICONS['pet_' + c.build.pet] || '' : '';
+    byId('petPortrait').title = c.build.pet ? PET_KIND[c.build.pet] || '' : '';
     byId('playerSub').textContent = 'Level 60 ' + WL.RACES[c.raceKey].name;
     el.health.textContent = whole(c.stats.maxHealth) + ' / ' + whole(c.stats.maxHealth);
     el.buildLabel.textContent = c.build.short;
@@ -340,7 +353,7 @@ export function createHud(WL, handlers) {
         slot.secs = document.createElement('span'); slot.secs.className = 'secs';
         slot.count = document.createElement('span'); slot.count.className = 'count';
         button.append(img, slot.cool, slot.secs, slot.count);
-        button.title = tooltip(key, name, c);
+        setTip(button, function () { return spellTip(i); });
       }
       button.addEventListener('click', function () { button.blur(); if (editing) pickSlot(i); else if (key) handlers.onPress(key); });
       slot.kbd.textContent = labelFor(code);
@@ -355,17 +368,67 @@ export function createHud(WL, handlers) {
     showBinds();
   }
 
-  function tooltip(key, name, c) {
-    if (key === 'racial') return name + '\n' + c.racial.cd + ' s cooldown, not on the global cooldown';
-    const e = c.table[key], s = c.spells[key], parts = [];
-    parts.push(e.cost ? Math.round(e.cost) + ' mana' : 'No mana cost');
-    if (e.range) parts.push(e.range + ' yd range');
-    if (e.radius) parts.push('hits everything within ' + e.radius + ' yd of ' + (e.range ? 'your target' : 'you'));
-    parts.push(s.kind === 'channel' ? 'Channelled, ' + s.duration + ' s' : e.cast ? e.cast + ' s cast' : 'Instant');
-    if (e.cd) parts.push(e.cd + ' s cooldown');
-    if (s.shards) parts.push('1 Soul Shard');
-    const text = WL.SPELL_TEXT && WL.SPELL_TEXT[key];
-    return name + '\n' + parts.join(' · ') + (typeof text === 'string' ? '\n\n' + text : '');
+  // ---------- tooltips ----------
+  function spellText(id) { const t = WL.SPELL_TEXT && WL.SPELL_TEXT[id]; return typeof t === 'string' ? tidy(t) : ''; }
+  function talentRank(key) { return (character.build.talents && character.build.talents[key]) || 0; }
+  function talentText(key) {
+    const rank = talentRank(key), t = WL.TALENT_TEXT && WL.TALENT_TEXT[key];
+    return rank && t ? tidy(t[Math.min(rank, t.length) - 1]) : '';
+  }
+  function talentValue(key, field) {
+    const rank = talentRank(key), t = (WL.TALENTS || []).filter(function (x) { return x.key === key; })[0];
+    return rank && t && t.v && t.v[field] ? t.v[field][Math.min(rank, t.v[field].length) - 1] : null;
+  }
+  // What a spell does for you with this gear and these talents (before crits and what is on the dummy).
+  function yours(key) {
+    const e = character.table[key], s = character.spells[key], parts = [];
+    if (e.directDmg) parts.push('about ' + whole(e.directDmg) + (s.aoe ? ' to each dummy' : ' a hit'));
+    if (e.tickDmg && e.ticks) {
+      if (s.kind === 'channel') parts.push('about ' + whole(e.tickDmg) + ' a tick' + (s.aoe ? ' to each dummy' : '') + ', ' + e.ticks + ' ticks');
+      else if (e.ticks === 1) parts.push('about ' + whole(e.tickDmg) + ' after ' + span(s.duration));
+      else parts.push('about ' + whole(e.tickDmg * e.ticks) + ' over ' + span(s.duration) + (s.ramp ? '' : ' (' + whole(e.tickDmg) + ' a tick)'));
+    }
+    return parts.length ? { text: 'For you: ' + parts.join(', then ') + '.', yours: true } : null;
+  }
+
+  // The spell in slot i: what it costs and how long it takes right now, what it does, and its key.
+  function spellTip(i) {
+    const slot = slots[i], key = slot && slot.key, c = character;
+    if (!key) return null;
+    const keyLine = 'Key: ' + labelFor(codes[i]);
+    if (key === 'racial') {
+      return { title: c.racial.name, right: 'Racial', rows: [['Instant', span(c.racial.cd) + ' cooldown']],
+               text: spellText(c.racial.id), notes: ['Not on the global cooldown.', keyLine] };
+    }
+    const e = c.table[key], s = c.spells[key];
+    const cost = lastCombat ? lastCombat.cost(key) : e.cost, cast = lastCombat ? lastCombat.castTime(key) : e.cast;
+    const rows = [[cost > 0.5 ? whole(cost) + ' Mana' : '', e.range ? e.range + ' yd range' : '']];
+    rows.push([s.kind === 'channel' ? 'Channeled, ' + span(s.duration) : cast > 0.005 ? span(cast) + ' cast' : 'Instant', e.cd ? span(e.cd) + ' cooldown' : '']);
+    if (s.shards) rows.push(['Reagent: Soul Shard', '']);
+    const notes = [yours(key)];
+    if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));
+    if (key === 'baneOfHavoc') notes.push('Not on the global cooldown.');
+    notes.push(keyLine);
+    return { title: s.name, right: s.rank ? 'Rank ' + s.rank : '', rows: rows, text: spellText(s.id), notes: notes };
+  }
+
+  // What a buff or debuff says: by its key. Texts from the game's data where they describe the effect itself.
+  function auraText(key) {
+    const c = character;
+    if (c.spells[key]) return spellText(c.spells[key].id);
+    if (key === 'coe') return c.spells.curseOfElements ? spellText(c.spells.curseOfElements.id) : '';
+    if (key === 'havoc') return c.spells.baneOfHavoc ? spellText(c.spells.baneOfHavoc.id) : '';
+    if (key === 'isb') return talentText('improvedShadowBolt');
+    if (key === 'shadowTrance') return 'Your next Shadow Bolt is instant.';
+    if (key === 'decimation') { const v = talentValue('decimation', 'sfCastRedPct'); return 'Soul Fire casts ' + (v ? v + '% ' : '') + 'faster and costs no Soul Shard.'; }
+    if (key === 'snfShadow' || key === 'snfFire') { const v = talentValue('shadowAndFlame', 'schoolPct'); return 'All ' + (key === 'snfFire' ? 'Fire' : 'Shadow') + ' damage you deal is increased' + (v ? ' by ' + v + '%.' : '.'); }
+    if (key === 'brand') return 'Your pet\'s next attacks against this target deal extra damage.';
+    if (key === 'bloodFury' || key === 'berserking' || key === 'eureka') return c.racial ? spellText(c.racial.id) : '';
+    return '';
+  }
+  function auraTip(a) {
+    const left = a.text ? (a.text.charAt(0) === 'x' ? a.text.slice(1) + ' left' : /m$/.test(a.text) ? a.text.replace('m', ' min left') : a.text + ' sec left') : '';
+    return { title: a.name, right: left, text: a.desc != null ? a.desc : auraText(a.key), notes: a.notes || [] };
   }
 
   // ---------- every picture ----------
@@ -376,10 +439,10 @@ export function createHud(WL, handlers) {
     if (holder._ids !== id) {
       holder._ids = id;
       holder.textContent = '';
-      list.forEach(function (a) {
+      list.forEach(function (a, i) {
         const box = document.createElement('span');
         box.className = 'aura';
-        box.title = a.name;
+        setTip(box, function () { const now = holder._list && holder._list[i]; return now ? auraTip(now) : null; });
         const img = document.createElement('img');
         img.src = WL.ICONS[a.icon] || ''; img.alt = a.name;
         const b = document.createElement('b');
@@ -387,6 +450,7 @@ export function createHud(WL, handlers) {
         holder.appendChild(box);
       });
     }
+    holder._list = list;
     list.forEach(function (a, i) { setText(holder.children[i].lastChild, a.text); });
   }
   function seconds(left) { return left === Infinity ? '' : left >= 60 ? Math.ceil(left / 60) + 'm' : left >= 9.5 ? String(Math.round(left)) : left.toFixed(1); }
@@ -407,12 +471,14 @@ export function createHud(WL, handlers) {
   // anchors: where each dummy's head is on the screen ([, a1, a2, a3], each { x, y, visible }).
   function render(combat, ctx, now, anchors) {
     clock = now;
+    lastCombat = combat;
+    refreshTips(now);
     const S = combat.state, c = character, ti = S.target, cur = combat.current, distance = ctx.distances[ti];
     currentTarget = ti;
 
     setText(el.distance, distance.toFixed(1) + ' yd');
     setClass(el.distance, 'far', distance > c.maxRange);
-    setText(el.targetSub, c.targets > 1 ? 'Dummy ' + ti + ' of ' + c.targets : 'Boss');
+    setText(el.targetSub, c.targets > 1 ? ti + ' of ' + c.targets : 'Boss');
     const nameButton = el.targetFrame.querySelector('button.name');
     if (!nameButton.hidden) setText(nameButton, getName('dummy'));
 
@@ -449,7 +515,9 @@ export function createHud(WL, handlers) {
     // Debuffs on the dummy, then your own buffs.
     const debuffs = aurasOn(combat, ti);
     auraList(el.debuffs, 'debuffs', debuffs);
-    const buffs = (c.standing || []).map(function (b) { return { key: b.key, icon: b.icon, name: b.desc ? b.name + '\n' + b.desc : b.name, text: '' }; });
+    const buffs = (c.standing || []).map(function (b) {
+      return { key: b.key, icon: b.icon, name: b.name, text: '', desc: b.id ? spellText(b.id) : '', notes: [b.desc, b.from ? 'From: ' + b.from : ''] };
+    });
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
       if (combat.buff(k)) buffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) });
     });
@@ -460,7 +528,7 @@ export function createHud(WL, handlers) {
     const pet = combat.pet;
     if (pet) {
       const doing = S.over ? 'idle' : pet.active ? 'attacking' : pet.mode === 'attack' ? 'running in' : 'following';
-      setText(el.petSub, PET_KIND[pet.key] + ', ' + doing);
+      setText(el.petSub, doing);                           // what kind of demon it is shows in its picture
       setWidth(el.petManaFill, 100 * combat.petMana() / pet.maxMana);
       setClass(el.petAttack, 'on', pet.mode === 'attack');
       setClass(el.petFollow, 'on', pet.mode !== 'attack');

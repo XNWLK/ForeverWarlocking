@@ -25,69 +25,37 @@
 <link rel="modulepreload" href="js/panels.js">
 <link rel="modulepreload" href="js/sound.js">
 <link rel="modulepreload" href="js/kit.js">
+<link rel="modulepreload" href="js/tooltip.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
 
 <div id="hud">
-  <!-- Top left: you, your target, your pet -->
-  <section id="playerFrame" class="panel unit">
-    <img class="portrait" id="playerPortrait" alt="">
-    <div class="unit-body">
-      <div class="unit-name"><button type="button" class="name" data-name="warlock"></button><span class="unit-sub" id="playerSub"></span></div>
-      <div class="bar health"><i></i><b id="playerHealth"></b></div>
-      <div class="bar mana"><i id="playerManaFill"></i><b id="playerMana"></b></div>
-    </div>
-  </section>
-
-  <section id="targetFrame" class="panel unit hostile">
-    <div class="portrait skull" aria-hidden="true">??</div>
-    <div class="unit-body">
-      <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub" id="targetSub">Boss</span></div>
-      <div class="bar health"><i id="targetHealthFill"></i><s id="executeMark" title="Execute phase starts here"></s><button type="button" id="targetHealth" title="Click to change the dummy's health"></button></div>
-      <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="auras" id="targetDebuffs"></span></div>
-    </div>
-  </section>
-
-  <section id="petFrame" class="panel unit pet">
-    <div class="unit-body">
-      <div class="unit-name"><button type="button" class="name" id="petName"></button><span class="unit-sub" id="petSub"></span></div>
-      <div class="bar health" id="petHealthBar"><i></i></div>
-      <div class="bar mana" id="petManaBar"><i id="petManaFill"></i></div>
-      <div class="pet-buttons" id="petButtons">
-        <button type="button" id="btnPetAttack" title="Send your pet at the dummy">Attack</button>
-        <button type="button" id="btnPetFollow" title="Call your pet back to your side">Follow</button>
+  <!-- Top right: one slim bar with everything you set up before a fight; its panels open under it -->
+  <section id="topBar">
+    <div class="toolbar">
+      <div class="group">
+        <span class="label">Dummies</span>
+        <div class="seg">
+          <button type="button" data-dummies="1">1</button>
+          <button type="button" data-dummies="2">2</button>
+          <button type="button" data-dummies="3">3</button>
+        </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Top right: dummies, build and tools, buffs -->
-  <section id="topRight">
-    <div class="panel row">
-      <span class="label">Dummies</span>
-      <div class="seg">
-        <button type="button" data-dummies="1">1</button>
-        <button type="button" data-dummies="2">2</button>
-        <button type="button" data-dummies="3">3</button>
+      <div class="group">
+        <span class="label" id="buildLabel"></span>
+        <button type="button" id="btnBuild">Build</button>
+        <button type="button" id="btnRace">Race</button>
+        <button type="button" id="btnImport" title="Play your own build, gear and buffs from the DPS sim">Import</button>
+        <button type="button" id="btnFight" title="How the fight ends, movement, hits taken">Fight</button>
       </div>
-    </div>
-    <div class="panel row">
-      <span class="label" id="buildLabel"></span>
-      <button type="button" id="btnBuild">Build</button>
-      <button type="button" id="btnRace">Race</button>
-      <button type="button" id="btnImport" title="Play your own build, gear and buffs from the DPS sim">Import</button>
-      <button type="button" id="btnFight" title="How the fight ends, movement, hits taken">Fight</button>
-    </div>
-    <div class="panel row">
-      <button type="button" id="btnKeys" title="See and change every key">Keybinds</button>
-      <button type="button" id="btnEdit" title="Move spells and change keys">Edit bar</button>
-      <button type="button" id="btnRings" class="on" aria-pressed="true">Range rings</button>
-      <button type="button" id="btnSound" aria-pressed="false" title="Sounds on or off">Sound</button>
-      <button type="button" id="btnReset">Reset</button>
-    </div>
-    <div class="panel row">
-      <span class="label">Buffs</span>
-      <span class="auras" id="playerBuffs"></span>
+      <div class="group">
+        <button type="button" id="btnKeys" title="See and change every key">Keybinds</button>
+        <button type="button" id="btnEdit" title="Move spells and change keys">Edit bar</button>
+        <button type="button" id="btnRings" class="on" aria-pressed="true" title="Rings on the ground that show your spell ranges">Rings</button>
+        <button type="button" id="btnSound" aria-pressed="false" title="Sounds on or off">Sound</button>
+        <button type="button" id="btnReset" title="Start the fight again">Reset</button>
+      </div>
     </div>
     <div class="panel picker" id="buildPanel" hidden>
       <h2>Build</h2>
@@ -124,7 +92,7 @@
     </div>
   </section>
 
-  <!-- Bottom centre: cast bar and action bar -->
+  <!-- Bottom centre, from the top down: cast bar, buffs and debuffs, you / your pet / your target, action bar -->
   <section id="bottomCentre">
     <div id="editStrip" class="panel edit-strip" hidden>
       <span id="editText">Click two slots to swap them. Click a slot and press a key to give it that key.</span>
@@ -133,7 +101,46 @@
     </div>
     <div id="errorText" class="error-text" aria-live="polite"></div>
     <div id="castBar" class="castbar idle"><i id="castFill"></i><b id="castText"></b></div>
-    <div id="actionBar" class="panel actionbar"></div>
+
+    <div id="auraRow">
+      <span class="auras" id="playerBuffs"></span>
+      <span class="auras large" id="targetDebuffs"></span>
+    </div>
+
+    <div id="frames">
+      <section id="playerFrame" class="unit">
+        <img class="portrait" id="playerPortrait" alt="">
+        <div class="unit-body">
+          <div class="unit-name"><button type="button" class="name" data-name="warlock"></button><span class="unit-sub" id="playerSub"></span></div>
+          <div class="bar health"><i></i><b id="playerHealth"></b></div>
+          <div class="bar mana"><i id="playerManaFill"></i><b id="playerMana"></b></div>
+        </div>
+      </section>
+
+      <section id="petFrame" class="unit pet">
+        <div class="unit-body">
+          <div class="unit-name"><img class="portrait small" id="petPortrait" alt=""><button type="button" class="name" id="petName"></button><span class="unit-sub" id="petSub"></span></div>
+          <div class="bar health" id="petHealthBar"><i></i></div>
+          <div class="bar mana" id="petManaBar"><i id="petManaFill"></i></div>
+          <div class="pet-buttons" id="petButtons">
+            <button type="button" id="btnPetAttack" title="Send your pet at your target">Attack</button>
+            <button type="button" id="btnPetFollow" title="Call your pet back to your side">Follow</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="targetFrame" class="unit hostile">
+        <div class="unit-body">
+          <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub"><span id="targetSub">Boss</span> &middot; <span id="targetDistance" class="distance"></span></span></div>
+          <div class="bar health"><i id="targetHealthFill"></i><s id="executeMark" title="Execute phase starts here"></s><button type="button" id="targetHealth" title="Click to change the dummy's health"></button></div>
+        </div>
+        <svg class="portrait" viewBox="0 0 44 44" aria-hidden="true">
+          <circle cx="22" cy="22" r="22" fill="#2a1420"/><circle cx="22" cy="22" r="17" fill="#efe6dc"/><circle cx="22" cy="22" r="11.5" fill="#c2362f"/><circle cx="22" cy="22" r="5.5" fill="#efe6dc"/>
+        </svg>
+      </section>
+    </div>
+
+    <div id="actionBar" class="actionbar"></div>
   </section>
 
   <!-- Bottom left: combat log -->
@@ -144,7 +151,6 @@
 
   <!-- Bottom right: damage meter -->
   <section id="meter" class="panel meter">
-    <h2>Damage</h2>
     <div class="meter-main"><b id="meterDps">0</b><span>DPS</span></div>
     <dl>
       <dt>Damage</dt><dd id="meterDamage">0</dd>
@@ -164,6 +170,7 @@
 </section>
 <div id="plates"></div>
 <div id="floaters" aria-hidden="true"></div>
+<div id="tip" hidden></div>
 <div id="fatal" hidden></div>
 
 <!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->

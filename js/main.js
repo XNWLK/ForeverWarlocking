@@ -27,8 +27,8 @@ const FULL_DETAIL = Math.min(window.devicePixelRatio || 1, 2);
 renderer.setPixelRatio(FULL_DETAIL);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
+renderer.toneMapping = THREE.NeutralToneMapping;     // keeps purple purple (the filmic one turned it blue)
+renderer.toneMappingExposure = 1.2;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 
@@ -316,15 +316,15 @@ function standingBuffs(build, stats) {
   const list = [];
   if (stats.sacrificeActive && build.sacrifice) {
     const what = build.sacrifice === 'imp' ? 'Imp' : build.sacrifice === 'succubus' ? 'Succubus' : build.sacrifice;
-    list.push({ key: 'sacrifice', icon: 'demonicSacrifice', name: 'Demonic Sacrifice (' + what + ')', desc: 'You sacrificed your ' + what + ' before the fight; its gift lasts the whole fight.' });
+    list.push({ key: 'sacrifice', icon: 'demonicSacrifice', name: 'Demonic Sacrifice (' + what + ')', desc: 'You sacrificed your ' + what + ' before the fight; its gift lasts the whole fight.', from: 'your talents' });
   }
   Object.keys(config.buffs).forEach(function (k) {
     const b = config.buffs[k];
-    if (b.on) list.push({ key: 'buff_' + k, icon: 'buff_' + k, name: b.name, desc: b.desc || '' });
+    if (b.on) list.push({ key: 'buff_' + k, icon: 'buff_' + k, name: b.name, desc: b.desc || '', id: b.id, from: b.cls });
   });
   Object.keys(config.consumables).forEach(function (k) {
     const c = config.consumables[k];
-    if (c.on) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '' });
+    if (c.on) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '', from: c.cat });
   });
   return list;
 }
@@ -446,7 +446,7 @@ panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), [], false)
 hud.setRings(getSetting('rings'));
 hud.log('You enter the fel chamber.', 'proc');
 hud.log('Build: ' + character.build.short + '.');
-hud.log('Cast with the keys on the action bar. The Keys button lists the rest.');
+hud.log('Cast with the keys on the action bar. Hover a spell or a buff to read it.');
 
 // ---------- a safeguard for weak graphics chips ----------
 // When the picture stays under about 45 a second, draw it with less detail (fewer pixels, stretched to the window).
@@ -492,7 +492,7 @@ function frame() {
 
   controls.update(dt);
   const player = controls.player;
-  ctx.moving = player.moving;
+  ctx.moving = player.moving || player.height > 0;         // a jump counts as moving: it stops the spell you are casting
   for (let i = 1; i <= 3; i++) ctx.distances[i] = Math.hypot(player.x - SPOTS[i].x, player.z - SPOTS[i].z);
 
   // The pet walks first, so the casting rules know whether it is in range of its dummy.

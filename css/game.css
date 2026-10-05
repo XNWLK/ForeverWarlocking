@@ -1,317 +1,263 @@
-/* Forever Warlocking - the screen around the 3D scene (layout A: frames and bars where the game puts them). */
+/* Forever Warlocking - the screen around the 3D scene.
+   Quiet on purpose: dark glass, one accent colour (violet), and colour only where it means something
+   (health, mana, hostile, a crit). You, your pet and your target sit in the bottom centre above the action bar. */
 
 :root {
-  --panel: rgba(14, 11, 22, 0.80);
-  --panel-line: #4b3f68;
-  --panel-line-bright: #7d68b3;
-  --ink: #ece7f6;
-  --ink-dim: #a79fbb;
-  --gold: #e9c869;
-  --health: #2f9e4d;
-  --mana: #2f6bd8;
-  --hostile: #c2362f;
-  --fel: #56e3a4;
+  --glass: rgba(20, 11, 30, 0.74);
+  --glass-solid: rgba(17, 9, 26, 0.96);
+  --line: rgba(205, 170, 255, 0.14);
+  --line-bright: rgba(205, 170, 255, 0.42);
+  --ink: #f2ecf8;
+  --ink-dim: #a999bd;
+  --accent: #b98aff;
+  --gold: #f0cf7a;
+  --health: #3fae5f;
+  --mana: #4a78e0;
+  --hostile: #cf4038;
+  --bad: #ff8478;
   --slot: rgba(255, 255, 255, 0.05);
 }
 
 * { box-sizing: border-box; }
+/* Anything marked hidden stays hidden, whatever layout it has. */
+[hidden] { display: none !important; }
 
-html, body { height: 100%; margin: 0; overflow: hidden; background: #0d0a16; color: var(--ink); }
+html, body { height: 100%; margin: 0; overflow: hidden; background: #0e0716; color: var(--ink); }
 body { font: 13px/1.35 "Segoe UI", system-ui, sans-serif; }
 
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 #scene.steer { cursor: none; }
 #scene.look { cursor: grabbing; }
 
-#hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
-#hud button { pointer-events: auto; }
+/* Layers, from the back: the scene, plates and damage numbers, the frames and panels, the review, tooltips. */
+#hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; user-select: none; }
+#hud button, #hud input, #hud textarea, #hud label, #hud form, #hud .aura { pointer-events: auto; }
 
-.panel {
-  position: absolute;
-  background: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: 6px;
-  padding: 8px;
-}
-.panel h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.02em; }
-
-/* --- Unit frames ------------------------------------------------------- */
-.unit { display: flex; gap: 8px; align-items: center; width: 250px; }
-#playerFrame { left: 16px; top: 16px; }
-#targetFrame { left: 278px; top: 16px; }
-#petFrame { left: 16px; top: 96px; width: 170px; padding: 6px 8px; }
-
-.portrait { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--panel-line-bright); object-fit: cover; background: #1b1626; }
-.portrait.skull { display: grid; place-items: center; border-color: var(--hostile); color: #ff8a80; font-weight: 700; font-size: 15px; }
-.unit-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
-.unit-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; color: var(--gold); white-space: nowrap; }
-.hostile .unit-name { color: #ff9c92; }
-
-/* A name is a button: click it to type a new one. */
-button.name { font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dashed transparent; border-radius: 0; padding: 0; cursor: text; overflow: hidden; text-overflow: ellipsis; }
-button.name:hover { background: none; border-bottom-color: currentColor; }
-input.name-edit { pointer-events: auto; user-select: text; font: inherit; color: inherit; width: 130px; min-width: 0; padding: 0 3px; background: rgba(0, 0, 0, 0.65); border: 1px solid var(--fel); border-radius: 3px; outline: none; }
-.unit-sub { font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
-.unit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 18px; }
-
-.bar { position: relative; height: 15px; border-radius: 3px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.10); overflow: hidden; }
-.bar i { position: absolute; inset: 0 auto 0 0; width: 100%; }
-.bar b { position: relative; display: block; text-align: center; font-size: 11px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; }
-.bar.health i { background: var(--health); }
-.bar.mana i { background: var(--mana); }
-.hostile .bar.health i { background: var(--hostile); }
-.bar.empty i { width: 0; }
-.pet .bar { height: 9px; }
-.pet .unit-name { color: #c9b8ff; }
-
-.distance { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fel); }
-.distance.far { color: #ff9c92; }
-
-.slots { display: flex; gap: 3px; }
-.slots span { width: 26px; height: 26px; border-radius: 4px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.09); }
-.slots.small span { width: 18px; height: 18px; border-radius: 3px; }
-
-/* --- Top right --------------------------------------------------------- */
-#topRight { position: absolute; right: 16px; top: 16px; display: grid; gap: 6px; justify-items: end; }
-#topRight .panel { position: static; }
-.row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
-.label { font-size: 11px; color: var(--ink-dim); margin-right: 2px; }
-
+/* --- Buttons, cards, forms ---------------------------------------------- */
 button {
   font: inherit; font-size: 12px; color: var(--ink);
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--panel-line);
-  border-radius: 4px; padding: 4px 9px; cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 6px; padding: 4px 9px; cursor: pointer;
 }
-button:hover { border-color: var(--panel-line-bright); background: rgba(255, 255, 255, 0.11); }
-button:focus-visible { outline: 2px solid var(--fel); outline-offset: 1px; }
-button.on { border-color: var(--fel); color: var(--fel); }
-button.soon { color: var(--ink-dim); border-style: dashed; }
-.seg { display: flex; gap: 3px; }
-.seg button { min-width: 28px; padding: 4px 0; font-weight: 600; }
+button:hover { background: rgba(255, 255, 255, 0.13); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.on { color: var(--accent); background: rgba(185, 138, 255, 0.14); border-color: rgba(185, 138, 255, 0.35); }
+button.wide { display: block; width: 100%; margin-top: 8px; }
 
-.keys { width: 330px; }
-.keys dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
-.keys dt { color: var(--gold); font-weight: 600; white-space: nowrap; }
-.keys dd { margin: 0; color: var(--ink); }
+.panel { background: var(--glass-solid); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.panel h2 { margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
 
-/* --- Bottom centre ----------------------------------------------------- */
-#bottomCentre { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: grid; gap: 10px; justify-items: center; }
-.castbar { position: relative; width: 300px; height: 20px; border-radius: 4px; border: 1px solid var(--panel-line-bright); background: rgba(0, 0, 0, 0.6); overflow: hidden; }
-.castbar i { position: absolute; inset: 0 auto 0 0; width: 0; background: #d9a21f; }
-.castbar b { position: relative; display: block; text-align: center; font-size: 12px; line-height: 18px; font-weight: 600; text-shadow: 0 1px 1px #000; }
-.castbar.idle { border-style: dashed; border-color: var(--panel-line); background: rgba(0, 0, 0, 0.3); }
-.castbar.idle b { color: var(--ink-dim); font-weight: 400; }
-
-.actionbar { position: static; display: flex; gap: 4px; padding: 6px; }
-.slot { position: relative; width: 44px; height: 44px; border-radius: 5px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.14); }
-.slot kbd { position: absolute; right: 3px; top: 1px; font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif; color: var(--ink-dim); text-shadow: 0 1px 1px #000; }
-
-/* --- Bottom corners ---------------------------------------------------- */
-.log { left: 16px; bottom: 16px; width: 290px; height: 170px; display: flex; flex-direction: column; }
-.log ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; font-size: 12px; color: var(--ink-dim); }
-.log li.note { color: var(--ink); }
-
-.meter { right: 16px; bottom: 16px; width: 230px; }
-.meter-main { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
-.meter-main b { font-size: 28px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
-.meter-main span { color: var(--ink-dim); }
-.meter dl { margin: 0; display: grid; grid-template-columns: 1fr max-content; gap: 2px 12px; font-size: 12px; }
-.meter dt { color: var(--ink-dim); }
-.meter dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-
-/* --- Start-up failure -------------------------------------------------- */
-#fatal { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
-
-/* ======================================================================
-   Step 2: casting
-   ====================================================================== */
-
-/* --- Target health: the number is a button (click to change the pool); a mark shows where execute starts --- */
-.bar s { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.75); }
-.bar button { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink); font-size: 11px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; cursor: text; }
-.bar button:hover { background: rgba(255, 255, 255, 0.12); }
-.bar input { position: relative; pointer-events: auto; user-select: text; display: block; width: 100%; height: 100%; padding: 0 4px; border: 0; outline: 1px solid var(--fel); background: rgba(0, 0, 0, 0.8); color: var(--ink); font: 600 11px/13px "Segoe UI", system-ui, sans-serif; text-align: center; }
-.execute .bar.health i { background: #e0662f; }
-
-/* --- Buffs and debuffs: an icon with the seconds left --- */
-.auras { display: flex; gap: 3px; min-height: 22px; align-items: center; }
-.aura { position: relative; width: 22px; height: 22px; border-radius: 3px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.25); background: #1b1626; }
-.aura img { display: block; width: 100%; height: 100%; }
-.aura b { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font-size: 11px; line-height: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }
-#playerBuffs { min-width: 100px; }
-
-/* --- Pickers --- */
-.picker { width: 330px; }
-.options { display: grid; gap: 2px; }
-.options button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 2px 8px; }
-.options button img, .options button .no-icon { width: 18px; height: 18px; border-radius: 3px; flex: none; }
-#topRight { z-index: 2; }
-.picker { background: rgba(14, 11, 22, 0.94); }
-.options button small { margin-left: auto; color: var(--ink-dim); font-size: 11px; }
-#buildLabel { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* --- Red error line and cast bar --- */
-.error-text { height: 18px; font-size: 14px; font-weight: 600; color: #ff5b4f; text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.4s; }
-.error-text.show { opacity: 1; transition: none; }
-.castbar.idle { visibility: hidden; }
-.castbar.channel i { background: #3fbf6a; }
-.castbar.interrupted { border-color: #ff5b4f; }
-.castbar.interrupted i { width: 100% !important; background: #b3261e; }
-
-/* --- Action bar slots --- */
-.slot { padding: 0; overflow: hidden; cursor: pointer; pointer-events: auto; }
-.slot:hover { border-color: var(--panel-line-bright); background: var(--slot); }
-.slot img { display: block; width: 100%; height: 100%; }
-.slot.empty { cursor: default; }
-.slot .cool { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(8, 6, 14, 0.78); }
-.slot .secs { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
-.slot .count { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000, 0 1px 1px #000; }
-.slot kbd { z-index: 1; color: #fff; }
-.slot.no-mana img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(180deg) saturate(3); }
-.slot.no-range img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(-50deg) saturate(4); }
-.slot.unusable img { filter: grayscale(1) brightness(0.45); }
-.slot.active { border-color: #ffd76a; box-shadow: 0 0 0 1px #ffd76a inset; }
-.slot.queued { border-color: var(--fel); box-shadow: 0 0 0 1px var(--fel) inset; }
-.slot.proc { border-color: #ffd76a; box-shadow: 0 0 8px 1px #ffd76a; }
-
-/* --- Combat log and meter --- */
-.log { height: 204px; }
-.log li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.log li.crit { color: #ffd76a; }
-.log li.miss { color: #9aa0b5; }
-.log li.gain { color: #7fb2ff; }
-.log li.proc { color: var(--fel); }
-.meter ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
-.meter li { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 1px 5px; font-size: 11px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.04); }
-.meter li i { position: absolute; inset: 0 auto 0 0; background: rgba(140, 108, 230, 0.45); }
-.meter li.fire i { background: rgba(230, 120, 50, 0.45); }
-.meter li span { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meter li span + span { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); }
-
-/* --- Damage numbers floating up from the dummy --- */
-#floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.float { position: absolute; transform: translate(-50%, -50%); font: 700 20px/1 "Segoe UI", system-ui, sans-serif; color: #c9a8ff; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px #000; white-space: nowrap; animation: float-up 1.3s ease-out forwards; }
-.float.fire { color: #ffab5e; }
-.float.tick { font-size: 15px; }
-.float.crit { font-size: 30px; color: #ffe27a; }
-.float.tick.crit { font-size: 20px; }
-.float.miss { font-size: 16px; color: #e8e8f0; }
-@keyframes float-up {
-  0% { opacity: 0; margin-top: 0; }
-  10% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: 0; margin-top: -90px; }
-}
-
-/* ======================================================================
-   Step 3: pets
-   ====================================================================== */
-#petFrame { width: 190px; }
-.pet .bar.health i { background: var(--health); }
-.pet-buttons { display: flex; gap: 4px; margin-top: 2px; }
-.pet-buttons button { flex: 1; padding: 2px 0; font-size: 11px; }
-.pet.none .bar, .pet.none .pet-buttons { display: none; }
-.float.pet { font-size: 14px; color: #f3e9ff; }
-.float.pet.crit { font-size: 19px; color: #ffe27a; }
-.meter li.pet i { background: rgba(110, 170, 120, 0.45); }
-.meter dt[title] { cursor: help; }
-
-/* ======================================================================
-   Step 4: several dummies
-   ====================================================================== */
-.slot { width: 40px; height: 40px; }
-.log { width: 270px; }
-#plates { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.plate { position: absolute; transform: translate(-50%, -100%); width: 110px; padding: 2px 4px 3px; border-radius: 4px; background: rgba(14, 11, 22, 0.72); border: 1px solid var(--panel-line); color: #ff9c92; font: 600 11px/1.3 "Segoe UI", system-ui, sans-serif; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; pointer-events: auto; }
-.plate i { display: block; height: 5px; margin-top: 2px; border-radius: 2px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
-.plate i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
-.plate.current { border-color: #ffd76a; color: #ffd76a; }
-.plate.dead { opacity: 0.45; }
-.plate[hidden] { display: none; }
-#meterDummies { font-size: 11px; }
-
-/* ======================================================================
-   Round 11: damage numbers, cooldown sweep, panels, review, edit bar
-   ====================================================================== */
-
-/* --- Damage numbers: placed every picture above their dummy, so they stay with it when the camera moves --- */
-.float { animation: none; left: 0; top: 0; will-change: transform, opacity; font: 700 24px/1 "Friz Quadrata TT", "Friz Quadrata", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; color: #ffd100; -webkit-text-stroke: 1px #000; paint-order: stroke fill; text-shadow: 0 0 2px #000, 1px 2px 0 #000, 0 0 5px rgba(0, 0, 0, 0.9); letter-spacing: 0.5px; }
-.float.crit { font-size: 38px; color: #ffd100; }
-.float.small { font-size: 18px; }
-.float.small.crit { font-size: 25px; }
-.float.pet { font-size: 17px; color: #ffffff; }
-.float.pet.crit { font-size: 24px; color: #ffffff; }
-.float.miss { font-size: 20px; color: #ffffff; }
-.float.fire, .float.tick { color: #ffd100; }
-
-/* --- The global cooldown and spell cooldowns sweep round the button like a clock hand, as in the game --- */
-.slot .cool { inset: 0; height: auto; background: conic-gradient(transparent calc((1 - var(--left, 0)) * 360deg), rgba(6, 4, 12, 0.74) 0); }
-.slot .cool.none { display: none; }
-
-/* --- Rows of buttons, forms, wide buttons --- */
-#hud input, #hud textarea, #hud label, #hud form { pointer-events: auto; }
-#hud input, #hud textarea { user-select: text; font: inherit; font-size: 12px; color: var(--ink); background: rgba(0, 0, 0, 0.55); border: 1px solid var(--panel-line); border-radius: 4px; padding: 2px 5px; }
+#hud input, #hud textarea { user-select: text; font: inherit; font-size: 12px; color: var(--ink); background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; }
 #hud input[type="number"] { width: 62px; }
-#hud input:focus, #hud textarea:focus { outline: 1px solid var(--fel); }
+#hud input:focus, #hud textarea:focus { outline: 1px solid var(--accent); }
 #hud textarea { display: block; width: 100%; margin-top: 3px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
 .form, #importPanel { display: grid; gap: 8px; }
 .form label, #importPanel label { display: block; font-size: 12px; }
 .hint { margin: 0; font-size: 11px; color: var(--ink-dim); }
-.hint.bad { color: #ff9c92; }
+.hint.bad { color: var(--bad); }
 .buttons { display: flex; gap: 6px; }
-button.wide { display: block; width: 100%; margin-top: 8px; }
-#topRight .row { flex-wrap: wrap; justify-content: flex-end; max-width: 430px; }
 
-/* --- "Move!" --- */
-#moveBanner { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); padding: 6px 18px; border-radius: 6px; background: rgba(120, 20, 16, 0.85); border: 1px solid #ff6a5e; color: #fff; font: 700 22px/1.2 "Segoe UI", system-ui, sans-serif; text-shadow: 0 1px 2px #000; pointer-events: none; }
-#moveBanner.soon { background: rgba(14, 11, 22, 0.8); border-color: var(--panel-line-bright); font-size: 14px; font-weight: 600; color: var(--ink-dim); }
-#moveBanner[hidden] { display: none; }
+/* --- Top right: one slim bar; its panels open under it -------------------- */
+#topBar { position: absolute; right: 14px; top: 12px; z-index: 2; display: grid; gap: 6px; justify-items: end; }
+.toolbar { display: flex; align-items: center; padding: 4px 0; background: var(--glass); border: 1px solid var(--line); border-radius: 10px; }
+.toolbar .group { display: flex; align-items: center; gap: 2px; padding: 0 8px; }
+.toolbar .group + .group { border-left: 1px solid var(--line); }
+.toolbar button { background: none; }
+.toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
+.toolbar button.on { background: rgba(185, 138, 255, 0.14); }
+.label { font-size: 11px; color: var(--ink-dim); margin-right: 4px; }
+#buildLabel { max-width: 220px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg { display: flex; gap: 2px; }
+.seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
 
-/* --- Edit bar --- */
-.edit-strip { position: static; display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; }
-.edit-strip[hidden] { display: none; }
-.editing .slot { border-style: dashed; border-color: var(--panel-line-bright); cursor: grab; }
-.editing .slot.picked { border-style: solid; border-color: #ffd76a; box-shadow: 0 0 0 2px #ffd76a inset; }
+.picker { width: 340px; }
+.options { display: grid; gap: 2px; }
+.options button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 3px 8px; background: none; }
+.options button:hover { background: rgba(255, 255, 255, 0.1); }
+.options button.on { background: rgba(185, 138, 255, 0.14); }
+.options button img, .options button .no-icon { width: 18px; height: 18px; border-radius: 4px; flex: none; }
+.options button small { margin-left: auto; color: var(--ink-dim); font-size: 11px; }
 
-/* --- Fight review --- */
-.review { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(640px, 92vw); max-height: 84vh; overflow: auto; padding: 14px 16px; background: rgba(14, 11, 22, 0.96); border: 1px solid var(--panel-line-bright); border-radius: 8px; color: var(--ink); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; }
-.review[hidden] { display: none; }
-.review header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.review h2 { margin: 0; font-size: 16px; color: var(--gold); }
-.review h3 { margin: 14px 0 4px; font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.03em; }
-.review-head { margin: 0; font-size: 14px; }
-.review-head b { font-size: 20px; }
-.review table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.review th { text-align: left; font-weight: 600; color: var(--ink-dim); padding: 2px 6px; border-bottom: 1px solid var(--panel-line); }
-.review td { padding: 2px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-.review .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.review tr.behind td { color: #ffb3a8; }
-.review .hint { margin-top: 12px; }
-
-/* Anything marked hidden stays hidden, whatever layout its panel has. */
-[hidden] { display: none !important; }
-
-/* The buff row holds the standing buffs too: let it wrap instead of running off. */
-#playerBuffs { flex-wrap: wrap; max-width: 330px; justify-content: flex-end; }
-
-/* ======================================================================
-   Round 13: keybinds panel, DoT icons over the dummies
-   ====================================================================== */
 .keys { width: 470px; display: grid; gap: 8px; }
 .binds { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .bind { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 0; font-size: 12px; }
 .bind span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bind button { flex: none; min-width: 58px; padding: 1px 6px; font-weight: 600; color: var(--gold); }
-.bind button.waiting { color: var(--fel); border-color: var(--fel); }
+.bind button.waiting { color: var(--accent); border-color: var(--accent); }
 .bind button.unset { color: var(--ink-dim); font-weight: 400; }
 
-/* What is on each dummy, right above its head: icons with the seconds left. */
-.plate { width: auto; min-width: 0; padding: 0; background: none; border: 0; overflow: visible; }
-.plate .auras { justify-content: center; gap: 2px; min-height: 0; margin-bottom: 2px; }
-.plate .aura { width: 26px; height: 26px; border-color: rgba(0, 0, 0, 0.8); box-shadow: 0 0 3px #000; }
+/* --- Bottom centre: cast bar, buffs and debuffs, the three frames, action bar --- */
+#bottomCentre { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 668px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+
+.error-text { height: 18px; font-size: 14px; font-weight: 600; color: #ff5b4f; text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.4s; }
+.error-text.show { opacity: 1; transition: none; }
+
+.castbar { position: relative; width: 280px; height: 18px; border-radius: 9px; background: rgba(0, 0, 0, 0.62); box-shadow: 0 0 0 1px var(--line-bright); overflow: hidden; }
+.castbar i { position: absolute; inset: 0 auto 0 0; width: 0; background: #e2ae36; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.castbar b { position: relative; display: block; text-align: center; font-size: 12px; line-height: 18px; font-weight: 600; text-shadow: 0 1px 1px #000; }
+.castbar.idle { visibility: hidden; }
+.castbar.channel i { background: #43b96c; }
+.castbar.interrupted { box-shadow: 0 0 0 1px #ff5b4f; }
+.castbar.interrupted i { width: 100% !important; background: #b3261e; }
+
+/* Buffs on the left (above you), what is on your target on the right (above it): an icon with the seconds left. */
+#auraRow { width: 100%; min-height: 30px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.auras { display: flex; gap: 3px; align-items: center; }
+#playerBuffs { flex-wrap: wrap; max-width: 380px; }
+#targetDebuffs { flex-wrap: wrap; justify-content: flex-end; }
+.aura { position: relative; width: 22px; height: 22px; border-radius: 5px; overflow: hidden; background: #1b1226; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.6); }
+.aura img { display: block; width: 100%; height: 100%; }
+.aura b { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font-size: 11px; line-height: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }
+.auras.large .aura { width: 30px; height: 30px; border-radius: 6px; }
+.auras.large .aura b { font-size: 12px; line-height: 13px; }
+
+/* The frames: you, your pet, your target. */
+#frames { width: 100%; display: grid; grid-template-columns: 1fr 158px 1fr; gap: 6px; align-items: stretch; }
+.unit { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 8px 11px; background: var(--glass); border: 1px solid var(--line); border-radius: 12px; }
+.portrait { flex: none; width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #1b1226; box-shadow: 0 0 0 1.5px rgba(205, 170, 255, 0.55), 0 0 0 4px rgba(0, 0, 0, 0.35); }
+.hostile .portrait { box-shadow: 0 0 0 1.5px rgba(255, 130, 118, 0.65), 0 0 0 4px rgba(0, 0, 0, 0.35); }
+.portrait.small { width: 18px; height: 18px; box-shadow: 0 0 0 1px rgba(205, 170, 255, 0.55); }
+.unit-body { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.unit-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.hostile .unit-name { color: #ffb4aa; }
+.unit-sub { font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
+.distance { font-variant-numeric: tabular-nums; color: var(--ink); }
+.distance.far { color: var(--bad); font-weight: 600; }
+
+/* A name is a button: click it to type a new one. */
+button.name { font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dashed transparent; border-radius: 0; padding: 0; cursor: text; overflow: hidden; text-overflow: ellipsis; }
+button.name:hover { background: none; border-bottom-color: currentColor; }
+#hud input.name-edit { font: inherit; color: inherit; width: 110px; min-width: 0; padding: 0 3px; background: rgba(0, 0, 0, 0.65); border: 1px solid var(--accent); border-radius: 4px; outline: none; }
+
+.bar { --h: 15px; position: relative; height: var(--h); border-radius: 5px; background: rgba(0, 0, 0, 0.58); overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 100%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -6px 6px rgba(0, 0, 0, 0.16); }
+.bar b { position: relative; display: block; text-align: center; font-size: 11px; line-height: var(--h); font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; }
+.bar.health i { background: var(--health); }
+.bar.mana { --h: 12px; }
+.bar.mana i { background: var(--mana); }
+.bar.mana b { font-size: 10px; }
+.bar.empty i { width: 0; }
+.hostile .bar.health { --h: 20px; }
+.hostile .bar.health i { background: var(--hostile); }
+.execute .bar.health i { background: #e0662f; }
+/* The target's health number is a button (click to change the pool); a mark shows where execute starts. */
+.bar s { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.75); }
+.bar button { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink); font-size: 11px; line-height: var(--h); font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; cursor: text; }
+.bar button:hover { background: rgba(255, 255, 255, 0.12); }
+#hud .bar input { position: relative; display: block; width: 100%; height: 100%; padding: 0 4px; border: 0; border-radius: 0; outline: 1px solid var(--accent); background: rgba(0, 0, 0, 0.8); font: 600 11px/1 "Segoe UI", system-ui, sans-serif; text-align: center; }
+
+.pet { padding: 6px 9px; }
+.pet .unit-body { gap: 3px; }
+.pet .unit-name { align-items: center; justify-content: flex-start; gap: 6px; font-size: 12px; color: #dcc6ff; }
+.pet .unit-sub { margin-left: auto; }
+.pet .bar { --h: 5px; border-radius: 3px; }
+.pet-buttons { display: flex; gap: 4px; margin-top: 2px; }
+.pet-buttons button { flex: 1; padding: 1px 0; font-size: 11px; }
+.pet.none .bar, .pet.none .pet-buttons, .pet.none .portrait { display: none; }
+.pet.none .unit-sub { margin: 0 auto; }
+
+/* Action bar. */
+.actionbar { display: flex; gap: 4px; padding: 5px; background: var(--glass); border: 1px solid var(--line); border-radius: 12px; }
+.slot { position: relative; width: 40px; height: 40px; padding: 0; overflow: hidden; border-radius: 7px; background: var(--slot); border: 1px solid rgba(0, 0, 0, 0.65); cursor: pointer; }
+.slot:hover { background: var(--slot); border-color: var(--line-bright); }
+.slot.empty { cursor: default; }
+.slot img { display: block; width: 100%; height: 100%; }
+.slot kbd { position: absolute; right: 3px; top: 1px; z-index: 1; font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif; color: #fff; text-shadow: 0 0 2px #000, 0 1px 1px #000; }
+/* The global cooldown and spell cooldowns sweep round the button like a clock hand, as in the game. */
+.slot .cool { position: absolute; inset: 0; background: conic-gradient(transparent calc((1 - var(--left, 0)) * 360deg), rgba(8, 4, 14, 0.76) 0); }
+.slot .cool.none { display: none; }
+.slot .secs { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+.slot .count { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000, 0 1px 1px #000; }
+.slot.no-mana img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(180deg) saturate(3); }
+.slot.no-range img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(-50deg) saturate(4); }
+.slot.unusable img { filter: grayscale(1) brightness(0.45); }
+.slot.active { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.slot.queued { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.slot.proc { border-color: var(--gold); box-shadow: 0 0 8px 1px var(--gold); }
+
+/* Edit bar. */
+.edit-strip { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; }
+.editing .slot { border-style: dashed; border-color: var(--line-bright); cursor: grab; }
+.editing .slot.picked { border-style: solid; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold) inset; }
+
+/* --- Bottom corners: combat log and damage meter ------------------------- */
+.log { position: absolute; left: 14px; bottom: 14px; width: 270px; height: 196px; display: flex; flex-direction: column; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
+.log ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; font-size: 12px; color: var(--ink-dim); }
+.log li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log li.note { color: var(--ink); }
+.log li.crit { color: var(--gold); }
+.log li.miss { color: #8f869f; }
+.log li.gain { color: #8fb2ff; }
+.log li.proc { color: #cfb0ff; }
+
+.meter { position: absolute; right: 14px; bottom: 14px; width: 230px; background: var(--glass); }
+.meter-main { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.meter-main b { font-size: 30px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meter-main span { font-size: 11px; letter-spacing: 0.08em; color: var(--ink-dim); }
+.meter dl { margin: 0; display: grid; grid-template-columns: 1fr max-content; gap: 2px 12px; font-size: 12px; }
+.meter dt { color: var(--ink-dim); }
+.meter dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+#meterDummies { font-size: 11px; }
+.meter ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
+.meter li { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 1px 6px; font-size: 11px; border-radius: 4px; overflow: hidden; background: rgba(255, 255, 255, 0.04); }
+.meter li i { position: absolute; inset: 0 auto 0 0; background: rgba(160, 110, 240, 0.5); }
+.meter li.fire i { background: rgba(230, 120, 50, 0.5); }
+.meter li.pet i { background: rgba(110, 170, 120, 0.45); }
+.meter li span { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meter li span + span { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* --- Over the scene: plates above the dummies, damage numbers, "Move!" --- */
+#plates { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.plate { position: absolute; transform: translate(-50%, -100%); color: #ffb4aa; font: 600 11px/1.3 "Segoe UI", system-ui, sans-serif; text-align: center; white-space: nowrap; cursor: pointer; pointer-events: auto; }
+.plate .auras { justify-content: center; gap: 2px; margin-bottom: 2px; }
+.plate .aura { width: 26px; height: 26px; }
 .plate .aura b { font-size: 12px; line-height: 13px; }
-.plate .tag { display: block; width: 110px; margin: 0 auto; padding: 2px 4px 3px; border-radius: 4px; background: rgba(14, 11, 22, 0.72); border: 1px solid var(--panel-line); overflow: hidden; text-overflow: ellipsis; }
-.plate.current .tag { border-color: #ffd76a; }
+.plate .tag { display: block; width: 110px; margin: 0 auto; padding: 2px 5px 4px; border-radius: 6px; background: rgba(20, 11, 30, 0.74); border: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; }
+.plate i { display: block; height: 5px; margin-top: 2px; border-radius: 3px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.plate i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
+.plate.current { color: var(--gold); }
+.plate.current .tag { border-color: var(--gold); }
+.plate.dead { opacity: 0.45; }
 .plate.solo .tag { display: none; }
 .plate.solo { pointer-events: none; }
+
+/* Damage numbers: placed every picture above their dummy, so they stay with it when the camera moves. */
+#floaters { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.float { position: absolute; left: 0; top: 0; will-change: transform, opacity; white-space: nowrap; font: 700 24px/1 "Friz Quadrata TT", "Friz Quadrata", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; color: #ffd100; -webkit-text-stroke: 1px #000; paint-order: stroke fill; text-shadow: 0 0 2px #000, 1px 2px 0 #000, 0 0 5px rgba(0, 0, 0, 0.9); letter-spacing: 0.5px; }
+.float.crit { font-size: 38px; }
+.float.small { font-size: 18px; }
+.float.small.crit { font-size: 25px; }
+.float.pet { font-size: 17px; color: #fff; }
+.float.pet.crit { font-size: 24px; }
+.float.miss { font-size: 20px; color: #fff; }
+
+#moveBanner { position: fixed; z-index: 3; left: 50%; top: 22%; transform: translateX(-50%); padding: 6px 18px; border-radius: 8px; background: rgba(120, 20, 16, 0.85); border: 1px solid #ff6a5e; color: #fff; font: 700 22px/1.2 "Segoe UI", system-ui, sans-serif; text-shadow: 0 1px 2px #000; pointer-events: none; }
+#moveBanner.soon { background: var(--glass); border-color: var(--line-bright); font-size: 14px; font-weight: 600; color: var(--ink-dim); }
+
+/* --- Tooltips: appear at once next to what the pointer is on -------------- */
+#tip { position: fixed; left: 0; top: 0; z-index: 30; max-width: 310px; padding: 9px 12px 10px; background: rgba(13, 7, 20, 0.97); border: 1px solid var(--line-bright); border-radius: 9px; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55); pointer-events: none; font: 12px/1.4 "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+#tip .tip-title { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; font-size: 14px; font-weight: 600; color: #fff; }
+#tip .tip-title span { font-size: 11px; font-weight: 400; color: var(--ink-dim); white-space: nowrap; }
+#tip .tip-row { display: flex; justify-content: space-between; gap: 18px; white-space: nowrap; }
+#tip .tip-text { margin-top: 5px; color: var(--gold); white-space: pre-line; }
+#tip .tip-note { margin-top: 5px; color: var(--ink-dim); }
+#tip .tip-note.yours { color: #9fe0b4; }
+#tip .tip-plain { white-space: pre-line; }
+
+/* --- Fight review ------------------------------------------------------- */
+.review { position: fixed; z-index: 10; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(640px, 92vw); max-height: 84vh; overflow: auto; padding: 14px 16px; background: var(--glass-solid); border: 1px solid var(--line-bright); border-radius: 12px; color: var(--ink); font: 13px/1.4 "Segoe UI", system-ui, sans-serif; }
+.review header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.review h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.review h3 { margin: 14px 0 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+.review-head { margin: 0; font-size: 14px; }
+.review-head b { font-size: 20px; }
+.review table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.review th { text-align: left; font-weight: 600; color: var(--ink-dim); padding: 2px 6px; border-bottom: 1px solid var(--line); }
+.review td { padding: 2px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.review .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.review tr.behind td { color: #ffb3a8; }
+.review .hint { margin-top: 12px; }
+
+/* --- Start-up failure ---------------------------------------------------- */
+#fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
