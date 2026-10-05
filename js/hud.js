@@ -1,6 +1,8 @@
 // The frames and bars around the scene. In this first step most of them are in place but empty:
 // casting, pets and more dummies fill them in later.
 
+import { getName, setName, maxLength } from './names.js';
+
 const ACTION_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'Z', 'X'];
 
 function byId(id) { return document.getElementById(id); }
@@ -42,6 +44,42 @@ export function createHud(character) {
     logLines.appendChild(line);
     while (logLines.children.length > 8) logLines.removeChild(logLines.firstChild);
   }
+
+  // Names: click one to type a new one. Enter or a click elsewhere keeps it, Escape leaves it as it was.
+  const petName = byId('petName');
+  petName.dataset.name = character.pet;
+  byId('petSub').textContent = character.petKind + ', arrives later';
+  document.querySelectorAll('#hud button.name').forEach(function (button) {
+    const key = button.dataset.name;
+    button.textContent = getName(key);
+    button.title = 'Click to rename';
+    button.addEventListener('click', function () {
+      const input = document.createElement('input');
+      input.className = 'name-edit';
+      input.value = getName(key);
+      input.maxLength = maxLength(key);
+      input.setAttribute('aria-label', 'New name');
+      let done = false;
+      function finish(keep) {
+        if (done) return;
+        done = true;
+        const before = getName(key), after = keep ? setName(key, input.value) : before;
+        button.textContent = after;
+        input.remove();
+        button.hidden = false;
+        if (after !== before) log(before + ' is now called ' + after + '.');
+      }
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Escape') finish(false);
+      });
+      input.addEventListener('blur', function () { finish(true); });
+      button.hidden = true;
+      button.after(input);
+      input.focus();
+      input.select();
+    });
+  });
 
   document.querySelectorAll('#hud button.soon').forEach(function (button) {
     button.title = 'Not built yet';

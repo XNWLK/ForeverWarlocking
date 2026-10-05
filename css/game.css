@@ -46,6 +46,11 @@ body { font: 13px/1.35 "Segoe UI", system-ui, sans-serif; }
 .unit-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
 .unit-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; color: var(--gold); white-space: nowrap; }
 .hostile .unit-name { color: #ff9c92; }
+
+/* A name is a button: click it to type a new one. */
+button.name { font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px dashed transparent; border-radius: 0; padding: 0; cursor: text; overflow: hidden; text-overflow: ellipsis; }
+button.name:hover { background: none; border-bottom-color: currentColor; }
+input.name-edit { pointer-events: auto; user-select: text; font: inherit; color: inherit; width: 130px; min-width: 0; padding: 0 3px; background: rgba(0, 0, 0, 0.65); border: 1px solid var(--fel); border-radius: 3px; outline: none; }
 .unit-sub { font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
 .unit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 18px; }
 
@@ -57,7 +62,7 @@ body { font: 13px/1.35 "Segoe UI", system-ui, sans-serif; }
 .hostile .bar.health i { background: var(--hostile); }
 .bar.empty i { width: 0; }
 .pet .bar { height: 9px; }
-.pet .unit-name { color: var(--ink-dim); }
+.pet .unit-name { color: #c9b8ff; }
 
 .distance { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fel); }
 .distance.far { color: #ff9c92; }

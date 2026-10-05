@@ -43,6 +43,8 @@ const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, co
 const hud = createHud({
   portrait: WL.ICONS['race_' + raceKey],
   raceName: WL.RACES[raceKey].name,
+  pet: build.pet,
+  petKind: build.pet === 'imp' ? 'Imp' : 'Succubus',
   health: Math.round(stats.maxHealth),
   mana: Math.round(stats.maxMana)
 });

@@ -14,7 +14,7 @@
   <section id="playerFrame" class="panel unit">
     <img class="portrait" id="playerPortrait" alt="">
     <div class="unit-body">
-      <div class="unit-name"><span id="playerName">Warlock</span><span class="unit-sub" id="playerSub"></span></div>
+      <div class="unit-name"><button type="button" class="name" data-name="warlock"></button><span class="unit-sub" id="playerSub"></span></div>
       <div class="bar health"><i id="playerHealthFill"></i><b id="playerHealth"></b></div>
       <div class="bar mana"><i id="playerManaFill"></i><b id="playerMana"></b></div>
     </div>
@@ -23,7 +23,7 @@
   <section id="targetFrame" class="panel unit hostile">
     <div class="portrait skull" aria-hidden="true">??</div>
     <div class="unit-body">
-      <div class="unit-name"><span>Mage dummy</span><span class="unit-sub">Boss</span></div>
+      <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub">Boss</span></div>
       <div class="bar health"><i style="width:100%"></i><b>100%</b></div>
       <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="slots small" id="targetDebuffs"></span></div>
     </div>
@@ -31,7 +31,7 @@
 
   <section id="petFrame" class="panel unit pet">
     <div class="unit-body">
-      <div class="unit-name"><span>Pet</span><span class="unit-sub">none yet</span></div>
+      <div class="unit-name"><button type="button" class="name" id="petName"></button><span class="unit-sub" id="petSub"></span></div>
       <div class="bar health empty"><i></i></div>
       <div class="bar mana empty"><i></i></div>
     </div>
