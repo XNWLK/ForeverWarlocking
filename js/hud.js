@@ -3,8 +3,8 @@
 import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
 
-export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyZ', 'KeyX'];
-const DEFAULT_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'Z', 'X'];
+export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG'];
+const DEFAULT_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', 'R', 'F', 'T', 'G'];
 const LOG_LINES = 9;
 
 function byId(id) { return document.getElementById(id); }
@@ -404,11 +404,18 @@ export function createHud(WL, handlers) {
     floaters.appendChild(node);
   }
 
-  // e: an event from the casting rules; anchor: where the dummy's head is on the screen { x, y, visible }.
-  function event(e, anchor) {
+  // The number that floats up for a hit, a tick or a miss.
+  function floatFor(e, anchor) {
+    if (e.type === 'miss') { if (!e.pet) float('Miss', 'miss', anchor); return; }
+    const school = e.school === 'fire' ? 'fire' : '';
+    float(whole(e.amount), (e.pet ? 'pet' : e.type === 'tick' ? 'tick ' + school : school) + (e.crit ? ' crit' : ''), anchor);
+  }
+
+  // e: an event from the casting rules; anchor: where the dummy's head is on the screen { x, y, visible };
+  // quiet: write the log line but leave the floating number for later (a bolt is still on its way).
+  function event(e, anchor, quiet) {
     const c = character, dummy = getName('dummy');
     const name = e.key && c.spells[e.key] ? c.spells[e.key].name : e.key === 'touchOfTheGrave' ? 'Touch of the Grave' : e.key === 'isb' ? 'Improved Shadow Bolt' : e.name || '';
-    const school = e.school === 'fire' ? 'fire' : '';
     if (e.pet && (e.type === 'hit' || e.type === 'miss')) {
       const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
       const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
@@ -416,7 +423,7 @@ export function createHud(WL, handlers) {
         log(e.dodge ? dummy + ' dodges ' + petName + '.' : who + ' misses ' + dummy + '.', 'miss');
       } else {
         log(who + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.glance ? ' (glancing).' : e.crit ? '!' : '.'), e.crit ? 'crit' : '');
-        float(whole(e.amount), 'pet' + (e.crit ? ' crit' : ''), anchor);
+        if (!quiet) floatFor(e, anchor);
       }
     } else if (e.type === 'petMode') {
       log(getName(c.build.pet) + (e.mode === 'attack' ? ' attacks.' : ' follows you.'), 'proc');
@@ -424,13 +431,13 @@ export function createHud(WL, handlers) {
       // shown by the Imp itself
     } else if (e.type === 'hit') {
       log(name + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.crit ? '!' : '.'), e.crit ? 'crit' : '');
-      float(whole(e.amount), school + (e.crit ? ' crit' : ''), anchor);
+      if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'tick') {
       log(name + ' ticks for ' + whole(e.amount) + (e.crit ? ' (crit).' : '.'), e.crit ? 'crit' : '');
-      float(whole(e.amount), 'tick ' + school + (e.crit ? ' crit' : ''), anchor);
+      floatFor(e, anchor);
     } else if (e.type === 'miss') {
       log(name + ' misses ' + dummy + '.', 'miss');
-      float('Miss', 'miss', anchor);
+      if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'apply') {
       log(dummy + ' is afflicted by ' + (e.key === 'brand' ? 'Demonic Brand' : name) + '.');
     } else if (e.type === 'mana') {
@@ -458,6 +465,6 @@ export function createHud(WL, handlers) {
 
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
-    setSimAverage: setSimAverage
+    setSimAverage: setSimAverage, floatFor: floatFor
   };
 }

@@ -1,7 +1,7 @@
 // The choices that are kept in this browser between visits: build, race, the dummy's health, range rings on or off.
 
 const STORE_KEY = 'forever-warlocking.settings';
-const DEFAULTS = { build: null, race: 'human', dummyHealth: 10000, rings: true };
+const DEFAULTS = { build: null, race: 'human', dummyHealth: 50000, rings: true };
 
 let saved = {};
 try {

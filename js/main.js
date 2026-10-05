@@ -7,6 +7,7 @@ import { createHud, ACTION_CODES } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
 import { getSetting, setSetting } from './settings.js';
 import { createPet } from './pets.js';
+import { createEffects, SPELL_FX } from './effects.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -28,6 +29,7 @@ scene.add(warlock.root);
 const beam = makeBeam();
 scene.add(beam.mesh);
 const pet = createPet(scene);
+const effects = createEffects(scene);
 
 const colliders = chamber.colliders.concat([{ x: 0, z: 0, r: dummy.radius }]);
 const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders });
@@ -65,13 +67,41 @@ function askSimAverage() {
   }
 }
 
+// What you see when something happens. A spell that flies is drawn as a bolt: its number and the dummy's flinch
+// wait until the bolt arrives (the damage itself is already counted, exactly as the rules say).
+let boltsInFlight = 0, deathWaiting = false;
+const spot = new THREE.Vector3();
 function onCombatEvent(e) {
+  const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
+  if (e.pet && lands && e.key !== 'pet:brand') pet.strike();
+
+  if (lands && fx && fx.bolt) {
+    hud.event(e, anchor, true);
+    if (e.pet) spot.set(pet.state.x, 0.75, pet.state.z); else warlock.orbPosition(spot);
+    boltsInFlight++;
+    effects.bolt(spot, dummy.chest, fx.bolt, function () {
+      boltsInFlight--;
+      if (e.type === 'hit') { effects.burst(dummy.chest, fx.land); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); }
+      hud.floatFor(e, anchor);
+      if (deathWaiting && boltsInFlight === 0) { deathWaiting = false; dummy.setDead(true); }
+    });
+    return;
+  }
+
   hud.event(e, anchor);
-  if (e.type === 'hit') dummy.hit(e.crit ? 1.6 : 1);
-  else if (e.type === 'tick') dummy.hit(0.25);
-  else if (e.type === 'miss' && e.pet) pet.strike();
-  if (e.pet && e.type === 'hit' && e.key !== 'pet:brand') pet.strike();
-  else if (e.type === 'death') dummy.setDead(true);
+  if (e.type === 'hit') {
+    dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1);
+    if (fx && fx.land) effects.burst(dummy.chest, fx.land);
+  } else if (e.type === 'tick') {
+    dummy.hit(0.25);
+    if (fx && fx.land && combat.spells[e.key] && combat.spells[e.key].kind === 'channel') effects.burst(dummy.chest, fx.land);
+  } else if (e.type === 'apply') {
+    if (fx && fx.land) effects.burst(dummy.chest, fx.land);
+  } else if (e.type === 'mana' && e.source === 'Life Tap') {
+    effects.burst(spot.set(controls.player.x, 1.2, controls.player.z), { color: 0xff4a5a, size: 1.3, ring: true });
+  } else if (e.type === 'death') {
+    if (boltsInFlight > 0) deathWaiting = true; else dummy.setDead(true);
+  }
 }
 
 // Builds the character from the chosen build and race and starts a fresh fight.
@@ -107,6 +137,9 @@ function resetFight() {
   fightClock = 0;
   dummy.setDead(false);
   pet.sendHome();
+  effects.clear();
+  boltsInFlight = 0;
+  deathWaiting = false;
 }
 
 function press(key) {
@@ -205,8 +238,19 @@ function frame() {
   dummy.update(dt);
   chamber.update(time);
 
+  // Spell looks: motes at the staff while casting, marks on the dummy for what is on it, bolts and bursts.
+  warlock.root.updateMatrixWorld();
+  if (casting) {
+    const fx = SPELL_FX[casting.key];
+    effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, S.cast ? (S.t - S.cast.start) / (S.cast.end - S.cast.start) : 0.6, time);
+  } else effects.casting(null);
+  effects.setMarks(S.over ? {} : {
+    immolate: combat.dotLeft('immolate') > 0, corruption: combat.dotLeft('corruption') > 0, siphonLife: combat.dotLeft('siphonLife') > 0,
+    baneOfAgony: combat.dotLeft('baneOfAgony') > 0, baneOfDoom: combat.dotLeft('baneOfDoom') > 0, coe: combat.buff('coe')
+  }, time);
+  effects.update(dt);
+
   if (S.channel) {
-    warlock.root.updateMatrixWorld();
     beam.material.color.set(S.channel.key === 'wrack' ? 0xb07cff : 0x8dff9a);
     beam.set(warlock.orbPosition(from), to.copy(dummy.chest), time);
   } else beam.hide();
@@ -225,6 +269,6 @@ renderer.setAnimationLoop(frame);
 window.FW = {
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press,
-  pet: pet, ctx: ctx,
+  pet: pet, ctx: ctx, effects: effects,
   get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
 };

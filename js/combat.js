@@ -54,7 +54,7 @@ export function createCombat(opts) {
   }
   function racialOf(effect) { return race.racials.filter(function (r) { return r.effect === effect; })[0] || null; }
 
-  let S, R, P, res, events, order, inst, queued, maxHealth = opts.dummyHealth || 10000;
+  let S, R, P, res, events, order, inst, queued, maxHealth = opts.dummyHealth || 50000;
 
   function reset(seed) {
     const seed0 = seed != null ? seed : (opts.seed != null ? opts.seed : Math.floor(Math.random() * 4294967296));
@@ -608,8 +608,7 @@ export function createCombat(opts) {
   };
 }
 
-// The spells on the action bar, left to right in the order of the build's priority list; then Life Tap, the race's
-// cooldown, and whatever else the build can cast.
+// Which spells of a build's priority list go on the action bar (the keys of this table are the priority actions).
 const ACTION_SPELLS = {
   deathCoilFinisher: ['deathCoil'], deathCoil: ['deathCoil'],
   bane: ['baneOfDoom', 'baneOfAgony'], baneOfAgony: ['baneOfAgony'],
@@ -625,12 +624,34 @@ const ACTION_SPELLS = {
 };
 const NOT_ON_BAR = { drainSoul: true, baneOfHavoc: true };    // Drain Soul is not used; Bane of Havoc needs a second target
 
+// Every spell has its own key, the same in every build (Xn, 2026-10-05). The slots are, in order:
+// 1 2 3 4 5 6 7 8 R F T G. A spell that has no place of its own in a build takes the place of the one it stands in
+// for: Incinerate and Wrack for Shadow Bolt, Conflagrate for Searing Pain, and so on.
+const HOME = {
+  curseOfElements: [0], searingPain: [1], shadowBolt: [2], immolate: [3], corruption: [4], baneOfAgony: [5], baneOfDoom: [6],
+  deathCoil: [7], lifeTap: [8], soulFire: [9], drainLife: [10], racial: [11],
+  incinerate: [2], wrack: [2, 10], conflagrate: [1], shadowburn: [9, 7], siphonLife: [6, 7]
+};
+
+// Returns one entry per slot: a spell key, 'racial', or null for an empty slot.
+// First the spells of the build's priority list (plus Life Tap and the race's cooldown) take their own keys; those
+// whose key is taken fill the free slots from the left; then whatever else the build can cast, if its key is free.
 export function actionBarFor(build, table, race, slots) {
   const bar = [];
-  function add(key) { if (bar.indexOf(key) < 0 && (key === 'racial' || table[key])) bar.push(key); }
-  build.rotation.forEach(function (action) { (ACTION_SPELLS[action] || []).forEach(add); });
-  add('lifeTap');
-  if (race.racials.some(function (r) { return r.effect === 'cooldown'; })) add('racial');
-  Object.keys(table).forEach(function (key) { if (!NOT_ON_BAR[key]) add(key); });
-  return bar.slice(0, slots);
+  for (let i = 0; i < slots; i++) bar.push(null);
+  const wanted = [];
+  function want(key) { if (wanted.indexOf(key) < 0 && (key === 'racial' || table[key])) wanted.push(key); }
+  build.rotation.forEach(function (action) { (ACTION_SPELLS[action] || []).forEach(want); });
+  want('lifeTap');
+  if (race.racials.some(function (r) { return r.effect === 'cooldown'; })) want('racial');
+
+  function home(key) {
+    const places = HOME[key] || [];
+    for (let i = 0; i < places.length; i++) if (places[i] < slots && bar[places[i]] === null) { bar[places[i]] = key; return true; }
+    return false;
+  }
+  const homeless = wanted.filter(function (key) { return !home(key); });
+  homeless.forEach(function (key) { const free = bar.indexOf(null); if (free >= 0) bar[free] = key; });
+  Object.keys(table).forEach(function (key) { if (!NOT_ON_BAR[key] && bar.indexOf(key) < 0) home(key); });
+  return bar;
 }
