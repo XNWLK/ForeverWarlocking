@@ -122,3 +122,84 @@ button.soon { color: var(--ink-dim); border-style: dashed; }
 
 /* --- Start-up failure -------------------------------------------------- */
 #fatal { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
+
+/* ======================================================================
+   Step 2: casting
+   ====================================================================== */
+
+/* --- Target health: the number is a button (click to change the pool); a mark shows where execute starts --- */
+.bar s { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.75); }
+.bar button { position: relative; display: block; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: var(--ink); font-size: 11px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; cursor: text; }
+.bar button:hover { background: rgba(255, 255, 255, 0.12); }
+.bar input { position: relative; pointer-events: auto; user-select: text; display: block; width: 100%; height: 100%; padding: 0 4px; border: 0; outline: 1px solid var(--fel); background: rgba(0, 0, 0, 0.8); color: var(--ink); font: 600 11px/13px "Segoe UI", system-ui, sans-serif; text-align: center; }
+.execute .bar.health i { background: #e0662f; }
+
+/* --- Buffs and debuffs: an icon with the seconds left --- */
+.auras { display: flex; gap: 3px; min-height: 22px; align-items: center; }
+.aura { position: relative; width: 22px; height: 22px; border-radius: 3px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.25); background: #1b1626; }
+.aura img { display: block; width: 100%; height: 100%; }
+.aura b { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font-size: 11px; line-height: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }
+#playerBuffs { min-width: 100px; }
+
+/* --- Pickers --- */
+.picker { width: 330px; }
+.options { display: grid; gap: 2px; }
+.options button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 2px 8px; }
+.options button img, .options button .no-icon { width: 18px; height: 18px; border-radius: 3px; flex: none; }
+#topRight { z-index: 2; }
+.picker { background: rgba(14, 11, 22, 0.94); }
+.options button small { margin-left: auto; color: var(--ink-dim); font-size: 11px; }
+#buildLabel { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- Red error line and cast bar --- */
+.error-text { height: 18px; font-size: 14px; font-weight: 600; color: #ff5b4f; text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.4s; }
+.error-text.show { opacity: 1; transition: none; }
+.castbar.idle { visibility: hidden; }
+.castbar.channel i { background: #3fbf6a; }
+.castbar.interrupted { border-color: #ff5b4f; }
+.castbar.interrupted i { width: 100% !important; background: #b3261e; }
+
+/* --- Action bar slots --- */
+.slot { padding: 0; overflow: hidden; cursor: pointer; pointer-events: auto; }
+.slot:hover { border-color: var(--panel-line-bright); background: var(--slot); }
+.slot img { display: block; width: 100%; height: 100%; }
+.slot.empty { cursor: default; }
+.slot .cool { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(8, 6, 14, 0.78); }
+.slot .secs { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+.slot .count { position: absolute; right: 3px; bottom: 1px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000, 0 1px 1px #000; }
+.slot kbd { z-index: 1; color: #fff; }
+.slot.no-mana img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(180deg) saturate(3); }
+.slot.no-range img { filter: saturate(0.4) brightness(0.55) sepia(1) hue-rotate(-50deg) saturate(4); }
+.slot.unusable img { filter: grayscale(1) brightness(0.45); }
+.slot.active { border-color: #ffd76a; box-shadow: 0 0 0 1px #ffd76a inset; }
+.slot.queued { border-color: var(--fel); box-shadow: 0 0 0 1px var(--fel) inset; }
+.slot.proc { border-color: #ffd76a; box-shadow: 0 0 8px 1px #ffd76a; }
+
+/* --- Combat log and meter --- */
+.log { height: 204px; }
+.log li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log li.crit { color: #ffd76a; }
+.log li.miss { color: #9aa0b5; }
+.log li.gain { color: #7fb2ff; }
+.log li.proc { color: var(--fel); }
+.meter ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 3px; }
+.meter li { position: relative; display: flex; justify-content: space-between; gap: 8px; padding: 1px 5px; font-size: 11px; border-radius: 2px; overflow: hidden; background: rgba(255, 255, 255, 0.04); }
+.meter li i { position: absolute; inset: 0 auto 0 0; background: rgba(140, 108, 230, 0.45); }
+.meter li.fire i { background: rgba(230, 120, 50, 0.45); }
+.meter li span { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meter li span + span { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* --- Damage numbers floating up from the dummy --- */
+#floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.float { position: absolute; transform: translate(-50%, -50%); font: 700 20px/1 "Segoe UI", system-ui, sans-serif; color: #c9a8ff; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px #000; white-space: nowrap; animation: float-up 1.3s ease-out forwards; }
+.float.fire { color: #ffab5e; }
+.float.tick { font-size: 15px; }
+.float.crit { font-size: 30px; color: #ffe27a; }
+.float.tick.crit { font-size: 20px; }
+.float.miss { font-size: 16px; color: #e8e8f0; }
+@keyframes float-up {
+  0% { opacity: 0; margin-top: 0; }
+  10% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; margin-top: -90px; }
+}

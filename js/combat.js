@@ -449,6 +449,7 @@ export function createCombat(opts) {
     stats: stats, table: table, spells: SPELLS, build: build, raceKey: raceKey,
     get state() { return S; },
     get result() { return res; },
+    get queuedKey() { return queued ? queued.key : null; },
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },

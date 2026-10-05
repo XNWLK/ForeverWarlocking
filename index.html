@@ -18,6 +18,8 @@
 <link rel="modulepreload" href="js/controls.js">
 <link rel="modulepreload" href="js/hud.js">
 <link rel="modulepreload" href="js/names.js">
+<link rel="modulepreload" href="js/combat.js">
+<link rel="modulepreload" href="js/settings.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -28,7 +30,7 @@
     <img class="portrait" id="playerPortrait" alt="">
     <div class="unit-body">
       <div class="unit-name"><button type="button" class="name" data-name="warlock"></button><span class="unit-sub" id="playerSub"></span></div>
-      <div class="bar health"><i id="playerHealthFill"></i><b id="playerHealth"></b></div>
+      <div class="bar health"><i></i><b id="playerHealth"></b></div>
       <div class="bar mana"><i id="playerManaFill"></i><b id="playerMana"></b></div>
     </div>
   </section>
@@ -37,8 +39,8 @@
     <div class="portrait skull" aria-hidden="true">??</div>
     <div class="unit-body">
       <div class="unit-name"><button type="button" class="name" data-name="dummy"></button><span class="unit-sub">Boss</span></div>
-      <div class="bar health"><i style="width:100%"></i><b>100%</b></div>
-      <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="slots small" id="targetDebuffs"></span></div>
+      <div class="bar health"><i id="targetHealthFill"></i><s id="executeMark" title="Execute phase starts here"></s><button type="button" id="targetHealth" title="Click to change the dummy's health"></button></div>
+      <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="auras" id="targetDebuffs"></span></div>
     </div>
   </section>
 
@@ -61,15 +63,24 @@
       </div>
     </div>
     <div class="panel row">
-      <button type="button" class="soon" data-soon="The build picker">Build</button>
-      <button type="button" class="soon" data-soon="The race picker">Race</button>
+      <span class="label" id="buildLabel"></span>
+      <button type="button" id="btnBuild">Build</button>
+      <button type="button" id="btnRace">Race</button>
       <button type="button" id="btnKeys">Keys</button>
       <button type="button" id="btnRings" class="on" aria-pressed="true">Range rings</button>
       <button type="button" id="btnReset">Reset</button>
     </div>
     <div class="panel row">
       <span class="label">Buffs</span>
-      <span class="slots small" id="playerBuffs"></span>
+      <span class="auras" id="playerBuffs"></span>
+    </div>
+    <div class="panel picker" id="buildPanel" hidden>
+      <h2>Build</h2>
+      <div class="options" id="buildOptions"></div>
+    </div>
+    <div class="panel picker" id="racePanel" hidden>
+      <h2>Race</h2>
+      <div class="options" id="raceOptions"></div>
     </div>
     <div class="panel keys" id="keysPanel" hidden>
       <h2>Keys</h2>
@@ -82,13 +93,16 @@
         <dt>Left mouse, held</dt><dd>Look around without turning</dd>
         <dt>Both mouse buttons</dt><dd>Walk forward</dd>
         <dt>Mouse wheel</dt><dd>Zoom</dd>
+        <dt>1 to 8, R, F, Z, X</dt><dd>Cast the spell in that slot (or click it)</dd>
+        <dt>Escape</dt><dd>Stop casting</dd>
       </dl>
     </div>
   </section>
 
   <!-- Bottom centre: cast bar and action bar -->
   <section id="bottomCentre">
-    <div id="castBar" class="castbar idle"><i></i><b>Cast bar</b></div>
+    <div id="errorText" class="error-text" aria-live="polite"></div>
+    <div id="castBar" class="castbar idle"><i id="castFill"></i><b id="castText"></b></div>
     <div id="actionBar" class="panel actionbar"></div>
   </section>
 
@@ -105,11 +119,12 @@
     <dl>
       <dt>Damage</dt><dd id="meterDamage">0</dd>
       <dt>Time</dt><dd id="meterTime">0:00</dd>
-      <dt>Sim average</dt><dd id="meterSim">&ndash;</dd>
     </dl>
+    <ol id="meterSpells"></ol>
   </section>
 </div>
 
+<div id="floaters" aria-hidden="true"></div>
 <div id="fatal" hidden></div>
 
 <!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->

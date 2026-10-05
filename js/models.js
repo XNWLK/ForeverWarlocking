@@ -71,17 +71,24 @@ export function makeWarlock() {
   }
   const orb = add(staff, new THREE.IcosahedronGeometry(0.12, 0), glow(0x7dffc0), 0, 2.36, 0);
 
-  let stride = 0;
-  function update(dt, time, moving, jumpHeight) {
+  // While a spell is being cast the orb grows and takes the colour of its school.
+  const ORB_IDLE = new THREE.Color(0x7dffc0), ORB_SHADOW = new THREE.Color(0xb07cff), ORB_FIRE = new THREE.Color(0xff9a3d);
+  let stride = 0, casting = 0;
+  function update(dt, time, moving, jumpHeight, school) {
     stride = moving ? stride + dt * 11 : 0;
     rig.position.y = jumpHeight + (moving ? Math.abs(Math.sin(stride)) * 0.06 : 0);
     rig.rotation.x = moving ? -0.07 : 0;
-    staff.rotation.x = moving ? Math.sin(stride) * 0.1 : 0;
-    orb.scale.setScalar(1 + Math.sin(time * 3) * 0.12);
+    staff.rotation.x = moving ? Math.sin(stride) * 0.1 : school ? -0.18 : 0;
+    casting += ((school ? 1 : 0) - casting) * Math.min(1, dt * 10);
+    orb.material.color.lerp(school === 'fire' ? ORB_FIRE : school ? ORB_SHADOW : ORB_IDLE, Math.min(1, dt * 12));
+    orb.scale.setScalar(1 + Math.sin(time * (school ? 14 : 3)) * 0.12 + casting * 0.9);
     orb.rotation.y = time * 1.5;
   }
 
-  return { root: root, update: update };
+  // Where the orb is in the world (a beam starts here).
+  function orbPosition(target) { return orb.getWorldPosition(target); }
+
+  return { root: root, update: update, orbPosition: orbPosition };
 }
 
 // The training dummy: a straw-stuffed figure on a post, with a round target on its chest. Built facing +z.
@@ -121,5 +128,34 @@ export function makeDummy() {
   circle.position.y = 0.06;
   root.add(circle);
 
-  return { root: root, radius: 1.2 };
+  // A hit makes the dummy rock back; at zero health it falls over until the next fight.
+  let rock = 0, rockSpeed = 0, fallen = 0, dead = false;
+  function hit(strength) { rockSpeed -= 1.6 * strength; }
+  function setDead(value) { dead = value; circle.visible = !value; }
+  function update(dt) {
+    rockSpeed += (-rock * 140 - rockSpeed * 9) * dt;       // a damped spring
+    rock += rockSpeed * dt;
+    fallen += ((dead ? 1 : 0) - fallen) * Math.min(1, dt * 6);
+    body.rotation.x = rock - fallen * 1.45;
+  }
+
+  return { root: root, radius: 1.2, hit: hit, setDead: setDead, update: update, chest: new THREE.Vector3(0, 2.2, 0), head: new THREE.Vector3(0, 3.1, 0) };
+}
+
+// A beam between two points, for channelled spells.
+export function makeBeam() {
+  const material = new THREE.MeshBasicMaterial({ color: 0x8dff9a, transparent: true, opacity: 0.75, depthWrite: false });
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 6, 1, true), material);
+  mesh.visible = false;
+  const up = new THREE.Vector3(0, 1, 0), dir = new THREE.Vector3();
+  function set(from, to, time) {
+    dir.subVectors(to, from);
+    const length = dir.length();
+    mesh.position.copy(from).addScaledVector(dir, 0.5);
+    mesh.quaternion.setFromUnitVectors(up, dir.normalize());
+    const pulse = 1 + Math.sin(time * 30) * 0.35;
+    mesh.scale.set(pulse, length, pulse);
+    mesh.visible = true;
+  }
+  return { mesh: mesh, set: set, hide: function () { mesh.visible = false; }, material: material };
 }

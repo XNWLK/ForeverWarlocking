@@ -1,23 +1,16 @@
-// Forever Warlocking - step 1: the chamber you can walk in. No spells yet.
+// Forever Warlocking - start-up and the frame loop.
 import * as THREE from 'three';
 import { buildChamber, makeRangeRings, HALF } from './chamber.js';
-import { makeWarlock, makeDummy } from './models.js';
+import { makeWarlock, makeDummy, makeBeam } from './models.js';
 import { createControls } from './controls.js';
-import { createHud } from './hud.js';
+import { createHud, ACTION_CODES } from './hud.js';
+import { createCombat, actionBarFor } from './combat.js';
+import { getSetting, setSetting } from './settings.js';
 
 const WL = window.WL;
+const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
 
-// The character: for now always the first ready build as a Human. The picker comes with casting.
-const config = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
-const build = WL.BUILDS[0], raceKey = 'human';
-const stats = WL.computeStats(build, raceKey, config);
-const spells = WL.buildSpellTable(build, stats, config);
-
-// Ranges in yards. Spells come from the spell table; the Succubus's melee reach is this project's own number.
-const SPELL_RANGE = spells.shadowBolt.range;
-const DRAIN_RANGE = spells.drainLife.range;
-const PET_MELEE_RANGE = 5;
-
+// ---------- the scene ----------
 const canvas = document.getElementById('scene');
 // 'high-performance' asks a laptop with two graphics chips for the strong one.
 const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
@@ -31,30 +24,82 @@ const dummy = makeDummy();
 scene.add(dummy.root);
 const warlock = makeWarlock();
 scene.add(warlock.root);
-
-const rings = makeRangeRings([
-  { yards: SPELL_RANGE, color: 0xb9a8ff },
-  { yards: DRAIN_RANGE, color: 0x58e0a8 },
-  { yards: PET_MELEE_RANGE, color: 0xff9d7a }
-]);
-scene.add(rings);
+const beam = makeBeam();
+scene.add(beam.mesh);
 
 const colliders = chamber.colliders.concat([{ x: 0, z: 0, r: dummy.radius }]);
 const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders });
 
-const hud = createHud({
-  portrait: WL.ICONS['race_' + raceKey],
-  raceName: WL.RACES[raceKey].name,
-  pet: build.pet,
-  petKind: build.pet === 'imp' ? 'Imp' : 'Succubus',
-  health: Math.round(stats.maxHealth),
-  mana: Math.round(stats.maxMana)
+// ---------- the character and the fight ----------
+const config = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
+let combat = null, character = null, rings = null;
+const ctx = { distance: 0, moving: false };               // what the casting rules need to know about you
+const anchor = { x: 0, y: 0, visible: false };            // where the dummy's head is on the screen
+let fightClock = 0;                                       // seconds since the last reset
+
+const hud = createHud(WL, {
+  onPress: function (key) { press(key); },
+  onBuild: function (key) { setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
+  onRace: function (key) { setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
+  onDummyHealth: function (health) { setSetting('dummyHealth', health); newCharacter(); hud.log('The dummy now has ' + health.toLocaleString('en-US') + ' health.'); },
+  onRings: function (on) { setSetting('rings', on); rings.visible = on; },
+  onReset: function () { resetFight(); hud.log('Fight reset.'); }
 });
-hud.onRings(function (on) { rings.visible = on; });
-hud.onReset(function () { controls.reset(); hud.log('Back at the start.'); });
-hud.log('You enter the fel chamber.', true);
-hud.log('Build: ' + build.short + '.');
-hud.log('Walk with W A S D. The Keys button lists the rest.');
+
+function onCombatEvent(e) {
+  hud.event(e, anchor);
+  if (e.type === 'hit') dummy.hit(e.crit ? 1.6 : 1);
+  else if (e.type === 'tick') dummy.hit(0.25);
+  else if (e.type === 'death') dummy.setDead(true);
+}
+
+// Builds the character from the chosen build and race and starts a fresh fight.
+function newCharacter() {
+  const build = WL.BUILDS.filter(function (b) { return b.key === getSetting('build'); })[0] || WL.BUILDS[0];
+  const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
+  const dummyHealth = getSetting('dummyHealth');
+  combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, onEvent: onCombatEvent });
+  const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length);
+  const ranges = bar.filter(function (k) { return combat.table[k]; }).map(function (k) { return combat.table[k].range; });
+  character = {
+    build: build, raceKey: raceKey, stats: combat.stats, table: combat.table, spells: combat.spells, bar: bar,
+    racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct,
+    maxRange: Math.max.apply(null, ranges.concat([0]))
+  };
+  hud.setCharacter(character);
+
+  // Range rings follow the character: its spell range (Destructive Reach included), Drain Life, the Succubus.
+  if (rings) scene.remove(rings);
+  const list = [{ yards: character.maxRange, color: 0xb9a8ff }];
+  if (combat.table.drainLife && combat.table.drainLife.range !== character.maxRange) list.push({ yards: combat.table.drainLife.range, color: 0x58e0a8 });
+  if (build.pet === 'succubus') list.push({ yards: PET_MELEE_RANGE, color: 0xff9d7a });
+  rings = makeRangeRings(list);
+  rings.visible = getSetting('rings');
+  scene.add(rings);
+  resetFight();
+}
+
+function resetFight() {
+  combat.reset();
+  fightClock = 0;
+  dummy.setDead(false);
+}
+
+function press(key) {
+  if (!key) return;
+  combat.update(fightClock, ctx);
+  combat.press(key, ctx);
+}
+
+// Action keys by their place on the keyboard; Escape stops a cast.
+window.addEventListener('keydown', function (e) {
+  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement) return;
+  if (e.code === 'Escape') { combat.cancel(); return; }
+  const slot = ACTION_CODES.indexOf(e.code);
+  if (slot < 0) return;
+  e.preventDefault();
+  press(character.bar[slot]);
+});
 
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -64,9 +109,16 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// A safeguard for weak graphics chips: when the picture stays under about 45 a second, draw it with less detail
-// (fewer pixels, stretched to the window). If that does not make it faster, detail was not the problem: put it
-// back and stop trying. Fast machines never notice any of this.
+newCharacter();
+hud.setRings(getSetting('rings'));
+hud.log('You enter the fel chamber.', 'proc');
+hud.log('Build: ' + character.build.short + '.');
+hud.log('Cast with the keys on the action bar. The Keys button lists the rest.');
+
+// ---------- a safeguard for weak graphics chips ----------
+// When the picture stays under about 45 a second, draw it with less detail (fewer pixels, stretched to the window).
+// If that does not make it faster, detail was not the problem: put it back and stop trying. Fast machines never
+// notice any of this.
 const speed = { detail: FULL_DETAIL, seconds: 0, frames: 0, slowRounds: 0, before: 0, previous: FULL_DETAIL, off: false };
 function setDetail(detail) {
   speed.detail = detail;
@@ -97,21 +149,49 @@ function watchSpeed(seconds, time) {
   }
 }
 
+// ---------- every picture ----------
 const clock = new THREE.Clock();
+const from = new THREE.Vector3(), to = new THREE.Vector3(), head = new THREE.Vector3();
 function frame() {
   const elapsed = clock.getDelta(), dt = Math.min(0.05, elapsed), time = clock.elapsedTime;
   watchSpeed(elapsed, time);
+
   controls.update(dt);
   const player = controls.player;
+  ctx.distance = Math.hypot(player.x, player.z);
+  ctx.moving = player.moving;
+
+  // The fight's own clock stands still while the page is hidden (a long gap counts as a quarter second at most).
+  fightClock += Math.min(0.25, elapsed);
+  combat.update(fightClock, ctx);
+
+  const S = combat.state, casting = S.cast || S.channel;
+  const school = casting ? combat.spells[casting.key].school : null;
   warlock.root.position.set(player.x, 0, player.z);
   warlock.root.rotation.y = player.yaw;
-  warlock.update(dt, time, player.moving, player.height);
+  warlock.update(dt, time, player.moving, player.height, school);
+  dummy.update(dt);
   chamber.update(time);
-  const distance = Math.hypot(player.x, player.z);
-  hud.setDistance(distance, distance <= SPELL_RANGE);
+
+  if (S.channel) {
+    warlock.root.updateMatrixWorld();
+    beam.material.color.set(S.channel.key === 'wrack' ? 0xb07cff : 0x8dff9a);
+    beam.set(warlock.orbPosition(from), to.copy(dummy.chest), time);
+  } else beam.hide();
+
   renderer.render(scene, camera);
+
+  head.copy(dummy.head).project(camera);
+  anchor.visible = head.z < 1 && Math.abs(head.x) < 1.1 && Math.abs(head.y) < 1.1;
+  anchor.x = (head.x * 0.5 + 0.5) * window.innerWidth;
+  anchor.y = (-head.y * 0.5 + 0.5) * window.innerHeight;
+  hud.render(combat, ctx, time);
 }
 renderer.setAnimationLoop(frame);
 
 // For checks from the browser console.
-window.FW = { player: controls.player, view: controls.view, rings: rings, scene: scene, camera: camera, renderer: renderer, frame: frame, speed: speed, watchSpeed: watchSpeed };
+window.FW = {
+  player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
+  speed: speed, watchSpeed: watchSpeed, press: press,
+  get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
+};
