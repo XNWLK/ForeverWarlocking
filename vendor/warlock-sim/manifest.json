@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "9565040",
-    "subject":  "Add priority action: Searing Pain only to trigger Decimation",
+    "commit":  "cecbb63",
+    "subject":  "Add spell ranges to the data",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-05 17:38",
+    "synced":  "2026-10-05 18:15",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
