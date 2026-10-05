@@ -1,8 +1,11 @@
 // Checks the real-time casting rules (js/combat.js) against the fight engine of the vendored sim.
 //
-// For every ready build and every race the engine plays one fight by its priority list. The casts it made are then
+// For every ready build and every race the engine plays fights by its priority list. The casts it made are then
 // replayed as button presses through js/combat.js with the same random seed. Both must deal the same damage, spell by
-// spell, the pet's attacks included. The pet attacks from the first moment, as it does in the engine.
+// spell and target by target, the pet's attacks included. The pet attacks from the first moment, as in the engine.
+//
+// Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
+// included where the build has it), and Rain of Fire and Hellfire as the filler on several targets.
 //
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
@@ -11,48 +14,71 @@ import { createCombat } from '../js/combat.js';
 const require = createRequire(import.meta.url);
 const WL = require('./load-sim.js').load();
 
-const DURATION = 120, SEEDS = [1, 2, 3];
-const ctx = { distance: 10, moving: false, petDistance: 0 };
+const DURATION = 120;
+const SCENES = [
+  { name: '1 target', targets: 1, seeds: [1, 2, 3] },
+  { name: '2 targets', targets: 2, seeds: [4] },
+  { name: '3 targets', targets: 3, seeds: [5] },
+  { name: '3 targets, Rain of Fire', targets: 3, seeds: [6], filler: 'rainOfFire' },
+  { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' }
+];
+const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
 
-for (const build of WL.BUILDS) {
-  for (const raceKey of WL.RACE_KEYS) {
-    for (const seed of SEEDS) {
-      const cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
-      const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
+function withFiller(build, filler) {
+  if (!filler) return build;
+  const copy = JSON.parse(JSON.stringify(build));
+  copy.rotation[copy.rotation.length - 1] = filler;       // the last action of every ready build is its filler
+  return copy;
+}
 
-      const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION });
-      const problems = [];
-      combat.petCommand('attack');
-      combat.update(0, ctx);
-      for (const entry of sim.log) {
-        if (entry.type !== 'cast' && entry.type !== 'racial') continue;
-        // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when a
-        // channel was cut short for this cast) the channel tick it was cut at - take whichever lies at the logged time.
-        combat.update(entry.t - 0.001, ctx);
-        let at = entry.t, off = 0.00051;
-        for (const candidate of [combat.readyAt()].concat(combat.eventTimes())) {
-          if (Math.abs(candidate - entry.t) < off) { at = candidate; off = Math.abs(candidate - entry.t); }
+for (const scene of SCENES) {
+  for (const ready of WL.BUILDS) {
+    const build = withFiller(ready, scene.filler);
+    for (const raceKey of WL.RACE_KEYS) {
+      for (const seed of scene.seeds) {
+        const cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
+        cfg.fight.targets = scene.targets;
+        cfg.fight.multiDot = scene.targets > 1;
+        const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
+
+        const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });
+        const problems = [];
+        combat.petCommand('attack', 1);
+        combat.update(0, ctx);
+        for (const entry of sim.log) {
+          if (entry.type !== 'cast' && entry.type !== 'racial') continue;
+          // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when
+          // a channel was cut short for this cast) the channel tick it was cut at - whichever lies at the logged time.
+          combat.update(entry.t - 0.001, ctx);
+          let at = entry.t, off = 0.00051;
+          for (const candidate of [combat.readyAt()].concat(combat.eventTimes())) {
+            if (Math.abs(candidate - entry.t) < off) { at = candidate; off = Math.abs(candidate - entry.t); }
+          }
+          combat.update(at, ctx);
+          // "x2:corruption" = Corruption on the second target; Bane of Havoc always goes on the second target.
+          const extra = /^x(\d):(.+)$/.exec(entry.spell || '');
+          const key = entry.type === 'racial' ? 'racial' : extra ? extra[2] : entry.spell;
+          combat.setTarget(key === 'baneOfHavoc' ? 2 : extra ? Number(extra[1]) : 1);
+          const result = combat.press(key, ctx);
+          if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
         }
-        combat.update(at, ctx);
-        const result = combat.press(entry.type === 'racial' ? 'racial' : entry.spell, ctx);
-        if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
-      }
-      combat.update(DURATION, ctx);
+        combat.update(DURATION, ctx);
 
-      const mine = combat.result;
-      const keys = new Set(Object.keys(sim.bySpell).concat(Object.keys(mine.bySpell)));
-      for (const key of keys) {
-        const a = sim.bySpell[key] ? sim.bySpell[key].dmg : 0, b = mine.bySpell[key] ? mine.bySpell[key].dmg : 0;
-        if (!(Math.abs(a - b) <= 1e-6 * Math.max(1, a))) problems.push(key + ': engine ' + a.toFixed(1) + ', here ' + b.toFixed(1));
-      }
-      if (!(Math.abs(sim.total - mine.total) <= 1e-6 * Math.max(1, sim.total))) problems.push('total: engine ' + sim.total.toFixed(1) + ', here ' + mine.total.toFixed(1));
+        const mine = combat.result;
+        const keys = new Set(Object.keys(sim.bySpell).concat(Object.keys(mine.bySpell)));
+        for (const key of keys) {
+          const a = sim.bySpell[key] ? sim.bySpell[key].dmg : 0, b = mine.bySpell[key] ? mine.bySpell[key].dmg : 0;
+          if (!(Math.abs(a - b) <= 1e-6 * Math.max(1, a))) problems.push(key + ': engine ' + a.toFixed(1) + ', here ' + b.toFixed(1));
+        }
+        if (!(Math.abs(sim.total - mine.total) <= 1e-6 * Math.max(1, sim.total))) problems.push('total: engine ' + sim.total.toFixed(1) + ', here ' + mine.total.toFixed(1));
 
-      fights++;
-      if (problems.length) {
-        failures++;
-        console.log('FAIL ' + build.key + ' / ' + raceKey + ' / seed ' + seed);
-        problems.slice(0, 6).forEach(p => console.log('   ' + p));
+        fights++;
+        if (problems.length) {
+          failures++;
+          console.log('FAIL ' + scene.name + ' / ' + build.key + ' / ' + raceKey + ' / seed ' + seed);
+          problems.slice(0, 6).forEach(p => console.log('   ' + p));
+        }
       }
     }
   }
