@@ -4,38 +4,102 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forever Warlocking</title>
-<style>
-  :root { --ground: #F5F3F8; --surface: #FFFFFF; --ink: #1E1A26; --muted: #6A6378; --line: #DDD8E6; --accent: #6C3FB5; --ok: #1E7F4F; --bad: #B3261E; }
-  @media (prefers-color-scheme: dark) {
-    :root { color-scheme: dark; --ground: #15121B; --surface: #1F1B28; --ink: #ECE8F3; --muted: #A69EB6; --line: #342E42; --accent: #B592F0; --ok: #6FD3A0; --bad: #F2A39C; }
-  }
-  body { margin: 0; padding: 32px 16px; background: var(--ground); color: var(--ink); font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }
-  main { max-width: 720px; margin: 0 auto; display: grid; gap: 16px; }
-  h1 { margin: 0; font-size: 28px; letter-spacing: -0.01em; }
-  p { margin: 0; }
-  .muted { color: var(--muted); }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; }
-  .status { font-weight: 600; }
-  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
-  dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-variant-numeric: tabular-nums; }
-  dt { color: var(--muted); } dd { margin: 0; }
-  .bar { display: flex; flex-wrap: wrap; gap: 6px; }
-  .bar img { width: 40px; height: 40px; border-radius: 6px; border: 1px solid var(--line); }
-  code { font: 13px ui-monospace, Consolas, monospace; }
-</style>
+<link rel="stylesheet" href="css/game.css">
 </head>
 <body>
-<main>
-  <h1>Forever Warlocking</h1>
-  <p class="muted">Placeholder page. The practice sim is not built yet — this only shows that the Warlock data and engine copied from the DPS sim load and work.</p>
-  <section class="card">
-    <p id="status" class="status">Loading…</p>
-    <dl id="facts"></dl>
-    <div id="bar" class="bar"></div>
-  </section>
-</main>
+<canvas id="scene"></canvas>
 
-<!-- The vendored sim, in the order of vendor/warlock-sim/manifest.json -->
+<div id="hud">
+  <!-- Top left: you, your target, your pet -->
+  <section id="playerFrame" class="panel unit">
+    <img class="portrait" id="playerPortrait" alt="">
+    <div class="unit-body">
+      <div class="unit-name"><span id="playerName">Warlock</span><span class="unit-sub" id="playerSub"></span></div>
+      <div class="bar health"><i id="playerHealthFill"></i><b id="playerHealth"></b></div>
+      <div class="bar mana"><i id="playerManaFill"></i><b id="playerMana"></b></div>
+    </div>
+  </section>
+
+  <section id="targetFrame" class="panel unit hostile">
+    <div class="portrait skull" aria-hidden="true">??</div>
+    <div class="unit-body">
+      <div class="unit-name"><span>Training Dummy</span><span class="unit-sub">Boss</span></div>
+      <div class="bar health"><i style="width:100%"></i><b>100%</b></div>
+      <div class="unit-row"><span id="targetDistance" class="distance"></span><span class="slots small" id="targetDebuffs"></span></div>
+    </div>
+  </section>
+
+  <section id="petFrame" class="panel unit pet">
+    <div class="unit-body">
+      <div class="unit-name"><span>Pet</span><span class="unit-sub">none yet</span></div>
+      <div class="bar health empty"><i></i></div>
+      <div class="bar mana empty"><i></i></div>
+    </div>
+  </section>
+
+  <!-- Top right: dummies, build and tools, buffs -->
+  <section id="topRight">
+    <div class="panel row">
+      <span class="label">Dummies</span>
+      <div class="seg">
+        <button type="button" class="on" data-dummies="1">1</button>
+        <button type="button" class="soon" data-soon="Two dummies">2</button>
+        <button type="button" class="soon" data-soon="Three dummies">3</button>
+      </div>
+    </div>
+    <div class="panel row">
+      <button type="button" class="soon" data-soon="The build picker">Build</button>
+      <button type="button" class="soon" data-soon="The race picker">Race</button>
+      <button type="button" id="btnKeys">Keys</button>
+      <button type="button" id="btnRings" class="on" aria-pressed="true">Range rings</button>
+      <button type="button" id="btnReset">Reset</button>
+    </div>
+    <div class="panel row">
+      <span class="label">Buffs</span>
+      <span class="slots small" id="playerBuffs"></span>
+    </div>
+    <div class="panel keys" id="keysPanel" hidden>
+      <h2>Keys</h2>
+      <dl>
+        <dt>W / S</dt><dd>Walk forward / back</dd>
+        <dt>A / D</dt><dd>Turn left / right</dd>
+        <dt>Q / E</dt><dd>Step left / right</dd>
+        <dt>Space</dt><dd>Jump</dd>
+        <dt>Right mouse, held</dt><dd>Steer with the mouse (A / D then step sideways)</dd>
+        <dt>Left mouse, held</dt><dd>Look around without turning</dd>
+        <dt>Both mouse buttons</dt><dd>Walk forward</dd>
+        <dt>Mouse wheel</dt><dd>Zoom</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- Bottom centre: cast bar and action bar -->
+  <section id="bottomCentre">
+    <div id="castBar" class="castbar idle"><i></i><b>Cast bar</b></div>
+    <div id="actionBar" class="panel actionbar"></div>
+  </section>
+
+  <!-- Bottom left: combat log -->
+  <section id="combatLog" class="panel log">
+    <h2>Combat log</h2>
+    <ol id="logLines"></ol>
+  </section>
+
+  <!-- Bottom right: damage meter -->
+  <section id="meter" class="panel meter">
+    <h2>Damage</h2>
+    <div class="meter-main"><b id="meterDps">0</b><span>DPS</span></div>
+    <dl>
+      <dt>Damage</dt><dd id="meterDamage">0</dd>
+      <dt>Time</dt><dd id="meterTime">0:00</dd>
+      <dt>Sim average</dt><dd id="meterSim">&ndash;</dd>
+    </dl>
+  </section>
+</div>
+
+<div id="fatal" hidden></div>
+
+<!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->
 <script src="vendor/warlock-sim/data/consumables.js"></script>
 <script src="vendor/warlock-sim/data/config.js"></script>
 <script src="vendor/warlock-sim/data/talents.js"></script>
@@ -52,32 +116,19 @@
 <script src="vendor/warlock-sim/engine/settings-code.js"></script>
 <script src="vendor/warlock-sim/data/icons.js"></script>
 <script src="vendor/warlock-sim/data/tooltips.js"></script>
+
 <script>
-(function () {
-  var status = document.getElementById('status'), facts = document.getElementById('facts');
-  function fact(k, v) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; facts.appendChild(dt); facts.appendChild(dd); }
-  try {
-    var cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG)), build = WL.BUILDS[0];
-    var stats = WL.computeStats(build, 'human', cfg), table = WL.buildSpellTable(build, stats, cfg);
-    var fight = WL.simulateOnce(build, 'human', cfg, { seed: 1, duration: 60 });
-    fact('Data', Object.keys(WL.SPELLS).length + ' spells, ' + WL.TALENTS.length + ' talents, ' + WL.BUILDS.length + ' builds, ' + Object.keys(WL.ICONS).length + ' icons');
-    fact('Sample character', build.short + ', Human');
-    fact('Spell power', String(Math.round(stats.sp)));
-    fact('Shadow Bolt', Math.round(table.shadowBolt.directDmg) + ' per hit, ' + table.shadowBolt.cast + ' s cast');
-    fact('Sample 60 s fight', fight.dps.toFixed(1) + ' DPS');
-    var bar = document.getElementById('bar');
-    Object.keys(table).forEach(function (k) {
-      if (!WL.ICONS[k]) return;
-      var img = document.createElement('img'); img.src = WL.ICONS[k]; img.alt = WL.SPELLS[k].name; img.title = WL.SPELLS[k].name; bar.appendChild(img);
-    });
-    status.textContent = 'Sim data and engine loaded.'; status.className = 'status ok';
-    fetch('vendor/warlock-sim/manifest.json').then(function (r) { return r.json(); }).then(function (m) {
-      fact('Copy of the sim', 'commit ' + m.commit + ', synced ' + m.synced);
-    }).catch(function () {});
-  } catch (e) {
-    status.textContent = 'The sim copy did not load: ' + e.message; status.className = 'status bad';
-  }
-})();
+// Shown when the 3D library or the game code cannot start (module errors do not reach the page otherwise).
+window.addEventListener('error', function (e) {
+  var box = document.getElementById('fatal');
+  if (!box || window.FW) return;
+  box.hidden = false;
+  box.textContent = 'Forever Warlocking could not start: ' + (e.message || 'a file did not load') + '. Check your connection and reload.';
+}, true);
 </script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" } }
+</script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

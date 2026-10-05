@@ -3,7 +3,10 @@
 An interactive Warlock practice sim for WoW Forever: stand in front of a training dummy, press your spells in real
 time and see how your rotation does.
 
-**Status: just started.** The page is a placeholder for now.
+**Play it in the browser: https://xnwlk.github.io/ForeverWarlocking/** (desktop, keyboard and mouse)
+
+**Status: early.** You can walk around the fel chamber with the game's default keys and see the range rings around
+the dummy. Casting, pets and more dummies are not built yet.
 
 It uses the same spell values, talents and mechanics as Xn's Forever Warlock Sim, the DPS simulator; a copy of that
 sim's data and engine lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).

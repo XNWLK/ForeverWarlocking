@@ -1,7 +1,8 @@
 # Minimal static file server for local testing (Windows PowerShell 5.1, no dependencies).
 # Usage: powershell -NoProfile -ExecutionPolicy Bypass -File tools\serve.ps1 [-Port 8770]
+# Without -Port it uses the PORT environment variable when set (the preview picks a free port), else 8770.
 # Keep this file ASCII.
-param([int]$Port = 8770)
+param([int]$Port = $(if ($env:PORT) { [int]$env:PORT } else { 8770 }))
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")

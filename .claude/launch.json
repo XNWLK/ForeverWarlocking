@@ -4,8 +4,9 @@
     {
       "name": "forever-warlocking",
       "runtimeExecutable": "powershell",
-      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/serve.ps1", "-Port", "8770"],
-      "port": 8770
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/serve.ps1"],
+      "port": 8770,
+      "autoPort": true
     }
   ]
 }

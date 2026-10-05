@@ -1,0 +1,119 @@
+/* Forever Warlocking - the screen around the 3D scene (layout A: frames and bars where the game puts them). */
+
+:root {
+  --panel: rgba(14, 11, 22, 0.80);
+  --panel-line: #4b3f68;
+  --panel-line-bright: #7d68b3;
+  --ink: #ece7f6;
+  --ink-dim: #a79fbb;
+  --gold: #e9c869;
+  --health: #2f9e4d;
+  --mana: #2f6bd8;
+  --hostile: #c2362f;
+  --fel: #56e3a4;
+  --slot: rgba(255, 255, 255, 0.05);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; overflow: hidden; background: #0d0a16; color: var(--ink); }
+body { font: 13px/1.35 "Segoe UI", system-ui, sans-serif; }
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#scene.steer { cursor: none; }
+#scene.look { cursor: grabbing; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+#hud button { pointer-events: auto; }
+
+.panel {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  padding: 8px;
+}
+.panel h2 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.02em; }
+
+/* --- Unit frames ------------------------------------------------------- */
+.unit { display: flex; gap: 8px; align-items: center; width: 250px; }
+#playerFrame { left: 16px; top: 16px; }
+#targetFrame { left: 278px; top: 16px; }
+#petFrame { left: 16px; top: 96px; width: 170px; padding: 6px 8px; }
+
+.portrait { flex: none; width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--panel-line-bright); object-fit: cover; background: #1b1626; }
+.portrait.skull { display: grid; place-items: center; border-color: var(--hostile); color: #ff8a80; font-weight: 700; font-size: 15px; }
+.unit-body { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.unit-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; color: var(--gold); white-space: nowrap; }
+.hostile .unit-name { color: #ff9c92; }
+.unit-sub { font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
+.unit-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 18px; }
+
+.bar { position: relative; height: 15px; border-radius: 3px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.10); overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 100%; }
+.bar b { position: relative; display: block; text-align: center; font-size: 11px; line-height: 13px; font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; }
+.bar.health i { background: var(--health); }
+.bar.mana i { background: var(--mana); }
+.hostile .bar.health i { background: var(--hostile); }
+.bar.empty i { width: 0; }
+.pet .bar { height: 9px; }
+.pet .unit-name { color: var(--ink-dim); }
+
+.distance { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fel); }
+.distance.far { color: #ff9c92; }
+
+.slots { display: flex; gap: 3px; }
+.slots span { width: 26px; height: 26px; border-radius: 4px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.09); }
+.slots.small span { width: 18px; height: 18px; border-radius: 3px; }
+
+/* --- Top right --------------------------------------------------------- */
+#topRight { position: absolute; right: 16px; top: 16px; display: grid; gap: 6px; justify-items: end; }
+#topRight .panel { position: static; }
+.row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.label { font-size: 11px; color: var(--ink-dim); margin-right: 2px; }
+
+button {
+  font: inherit; font-size: 12px; color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-line);
+  border-radius: 4px; padding: 4px 9px; cursor: pointer;
+}
+button:hover { border-color: var(--panel-line-bright); background: rgba(255, 255, 255, 0.11); }
+button:focus-visible { outline: 2px solid var(--fel); outline-offset: 1px; }
+button.on { border-color: var(--fel); color: var(--fel); }
+button.soon { color: var(--ink-dim); border-style: dashed; }
+.seg { display: flex; gap: 3px; }
+.seg button { min-width: 28px; padding: 4px 0; font-weight: 600; }
+
+.keys { width: 330px; }
+.keys dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; }
+.keys dt { color: var(--gold); font-weight: 600; white-space: nowrap; }
+.keys dd { margin: 0; color: var(--ink); }
+
+/* --- Bottom centre ----------------------------------------------------- */
+#bottomCentre { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: grid; gap: 10px; justify-items: center; }
+.castbar { position: relative; width: 300px; height: 20px; border-radius: 4px; border: 1px solid var(--panel-line-bright); background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.castbar i { position: absolute; inset: 0 auto 0 0; width: 0; background: #d9a21f; }
+.castbar b { position: relative; display: block; text-align: center; font-size: 12px; line-height: 18px; font-weight: 600; text-shadow: 0 1px 1px #000; }
+.castbar.idle { border-style: dashed; border-color: var(--panel-line); background: rgba(0, 0, 0, 0.3); }
+.castbar.idle b { color: var(--ink-dim); font-weight: 400; }
+
+.actionbar { position: static; display: flex; gap: 4px; padding: 6px; }
+.slot { position: relative; width: 44px; height: 44px; border-radius: 5px; background: var(--slot); border: 1px solid rgba(255, 255, 255, 0.14); }
+.slot kbd { position: absolute; right: 3px; top: 1px; font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif; color: var(--ink-dim); text-shadow: 0 1px 1px #000; }
+
+/* --- Bottom corners ---------------------------------------------------- */
+.log { left: 16px; bottom: 16px; width: 290px; height: 170px; display: flex; flex-direction: column; }
+.log ol { list-style: none; margin: 0; padding: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; font-size: 12px; color: var(--ink-dim); }
+.log li.note { color: var(--ink); }
+
+.meter { right: 16px; bottom: 16px; width: 230px; }
+.meter-main { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.meter-main b { font-size: 28px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meter-main span { color: var(--ink-dim); }
+.meter dl { margin: 0; display: grid; grid-template-columns: 1fr max-content; gap: 2px 12px; font-size: 12px; }
+.meter dt { color: var(--ink-dim); }
+.meter dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Start-up failure -------------------------------------------------- */
+#fatal { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
