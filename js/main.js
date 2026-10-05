@@ -104,9 +104,21 @@ function onCombatEvent(e) {
   }
 }
 
+function buildByKey(key) { return WL.BUILDS.filter(function (b) { return b.key === key; })[0] || null; }
+
+// The build you start with before you have picked one: the highest in the sim's DPS ranking.
+function startingBuild() {
+  const ranking = (window.FW_BUILD_ORDER && window.FW_BUILD_ORDER.order) || [];
+  for (let i = 0; i < ranking.length; i++) {
+    const build = buildByKey(ranking[i].key);
+    if (build) return build;
+  }
+  return WL.BUILDS[0];
+}
+
 // Builds the character from the chosen build and race and starts a fresh fight.
 function newCharacter() {
-  const build = WL.BUILDS.filter(function (b) { return b.key === getSetting('build'); })[0] || WL.BUILDS[0];
+  const build = buildByKey(getSetting('build')) || startingBuild();
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
   const dummyHealth = getSetting('dummyHealth');
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE });
