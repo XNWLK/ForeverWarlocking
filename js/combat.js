@@ -71,7 +71,7 @@ export function createCombat(opts) {
   const havocPct = table.baneOfHavoc ? SPELLS.baneOfHavoc.havocPct / 100 : 0;
   // The 5-second rule (Xn, 2026-10-06; as in the engine): Spirit gives mana back only while you have spent none for
   // FSR seconds - (8 + Spirit / 4) every 2 seconds, counted evenly. A spell with a cast time spends its mana when the
-  // cast is complete, an instant or a channel when it starts. Life Tap costs health, not mana: it does not restart the
+  // cast is complete, an instant or a channel when it starts. Nothing comes back while a channel runs. Life Tap costs health, not mana: it does not restart the
   // 5 seconds. Nothing before the first mana is spent in a fight. (MP5 from gear and buffs always runs, as before.)
   const FSR = cb.fsrSeconds > 0 ? cb.fsrSeconds : 0, SPI_REGEN = FSR ? (cb.spiritRegenBase + cb.spiritRegenPerSpi * stats.spi) / 2 : 0;
 
@@ -742,8 +742,11 @@ export function createCombat(opts) {
       if (fighting && gained > cap) res.track.wasted += gained - Math.max(cap, S.mana);
       S.mana = Math.min(cap, gained);
     }
-    // Spirit, outside the 5 seconds after mana was last spent.
-    if (SPI_REGEN > 0 && S.lastSpend !== -Infinity) {
+    // Spirit, outside the 5 seconds after mana was last spent - and never while you channel (Xn, 2026-10-07; as in the
+    // engine). The 5 seconds still count from the start of the channel, so after a 5-second Drain Life they are over:
+    // a Life Tap right after it regenerates. (A channel starts and ends at moments of its own, so it is either on or
+    // off for the whole stretch from `from` to `to`.)
+    if (SPI_REGEN > 0 && S.lastSpend !== -Infinity && !S.channel) {
       const start = Math.max(from, S.lastSpend + FSR);
       if (to > start) {
         const gained = S.mana + SPI_REGEN * (to - start), cap = manaCap();
@@ -938,7 +941,11 @@ export function createCombat(opts) {
     },
     // The 5-second rule: seconds until Spirit gives mana back again (0 = it does now; null = no mana spent yet, or
     // this character has no Spirit regeneration).
-    spiritIn: function () { return !SPI_REGEN || S.lastSpend === -Infinity ? null : Math.max(0, S.lastSpend + FSR - S.t); },
+    // While you channel it is at least the rest of the channel.
+    spiritIn: function () {
+      if (!SPI_REGEN || S.lastSpend === -Infinity) return null;
+      return Math.max(0, S.lastSpend + FSR - S.t, S.channel ? S.channel.end - S.t : 0);
+    },
     spiritRate: SPI_REGEN,
     timeLeft: function () { return timed ? (S.fightStart === null ? linear : Math.max(0, endAt() - S.t)) : null; },
     racial: function () { return racialOf('cooldown'); },
