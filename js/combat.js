@@ -550,7 +550,10 @@ export function createCombat(opts) {
       }
     } else if (castT > EPS) {
       const id = ++inst;
-      if (e.cd) S.cds[key] = S.t + e.cd;                 // as in the engine: the cooldown runs from the start of the cast
+      // A cooldown starts when the cast is complete, not when it begins (Xn, 2026-10-06; as in the engine). It is set
+      // here for the moment the cast will end; a pushback moves it along (takeHit), and a cast that is stopped never
+      // had one (interrupt). Only Soul Fire has both a cast time and a cooldown.
+      if (e.cd) S.cds[key] = S.t + castT + e.cd;
       S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, full: castT, hits: 0, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation') };
       push({ t: S.t + castT, o: 1, type: 'castEnd', inst: id });
     } else {
@@ -584,6 +587,7 @@ export function createCombat(opts) {
       lost = end - cs.end; cs.hits++;
       if (lost <= EPS) return;
       cs.end = end; cs.inst = ++inst;                    // the old ending no longer counts
+      if (table[cs.key] && table[cs.key].cd && S.cds[cs.key]) S.cds[cs.key] += lost;   // its cooldown starts at the later cast end
       push({ t: cs.end, o: 1, type: 'castEnd', inst: cs.inst });
     }
     res.track.pushbacks++; res.track.pushbackTime += lost;

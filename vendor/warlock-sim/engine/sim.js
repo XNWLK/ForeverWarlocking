@@ -401,6 +401,7 @@ window.WL = window.WL || {};
         lost = end - cs.end; cs.n++;
         if (lost <= EPS) return;
         cs.end = end; cs.ev.dead = true;
+        if (table[cs.key] && table[cs.key].cd && S.cds[cs.key]) S.cds[cs.key] += lost;   // its cooldown starts at the later cast end (round 107)
         cs.ev = Object.assign({}, cs.ev, { t: cs.ev.t + lost, dead: false });
         H.push(cs.ev);
         row(cs.rk).castTime += lost;
@@ -599,7 +600,7 @@ window.WL = window.WL || {};
       return c;
     }
 
-    function startCast(key, target, fromTL) {
+    function startCast(key, target, fromTL, actIdx) {   // actIdx: place of the priority action that picked it (channel clipping)
       var s = SPELLS[key], e = table[key], rk = target > 1 ? xkey(target, key) : key;
       var castT = S.castTime(key), gcdT = S.gcd();
       var instantTrance = isSB(key) && S.buff('shadowTrance');
@@ -618,7 +619,9 @@ window.WL = window.WL || {};
       if (s.shards && !(key === 'soulFire' && S.buff('decimation'))) S.shards -= s.shards;
       if (key === 'soulFire' && S.buff('decimation')) delete S.buffs.decimation;
       if (instantTrance) delete S.buffs.shadowTrance;
-      if (e.cd) S.cds[key] = S.t + e.cd;
+      // A cooldown starts when the cast is COMPLETE, not when it begins (round 107, user) — matters for Soul Fire, the only
+      // spell with both a cast time and a cooldown. Instants: castT = 0. Pushback moves it along with the cast (takeHit).
+      if (e.cd) S.cds[key] = S.t + castT + e.cd;
       row(rk).casts++;
       S.minManaCheck();
       L('cast', rk, { castTime: +castT.toFixed(3), gcd: +gcdT.toFixed(3), channel: s.kind === 'channel' ? s.duration : undefined,
@@ -635,7 +638,7 @@ window.WL = window.WL || {};
         touchOfTheGrave();                                                // on cast, not on the channel's ticks [A29]
         jowProc(false);                                                   // [A64]
         var id = ++inst;
-        S.channel = { key: key, inst: id, snap: makeSnap(key, eureka), start: S.t, end: S.t + s.duration, eurekaHeld: eurekaUsed, tl: !!fromTL };   // timeline channels run to the end
+        S.channel = { key: key, inst: id, snap: makeSnap(key, eureka), start: S.t, end: S.t + s.duration, eurekaHeld: eurekaUsed, tl: !!fromTL, idx: actIdx };   // timeline channels run to the end
         for (var i = 1; i <= e.ticks; i++) H.push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
         S.busyUntil = S.t + s.duration; S.gcdReady = S.t + gcdT;
         r.castTime += s.duration;
@@ -1006,7 +1009,7 @@ window.WL = window.WL || {};
         if (stats.maxMana < effectiveCost(p.key)) { res.oom++; scheduleDecide(S.t + 1); return; }
         lifeTap(); return;
       }
-      startCast(p.key, p.target);
+      startCast(p.key, p.target, false, p.index);
     }
 
     // ---------- fight timeline (round 70, A73) ----------
@@ -1110,7 +1113,7 @@ window.WL = window.WL || {};
         }
         // Clip the channel when something higher in the priority list is ready (and the GCD allows it).
         if (S.t >= S.gcdReady - EPS && !c.tl) {
-          var idx = ROT.indexOf(ev.key);
+          var idx = c.idx != null ? c.idx : ROT.indexOf(ev.key);   // the action that started it (round 106: an action's key need not be the spell's)
           var higher = pickAction(idx >= 0 ? idx : ROT.length);
           if (higher) {
             if (c.eurekaHeld) eurekaRelease();                // a clipped channel ends here

@@ -576,7 +576,8 @@ export function createHud(WL, handlers) {
     for (let i = 0; i < slots.length; i++) {
       const slot = slots[i], key = slot.key;
       if (!key) continue;
-      const own = Math.max(0, (S.cds[key] || 0) - S.t);
+      // A spell that is still being cast has no cooldown yet: it starts when the cast is complete.
+      const own = cast && cast.key === key ? 0 : Math.max(0, (S.cds[key] || 0) - S.t);
       const span = key === 'racial' ? c.racial.cd : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'baneOfHavoc';
       let frac = 0, text = '';
       if (own > gcdLeft && span) { frac = own / span; text = own >= 60 ? Math.ceil(own / 60) + 'm' : String(Math.ceil(own)); }

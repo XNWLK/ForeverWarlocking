@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "00b0cd9",
-    "subject":  "Every built-in build taps early (Life Tap below a mana % with time left)",
+    "commit":  "708c17a",
+    "subject":  "Fix: a cooldown starts when the cast completes, not when it begins",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-06 15:41",
+    "synced":  "2026-10-06 16:36",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

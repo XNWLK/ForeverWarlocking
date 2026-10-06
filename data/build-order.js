@@ -2,11 +2,11 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-10-06",
-  "simCommit": "00b0cd9",
+  "simCommit": "708c17a",
   "order": [
     {
       "key": "demo_pact_fire",
-      "dps": 725.6,
+      "dps": 722.4,
       "race": "undead"
     },
     {
@@ -20,18 +20,18 @@ window.FW_BUILD_ORDER = {
       "race": "undead"
     },
     {
-      "key": "demo_pact_imp_sb",
-      "dps": 685.2,
+      "key": "aff_pact_fire",
+      "dps": 681.3,
       "race": "undead"
     },
     {
-      "key": "aff_pact_fire",
-      "dps": 684.2,
+      "key": "demo_pact_imp_sb",
+      "dps": 680.2,
       "race": "undead"
     },
     {
       "key": "demo_pact_succ_fire",
-      "dps": 672,
+      "dps": 669.2,
       "race": "undead"
     },
     {
@@ -50,13 +50,13 @@ window.FW_BUILD_ORDER = {
       "race": "human"
     },
     {
-      "key": "aff_succ_sb",
-      "dps": 603.2,
+      "key": "aff_pact_succ_drain",
+      "dps": 601.6,
       "race": "undead"
     },
     {
-      "key": "aff_pact_succ_drain",
-      "dps": 601.6,
+      "key": "aff_succ_sb",
+      "dps": 601.1,
       "race": "undead"
     },
     {
