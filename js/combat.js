@@ -844,7 +844,7 @@ const ACTION_SPELLS = {
   shadowburn: ['shadowburn'], shadowburnSnF: ['shadowburn'],
   soulFire: ['soulFire'], soulFireShards: ['soulFire'],
   shadowTrance: ['shadowBolt'], isbUpkeep: ['shadowBolt'], shadowBoltSpread: ['shadowBolt'], shadowBolt: ['shadowBolt'],
-  lifeTapPet: ['lifeTap'],
+  lifeTapPet: ['lifeTap'], lifeTapBelow: ['lifeTap'],
   wrack: ['wrack'], incinerate: ['incinerate'], drainLife: ['drainLife'],
   hellfire: ['hellfire'], rainOfFire: ['rainOfFire']
 };
