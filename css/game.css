@@ -61,7 +61,7 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 /* --- Top right: one slim bar; its panels open under it -------------------- */
 #topBar { position: absolute; right: 14px; top: 12px; z-index: 2; display: grid; gap: 6px; justify-items: end; }
 .toolbar { display: flex; align-items: center; padding: 4px 0; background: var(--glass); border: 1px solid var(--line); border-radius: 10px; }
-.toolbar .group { display: flex; align-items: center; gap: 2px; padding: 0 6px; }
+.toolbar .group { display: flex; align-items: center; gap: 2px; padding: 0 8px; }
 .toolbar .group + .group { border-left: 1px solid var(--line); }
 .toolbar button { background: none; }
 .toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
@@ -69,7 +69,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .label { font-size: 11px; color: var(--ink-dim); margin-right: 4px; }
 /* Top left: buttons that open this project's code and the Warlock SIM. */
 #links { position: absolute; left: 14px; top: 12px; z-index: 2; }
-#buildLabel { max-width: 124px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
+#buildLabel { max-width: 220px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
 
@@ -111,7 +112,7 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .seed { display: flex; gap: 4px; }
 .seed input { flex: 1; min-width: 0; }
 
-.rotation { position: absolute; left: 14px; top: 56px; width: 270px; max-height: calc(100% - 56px - 232px); overflow: hidden; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
+.rotation { position: absolute; left: 14px; top: 98px; width: 270px; max-height: calc(100% - 98px - 232px); overflow: hidden; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
 .rotation ol { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 3px; counter-reset: step; }
 .rotation li { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.25; color: var(--ink); counter-increment: step; }
 .rotation li::before { content: counter(step); flex: none; width: 12px; text-align: right; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
