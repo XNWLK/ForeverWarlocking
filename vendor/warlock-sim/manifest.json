@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "7b844e7",
-    "subject":  "Spell data comments for health and threat fields; README",
+    "commit":  "25869f9",
+    "subject":  "Icons for Blessing of Salvation and Tranquil Air Totem",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 01:44",
+    "synced":  "2026-10-07 01:51",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
