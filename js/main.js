@@ -10,6 +10,7 @@ import { createPet } from './pets.js';
 import { createEffects, SPELL_FX } from './effects.js';
 import { createPanels } from './panels.js';
 import { createSound } from './sound.js';
+import { createExtras, gradeFor } from './extras.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -62,6 +63,10 @@ const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, co
 let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
 let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
 const sound = createSound(getSetting('sound') === true);   // off until you switch it on (Xn)
+// A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
+// settings alone. null = your own settings.
+let challenge = null;
+let myCurve = [0];                                         // your damage by the end of each second of this fight (for the review's graph)
 let keyCodes = ACTION_CODES.slice();
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -89,12 +94,19 @@ function buildConfig() {
     if (b.on && (b.tide || b.innervate || b.spellDmgPct)) { b.on = false; leftOut.push(b.name); }
   });
   const fight = fightOptions();
+  cfg.fight.latencyMs = Math.max(0, Number(getSetting('latency')) || 0);      // the sim average waits this long after each cast
+  if (challenge && challenge.executePct) cfg.fight.executePct = challenge.executePct;
   cfg.fight.moveEvery = fight.moveEvery > 0 && fight.moveDuration > 0 ? fight.moveEvery : 0;
   cfg.fight.moveDuration = cfg.fight.moveEvery ? fight.moveDuration : 0;
   cfg.fight.hitEvery = fight.hitEvery;
   return cfg;
 }
-function fightOptions() { return Object.assign({ timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 }, getSetting('fight') || {}); }
+function fightOptions() {
+  const none = { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
+  return challenge ? Object.assign(none, challenge.fight) : Object.assign(none, getSetting('fight') || {});
+}
+// Changing the fight by hand ends a drill or seeded fight.
+function leaveChallenge() { if (challenge) { challenge = null; hud.log('Challenge ended.'); } }
 
 // An imported build code becomes one more build in the list. Returns the reasons when it cannot be played.
 function readCustomBuild() {
@@ -122,8 +134,8 @@ const hud = createHud(WL, {
   onPress: function (key) { press(key); },
   onBuild: function (key) { setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
   onRace: function (key) { setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
-  onDummyHealth: function (health) { setSetting('dummyHealth', health); newCharacter(); hud.log((targets > 1 ? 'Each dummy' : 'The dummy') + ' now has ' + health.toLocaleString('en-US') + ' health.'); },
-  onDummies: function (count) { setSetting('dummies', count); newCharacter(); hud.log(count === 1 ? 'One dummy.' : count + ' dummies. Tab or a click changes your target.', 'proc'); },
+  onDummyHealth: function (health) { leaveChallenge(); setSetting('dummyHealth', health); newCharacter(); hud.log((targets > 1 ? 'Each dummy' : 'The dummy') + ' now has ' + health.toLocaleString('en-US') + ' health.'); },
+  onDummies: function (count) { leaveChallenge(); setSetting('dummies', count); newCharacter(); hud.log(count === 1 ? 'One dummy.' : count + ' dummies. Tab or a click changes your target.', 'proc'); },
   onTarget: function (ti) { setTarget(ti); },
   onRings: function (on) { setSetting('rings', on); rings.visible = on; },
   onReset: function () { resetFight(); hud.log('Fight reset.'); },
@@ -167,8 +179,35 @@ const hud = createHud(WL, {
   }
 });
 
+const extras = createExtras(WL, {
+  // A drill, a seeded fight, or null to go back to your own fight settings.
+  onChallenge: function (next) {
+    challenge = next;
+    hud.closePanels();
+    newCharacter();
+    if (next) { hud.log((next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts with your first cast. "End" at the top goes back to your own fight.'); }
+    else hud.log('Back to your own fight settings.');
+  },
+  onPreset: function (p) {
+    challenge = null;
+    setSetting('dummies', p.dummies);
+    if (p.health) setSetting('dummyHealth', p.health);
+    setSetting('fight', Object.assign({}, p.fight));
+    newCharacter();
+    hud.log('Fight: ' + p.name + '.', 'proc');
+  },
+  onLatency: function (ms) {
+    setSetting('latency', ms);
+    newCharacter();
+    hud.log(ms ? 'Latency: ' + ms + ' ms. Every key press arrives that much later; the sim average waits as long after each cast.' : 'No latency.');
+  },
+  fullLog: function () { return hud.fullLog(); },
+  log: function (text, kind) { hud.log(text, kind); }
+});
+
 const panels = createPanels({
   onFight: function (options) {
+    leaveChallenge();
     setSetting('fight', options);
     hud.closePanels();
     newCharacter();
@@ -204,9 +243,24 @@ const panels = createPanels({
   onReview: function () { showReview(); }
 });
 
+// What a finished drill or seeded fight comes to: its grade against the sim, and a line to pass on.
+function challengeResult() {
+  if (!challenge || !combat.state.over || !simResult) return challenge ? { name: challenge.name, waiting: true } : null;
+  const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0, pct = Math.round(100 * dps / simResult.dps);
+  const out = { name: challenge.name, grade: gradeFor(pct), pct: pct, dps: dps };
+  out.line = 'Forever Warlocking · ' + challenge.name + ' · ' + character.build.short + ' · ' + WL.RACES[character.raceKey].name + ' · ' +
+    Math.round(dps).toLocaleString('en-US') + ' DPS · ' + pct + '% of the sim (' + out.grade + ')';
+  if (challenge.drill) {
+    const all = Object.assign({}, getSetting('drills')), old = all[challenge.id];
+    if (!old || pct > old.pct) { all[challenge.id] = { grade: out.grade, pct: pct, dps: Math.round(dps) }; setSetting('drills', all); out.record = true; extras.refreshDrills(); }
+    out.best = all[challenge.id];
+  }
+  return out;
+}
 function showReview() {
   if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
   panels.showReview({
+    curve: myCurve, challenge: challengeResult(), copy: extras.copy,
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
     timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
@@ -242,6 +296,12 @@ const boltsAt = [0, 0, 0, 0], deathWaiting = [false, false, false, false];
 const spot = new THREE.Vector3(), staffAt = new THREE.Vector3();
 function hitSound(e) { sound.play(e.school === 'fire' ? 'hitFire' : 'hitShadow'); if (e.crit) sound.play('crit'); }
 function onCombatEvent(e) {
+  if (e.amount > 0 && (e.type === 'hit' || e.type === 'tick' || e.type === 'havoc')) {
+    const second = Math.floor(combat.fightSeconds()) + 1;
+    while (myCurve.length <= second) myCurve.push(myCurve[myCurve.length - 1]);
+    myCurve[second] += e.amount;
+  }
+  extras.event(e, combat);
   const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
   if (e.pet && lands && e.key !== 'pet:brand') pet.strike();
@@ -334,11 +394,12 @@ function newCharacter() {
   const build = buildByKey(getSetting('build')) || startingBuild();
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
   const dummyHealth = getSetting('dummyHealth');
-  targets = Math.max(1, Math.min(3, Number(getSetting('dummies')) || 1));
+  targets = Math.max(1, Math.min(3, Number(challenge ? challenge.targets : getSetting('dummies')) || 1));
   config = buildConfig();
   const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
-                          timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE });
+                          timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE,
+                          seed: challenge && challenge.seeded ? challenge.seed : undefined });   // a seeded fight rolls the same dice every time
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
   panels.setFight(fight);
@@ -351,6 +412,7 @@ function newCharacter() {
     maxRange: Math.max.apply(null, ranges.concat([0]))
   };
   character.standing = standingBuffs(build, combat.stats);
+  extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
 
   // The dummies in the room, and what you cannot walk through.
@@ -374,6 +436,7 @@ function newCharacter() {
 
 function resetFight() {
   combat.reset();
+  myCurve = [0];
   fightClock = 0;
   for (let i = 1; i <= 3; i++) { dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
   pet.sendHome();
@@ -382,6 +445,8 @@ function resetFight() {
 
 function press(key) {
   if (!key) return;
+  const late = Math.max(0, Number(getSetting('latency')) || 0), fight = combat;
+  if (late > 0) { window.setTimeout(function () { if (combat === fight) { combat.update(fightClock, ctx); combat.press(key, ctx); } }, late); return; }
   combat.update(fightClock, ctx);
   combat.press(key, ctx);
 }
@@ -416,6 +481,7 @@ function clickScene(x, y) {
 // Keys: Escape closes what is open; the rest is whatever the Keybinds panel says.
 window.addEventListener('keydown', function (e) {
   if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  if (e.code === 'Escape' && extras.sheetOpen()) { extras.closeSheet(); return; }
   if (e.code === 'Escape' && (panels.reviewOpen() || hud.anyPanelOpen())) { if (panels.reviewOpen()) panels.hideReview(); else hud.closePanels(); return; }
   if (e.code === binds.cancel) { combat.cancel(); return; }
   if (e.code === binds.nextTarget) { e.preventDefault(); nextTarget(); return; }
@@ -572,11 +638,13 @@ function frame() {
     anchor.y = (-head.y * 0.5 + 0.5) * window.innerHeight;
   }
   hud.render(combat, ctx, time, anchors);
+  extras.render(combat, time, simResult);
 }
 renderer.setAnimationLoop(frame);
 
 // For checks from the browser console.
 window.FW = {
+  extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,

@@ -112,7 +112,11 @@ export function createHud(WL, handlers) {
   }
 
   // ---------- combat log ----------
+  const everything = [];                                    // every line since the page opened, with its fight time, for "Copy the whole log"
   function log(text, kind) {
+    const at = lastCombat ? lastCombat.fightSeconds() : 0;
+    everything.push('[' + (at > 0 ? at.toFixed(1).padStart(6) : '   0.0') + '] ' + text);
+    if (everything.length > 20000) everything.splice(0, 5000);
     const line = document.createElement('li');
     line.textContent = text;
     if (kind) line.className = kind;
@@ -202,7 +206,9 @@ export function createHud(WL, handlers) {
       button.appendChild(document.createTextNode(b.short));
       const dps = document.createElement('small'), r = b.custom ? null : rank[b.key];
       dps.textContent = b.custom ? 'imported' : r ? Math.round(r.dps) + ' DPS' : '';
-      if (r) button.title = 'In the DPS sim: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs';
+      const notes = b.notes ? [].concat(b.notes).join(' ').replace(/\s*\[A\d+\]/g, '') : '';
+      if (r || notes) button.title = (r ? 'In the Warlock SIM: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs.' : '') +
+        (notes ? (r ? '\n\n' : '') + 'Its notes on this build: ' + notes : '');
       button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
       button.addEventListener('click', function () { showPanel(null); handlers.onBuild(b.key); });
@@ -743,6 +749,7 @@ export function createHud(WL, handlers) {
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
     setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound,
+    fullLog: function () { return everything.join('\n'); },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
     setBinds: function (map) { binds = map; if (character) showBinds(); },
     anyPanelOpen: function () { return Object.keys(panels).some(function (k) { return !panels[k].hidden; }); },

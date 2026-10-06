@@ -33,8 +33,23 @@ self.onmessage = function (e) {
       if (settled) break;
     }
   }
+  // The race and the review's graph: how much damage the sim has done by each second, averaged over a number of
+  // its fights (each with other dice).
+  var curve = null;
+  try {
+    var count = Math.max(1, Math.ceil(seconds)), sums = new Array(count + 1).fill(0), RUNS = 40;
+    cfg.fight.duration = seconds;
+    for (var n = 0; n < RUNS; n++) {
+      var one = WL.simulateOnce(job.build, job.race, cfg, { seed: 1000 + n * 7919, log: true });
+      (one.log || []).forEach(function (line) { if (line.dmg > 0) sums[Math.min(count, Math.floor(line.t) + 1)] += line.dmg; });
+    }
+    curve = [0];
+    for (var i = 1; i <= count; i++) curve.push(curve[i - 1] + sums[i] / RUNS);
+    var scale = curve[count] > 0 ? result.dps * seconds / curve[count] : 1;     // ends exactly where the average does
+    curve = curve.map(function (v) { return v * scale; });
+  } catch (err) { curve = null; }
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
   self.postMessage({ id: job.id, dps: result.dps, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time });
+                     idle: result.mana.idleSecAvg, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve });
 };

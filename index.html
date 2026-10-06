@@ -26,6 +26,7 @@
 <link rel="modulepreload" href="js/sound.js">
 <link rel="modulepreload" href="js/kit.js">
 <link rel="modulepreload" href="js/tooltip.js">
+<link rel="modulepreload" href="js/extras.js">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -105,6 +106,55 @@
     </div>
   </section>
 
+  <!-- Right: the bar of things you can switch on or open. Its groups fold away. -->
+  <aside id="side" class="panel side">
+    <details open>
+      <summary>Show</summary>
+      <label class="switch"><input type="checkbox" id="swRotation"><span>Rotation panel</span></label>
+      <label class="switch"><input type="checkbox" id="swRace"><span>Race the sim live</span></label>
+      <label class="switch"><input type="checkbox" id="swCallouts"><span>Mistake callouts</span></label>
+    </details>
+    <details>
+      <summary>Your character</summary>
+      <p class="hint">From the Warlock SIM, to look at only.</p>
+      <div class="stack">
+        <button type="button" id="btnSheet">Character sheet</button>
+        <button type="button" id="btnTalents">Talents</button>
+        <button type="button" id="btnBuffs">Buffs and consumables</button>
+      </div>
+    </details>
+    <details>
+      <summary>Fight</summary>
+      <label title="How long each key press takes to arrive, as on a slow connection. The sim average waits just as long after each cast.">Latency <input type="number" id="latency" min="0" max="1000" step="10" value="0"> ms</label>
+      <p class="hint">Presets (they replace your fight settings):</p>
+      <div class="stack" id="presets"></div>
+    </details>
+    <details>
+      <summary>Challenges</summary>
+      <p class="hint">Drills, graded against the sim. Your own fight settings stay as they are.</p>
+      <div class="stack drills" id="drills"></div>
+      <p class="hint">Seeded fight: the same dice for everyone who types the same seed.</p>
+      <div class="seed"><input type="text" id="seed" maxlength="24" spellcheck="false" aria-label="Seed"><button type="button" id="seedStart">Start</button></div>
+    </details>
+    <details>
+      <summary>Combat log</summary>
+      <button type="button" id="btnCopyLog" class="wide">Copy the whole log</button>
+    </details>
+  </aside>
+
+  <!-- Left: what the sim plays with this build, top first -->
+  <section id="rotationPanel" class="panel rotation" hidden>
+    <h2>Rotation</h2>
+    <ol id="rotationList"></ol>
+    <p class="hint">The sim's priority list for this build: it casts the first line that applies, and taps when mana is too low for the next spell. From the Warlock SIM.</p>
+  </section>
+
+  <!-- Top centre: the drill or seeded fight that is running, and quiet notes about mistakes -->
+  <div id="topCentre">
+    <div id="challengeTag" class="panel chip" hidden><span id="challengeText"></span><button type="button" id="challengeEnd">End</button></div>
+    <div id="callout" class="callout" aria-live="polite"></div>
+  </div>
+
   <!-- Bottom centre, from the top down: cast bar, buffs and debuffs, you / your pet / your target, action bar -->
   <section id="bottomCentre">
     <div id="editStrip" class="panel edit-strip" hidden>
@@ -171,6 +221,11 @@
       <dt title="What the DPS sim's priority list reaches on these dummies with the same character">Sim average</dt><dd id="meterSim">&ndash;</dd>
       <dt id="meterDummiesLabel" hidden>Per dummy</dt><dd id="meterDummies" hidden></dd>
     </dl>
+    <div id="race" class="race" hidden>
+      <div class="race-row"><span>You</span><i><b id="raceYou"></b></i></div>
+      <div class="race-row sim"><span>Sim</span><i><b id="raceSim"></b></i></div>
+      <p id="raceText"></p>
+    </div>
     <ol id="meterSpells"></ol>
     <button type="button" id="btnReview" class="wide">Review the fight</button>
   </section>
@@ -180,6 +235,15 @@
 <section id="review" class="review" hidden>
   <header><h2>Fight review</h2><button type="button" id="reviewClose">Close</button></header>
   <div id="reviewBody"></div>
+</section>
+<section id="sheet" class="review sheet" hidden>
+  <header>
+    <h2 id="sheetTitle"></h2>
+    <div class="tabs"><button type="button" id="tabCharacter">Character</button><button type="button" id="tabTalents">Talents</button><button type="button" id="tabBuffs">Buffs</button></div>
+    <button type="button" id="sheetClose">Close</button>
+  </header>
+  <p class="hint from-sim" id="sheetNote"></p>
+  <div id="sheetBody"></div>
 </section>
 <div id="plates"></div>
 <div id="floaters" aria-hidden="true"></div>

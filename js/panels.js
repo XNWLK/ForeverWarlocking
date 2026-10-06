@@ -70,12 +70,55 @@ export function createPanels(handlers) {
     const res = d.result, k = res.track, sim = d.sim, dps = d.seconds > 0 ? res.total / d.seconds : 0;
     body.textContent = '';
 
+    // A drill or seeded fight: its grade, and a line to pass on.
+    if (d.challenge) {
+      const c = d.challenge, line = el('div', null, 'challenge-line');
+      if (c.waiting) line.appendChild(el('span', c.name + ': the grade comes when the fight is over and the sim has its numbers.'));
+      else {
+        line.appendChild(el('b', c.grade));
+        line.appendChild(el('span', c.name + ': ' + c.pct + '% of the sim.' + (c.record ? ' A new best.' : c.best ? ' Your best: ' + c.best.grade + ' (' + c.best.pct + '%).' : '')));
+        const copy = el('button', 'Copy the result');
+        copy.type = 'button';
+        copy.addEventListener('click', function () { d.copy(c.line, copy); });
+        line.appendChild(copy);
+      }
+      body.appendChild(line);
+    }
+
     const head = el('p', null, 'review-head');
     head.appendChild(el('b', whole(dps) + ' DPS'));
     head.appendChild(document.createTextNode(' in ' + d.seconds.toFixed(1) + ' s'));
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
     else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
     body.appendChild(head);
+
+    // Damage over time: you against the sim's average fight.
+    const yourCurve = d.curve || [], simCurve = sim && sim.curve ? sim.curve : null;
+    if (yourCurve.length > 2) {
+      const span = Math.max(yourCurve.length - 1, simCurve ? simCurve.length - 1 : 0, 1);
+      const top = Math.max(yourCurve[yourCurve.length - 1], simCurve ? simCurve[simCurve.length - 1] : 0, 1), W = 600, H = 150, pad = 4;
+      const points = function (curve) {
+        return curve.map(function (v, i) { return (pad + (W - 2 * pad) * i / span).toFixed(1) + ',' + (H - pad - (H - 2 * pad) * v / top).toFixed(1); }).join(' ');
+      };
+      const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'graph');
+      const line = function (curve, color, width) {
+        const p = document.createElementNS(NS, 'polyline');
+        p.setAttribute('points', points(curve)); p.setAttribute('fill', 'none'); p.setAttribute('stroke', color);
+        p.setAttribute('stroke-width', width); p.setAttribute('vector-effect', 'non-scaling-stroke'); p.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(p);
+      };
+      if (simCurve) line(simCurve, 'rgba(255,255,255,0.6)', '1.5');
+      line(yourCurve, '#b98aff', '2');
+      body.appendChild(el('h3', 'Damage over time'));
+      body.appendChild(svg);
+      const key = el('p', null, 'graph-key');
+      const you = el('span', 'You'); you.insertBefore(el('i'), you.firstChild);
+      key.appendChild(you);
+      if (simCurve) { const s = el('span', 'The sim (average of its fights)'); s.insertBefore(el('i', null, 'sim'), s.firstChild); key.appendChild(s); }
+      key.appendChild(el('span', '0 s to ' + span + ' s, up to ' + whole(top) + ' damage'));
+      body.appendChild(key);
+    }
 
     // Where the time went.
     const idle = Math.max(0, d.seconds - k.busy), notes = [];

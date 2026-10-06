@@ -834,7 +834,7 @@ export function createCombat(opts) {
 }
 
 // Which spells of a build's priority list go on the action bar (the keys of this table are the priority actions).
-const ACTION_SPELLS = {
+export const ACTION_SPELLS = {
   deathCoilFinisher: ['deathCoil'], deathCoil: ['deathCoil'],
   bane: ['baneOfDoom', 'baneOfAgony'], baneOfAgony: ['baneOfAgony'],
   curseOfElements: ['curseOfElements'],

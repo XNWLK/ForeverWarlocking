@@ -89,6 +89,50 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .bind button.waiting { color: var(--accent); border-color: var(--accent); }
 .bind button.unset { color: var(--ink-dim); font-weight: 400; }
 
+/* --- Right: the bar of switches and things to open; left: the rotation panel; top centre: drill tag and callouts --- */
+#hud summary, #hud .side { pointer-events: auto; }
+.side { position: absolute; right: 14px; top: 56px; width: 232px; max-height: calc(100% - 56px - 352px); overflow-y: auto; padding: 4px 10px; background: var(--glass); scrollbar-width: thin; }
+.side details { padding: 5px 0; }
+.side details + details { border-top: 1px solid var(--line); }
+.side summary { cursor: pointer; list-style: none; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); }
+.side summary::-webkit-details-marker { display: none; }
+.side summary::after { content: '+'; float: right; font-weight: 400; }
+.side details[open] summary::after { content: '\2212'; }
+.side details[open] summary { margin-bottom: 5px; }
+.side label { display: block; font-size: 12px; }
+.side .hint { margin: 4px 0; }
+.switch { display: flex !important; align-items: center; gap: 8px; padding: 2px 0; cursor: pointer; }
+.switch input { appearance: none; flex: none; width: 28px !important; height: 16px; margin: 0; padding: 0 !important; border-radius: 8px !important; background: rgba(255, 255, 255, 0.12) !important; border: 0 !important; position: relative; cursor: pointer; }
+.switch input::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-dim); transition: left 0.12s; }
+.switch input:checked { background: rgba(185, 138, 255, 0.45) !important; }
+.switch input:checked::after { left: 14px; background: #fff; }
+.stack { display: grid; gap: 3px; }
+.stack button { text-align: left; }
+.drills button { display: flex; justify-content: space-between; gap: 8px; }
+.drills button small { color: var(--gold); font-size: 11px; font-weight: 600; }
+.seed { display: flex; gap: 4px; }
+.seed input { flex: 1; min-width: 0; }
+
+.rotation { position: absolute; left: 14px; top: 56px; width: 270px; max-height: calc(100% - 56px - 232px); overflow: hidden; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
+.rotation ol { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 3px; counter-reset: step; }
+.rotation li { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.25; color: var(--ink); counter-increment: step; }
+.rotation li::before { content: counter(step); flex: none; width: 12px; text-align: right; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.rotation li img, .rotation li .no-icon { flex: none; width: 18px; height: 18px; border-radius: 4px; }
+
+#topCentre { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; }
+.chip { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 12px; max-width: 520px; background: var(--glass); border-color: rgba(240, 207, 122, 0.45); font-size: 12px; }
+.callout { min-height: 18px; font-size: 14px; font-weight: 600; color: var(--gold); text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.5s; }
+.callout.show { opacity: 1; transition: none; }
+
+/* The race against the sim, in the damage meter. */
+.race { margin-top: 8px; display: grid; gap: 3px; }
+.race-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); }
+.race-row span { width: 24px; }
+.race-row i { flex: 1; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.5); overflow: hidden; }
+.race-row b { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--accent); }
+.race-row.sim b { background: rgba(255, 255, 255, 0.55); }
+.race p { margin: 0; font-size: 11px; color: var(--ink); }
+
 /* --- Bottom centre: cast bar, buffs and debuffs, the three frames, action bar --- */
 #bottomCentre { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: 668px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
@@ -262,6 +306,39 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .review .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .review tr.behind td { color: #ffb3a8; }
 .review .hint { margin-top: 12px; }
+
+/* The sheets (character, talents, buffs) use the review's box. */
+.sheet { width: min(760px, 94vw); z-index: 11; }
+.sheet header { gap: 12px; }
+.sheet .tabs { display: flex; gap: 3px; margin-right: auto; }
+.from-sim { margin: 0 0 10px !important; padding: 5px 8px; border-radius: 6px; background: rgba(185, 138, 255, 0.1); color: var(--ink) !important; }
+.sheet td.from { color: var(--ink-dim); font-size: 11px; }
+.trees { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.tree-grid { display: grid; grid-template-columns: repeat(4, 40px); grid-auto-rows: 40px; gap: 7px; justify-content: center; }
+.talent { position: relative; border-radius: 7px; overflow: hidden; background: #1b1226; box-shadow: 0 0 0 1px rgba(205, 170, 255, 0.35); }
+.talent img { display: block; width: 100%; height: 100%; }
+.talent b { position: absolute; right: 0; bottom: 0; padding: 0 3px; border-radius: 5px 0 0 0; background: rgba(8, 4, 14, 0.85); font-size: 10px; line-height: 13px; font-weight: 700; color: #9fe0b4; }
+.talent.full { box-shadow: 0 0 0 1px var(--gold); }
+.talent.full b { color: var(--gold); }
+.talent.none { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.talent.none img { filter: grayscale(1) brightness(0.4); }
+.talent.none b { color: var(--ink-dim); }
+.onoff { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.onoff li { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.onoff li i { flex: none; width: 26px; font-style: normal; font-size: 10px; font-weight: 700; text-transform: uppercase; text-align: center; border-radius: 4px; color: #9fe0b4; background: rgba(110, 200, 140, 0.14); }
+.onoff li.off { color: var(--ink-dim); }
+.onoff li.off i { color: var(--ink-dim); background: rgba(255, 255, 255, 0.06); }
+.onoff li.off img { filter: grayscale(1) brightness(0.5); }
+.onoff img, .onoff .no-icon { flex: none; width: 18px; height: 18px; border-radius: 4px; }
+.onoff small { margin-left: auto; text-align: right; font-size: 11px; color: var(--ink-dim); }
+/* The graph and the challenge line in the review. */
+.graph { display: block; width: 100%; height: 150px; margin-top: 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); }
+.graph-key { display: flex; gap: 14px; margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); }
+.graph-key i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; border-radius: 2px; background: var(--accent); }
+.graph-key i.sim { background: rgba(255, 255, 255, 0.6); }
+.challenge-line { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: rgba(240, 207, 122, 0.1); font-size: 13px; }
+.challenge-line b { font-size: 26px; line-height: 1; color: var(--gold); }
+.challenge-line span { flex: 1; }
 
 /* --- Start-up failure ---------------------------------------------------- */
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
