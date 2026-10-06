@@ -272,7 +272,13 @@ export function buildChamber(scene) {
   }
   const moteGeometry = new THREE.BufferGeometry();
   moteGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  scene.add(new THREE.Points(moteGeometry, new THREE.PointsMaterial({ color: 0xcfc8dc, size: 0.12, transparent: true, opacity: 0.4, depthWrite: false })));
+  // Each mote is a soft round dot (a plain point is a square, which shows when one drifts close to the camera).
+  const dot = canvasTexture(64, function (g, s) {
+    const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.4, 'rgba(255,255,255,0.5)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, s, s);
+  });
+  scene.add(new THREE.Points(moteGeometry, new THREE.PointsMaterial({ map: dot, color: 0xcfc8dc, size: 0.2, transparent: true, opacity: 0.45, depthWrite: false })));
   let lastTime = 0;
   animated.push(function (t) {
     const dt = Math.min(0.1, t - lastTime);

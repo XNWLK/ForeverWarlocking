@@ -3,83 +3,93 @@
 import * as THREE from 'three';
 import { flat, glow, light, add, halo, groundShadow } from './kit.js';
 
-// The Warlock: layered robe, horned shoulder plates, deep hood with glowing eyes, a cape, and a staff whose crystal
-// floats in a claw. About two yards tall.
+// The Warlock: a robe with a gold-edged front panel, belt with book and pouch, shoulder plates with a horn each, a
+// hood that leaves the face free, a cape, and a staff whose crystal floats in a claw. About two yards tall.
+// The arms bend at the elbow: they hang a little forward, swing while walking, and reach forward to cast.
 export function makeWarlock() {
   const root = new THREE.Group();   // stays on the ground (position and facing)
   const rig = new THREE.Group();    // the body: bobs while walking, rises in a jump
   root.add(rig);
-  root.add(groundShadow(0.8));
+  root.add(groundShadow(0.75));
 
   const robe = flat(0x6a2f96), robeDark = flat(0x42195f), lining = flat(0x241036), gold = flat(0xd2a83c), skin = flat(0xcfa184);
   const bone = flat(0xcabfa6), wood = flat(0x4a2f1a), leather = flat(0x3a2414), iron = flat(0x3b3846);
+  const SIDES = 14;
 
-  // Robe: a flared skirt in two layers, a front panel with a gold edge, a hem band.
-  add(rig, new THREE.CylinderGeometry(0.3, 0.62, 1.08, 10), robe, 0, 0.56, 0);
-  add(rig, new THREE.CylinderGeometry(0.63, 0.66, 0.1, 10), gold, 0, 0.06, 0);
-  add(rig, new THREE.CylinderGeometry(0.33, 0.5, 0.5, 10), robeDark, 0, 0.92, 0);
-  const panel = add(rig, new THREE.BoxGeometry(0.26, 0.98, 0.03), lining, 0, 0.56, -0.5);
-  panel.rotation.x = 0.3;
-  [-1, 1].forEach(function (s) { const edge = add(rig, new THREE.BoxGeometry(0.03, 0.98, 0.035), gold, s * 0.145, 0.56, -0.5); edge.rotation.x = 0.3; });
-  const rune = add(rig, new THREE.OctahedronGeometry(0.07, 0), glow(0x7dffc0), 0, 0.62, -0.535);
+  // Robe: a skirt that flares gently, a front panel with a gold edge, a hem band, boot tips.
+  add(rig, new THREE.CylinderGeometry(0.27, 0.52, 1.06, SIDES), robe, 0, 0.55, 0);
+  add(rig, new THREE.CylinderGeometry(0.53, 0.55, 0.08, SIDES), gold, 0, 0.05, 0);
+  const panel = add(rig, new THREE.BoxGeometry(0.24, 1.0, 0.03), lining, 0, 0.56, -0.405);
+  panel.rotation.x = 0.235;
+  [-1, 1].forEach(function (s) {
+    const edge = add(rig, new THREE.BoxGeometry(0.03, 1.0, 0.035), gold, s * 0.135, 0.56, -0.405);
+    edge.rotation.x = 0.235;
+    add(rig, new THREE.BoxGeometry(0.14, 0.1, 0.24), leather, s * 0.13, 0.05, -0.44);
+  });
+  const rune = add(rig, new THREE.OctahedronGeometry(0.06, 0), glow(0x7dffc0), 0, 0.66, -0.425);
   rune.scale.set(0.8, 1.3, 0.3);
 
-  // Belt with a skull buckle, a pouch and a book.
-  add(rig, new THREE.CylinderGeometry(0.335, 0.335, 0.1, 10), leather, 0, 1.13, 0);
-  add(rig, new THREE.IcosahedronGeometry(0.075, 0), bone, 0, 1.13, -0.34);
-  add(rig, new THREE.BoxGeometry(0.14, 0.16, 0.1), leather, 0.3, 1.02, -0.14);
-  const book = add(rig, new THREE.BoxGeometry(0.06, 0.24, 0.18), flat(0x6b1f2a), -0.36, 1.0, 0.02);
+  // Waist, belt with a skull buckle, a pouch and a book.
+  add(rig, new THREE.CylinderGeometry(0.3, 0.27, 0.34, SIDES), robeDark, 0, 1.23, 0);
+  add(rig, new THREE.CylinderGeometry(0.295, 0.295, 0.09, SIDES), leather, 0, 1.1, 0);
+  add(rig, new THREE.IcosahedronGeometry(0.065, 0), bone, 0, 1.1, -0.3);
+  add(rig, new THREE.BoxGeometry(0.13, 0.15, 0.1), leather, 0.27, 1.0, -0.14);
+  const book = add(rig, new THREE.BoxGeometry(0.06, 0.22, 0.17), flat(0x6b1f2a), -0.33, 0.98, 0.02);
   book.rotation.z = 0.2;
-  add(rig, new THREE.BoxGeometry(0.065, 0.05, 0.185), gold, -0.36, 1.0, 0.02).rotation.z = 0.2;
+  add(rig, new THREE.BoxGeometry(0.065, 0.05, 0.175), gold, -0.33, 0.98, 0.02).rotation.z = 0.2;
 
-  // Chest and mantle.
-  add(rig, new THREE.CylinderGeometry(0.35, 0.3, 0.5, 10), robe, 0, 1.4, 0);
-  add(rig, new THREE.CylinderGeometry(0.2, 0.43, 0.2, 10), robeDark, 0, 1.69, 0);
-  add(rig, new THREE.CylinderGeometry(0.44, 0.44, 0.04, 10), gold, 0, 1.6, 0);
+  // Chest, sloping shoulders with a gold line, neck.
+  add(rig, new THREE.CylinderGeometry(0.36, 0.3, 0.3, SIDES), robe, 0, 1.52, 0);
+  add(rig, new THREE.CylinderGeometry(0.17, 0.4, 0.17, SIDES), robeDark, 0, 1.735, 0);
+  add(rig, new THREE.CylinderGeometry(0.405, 0.405, 0.035, SIDES), gold, 0, 1.66, 0);
+  add(rig, new THREE.CylinderGeometry(0.07, 0.08, 0.1, 8), skin, 0, 1.82, -0.01);
 
   // Cape down the back; it lags a little when you walk.
   const cape = new THREE.Group();
-  cape.position.set(0, 1.66, 0.2);
+  cape.position.set(0, 1.7, 0.17);
   rig.add(cape);
-  add(cape, new THREE.BoxGeometry(0.72, 1.3, 0.04), lining, 0, -0.66, 0.08);
-  add(cape, new THREE.BoxGeometry(0.76, 0.06, 0.05), gold, 0, -1.3, 0.085);
+  add(cape, new THREE.BoxGeometry(0.66, 1.3, 0.04), lining, 0, -0.66, 0.08);
+  add(cape, new THREE.BoxGeometry(0.7, 0.06, 0.05), gold, 0, -1.3, 0.085);
 
-  // Shoulder plates with horns and a gem each; the arms hang from pivots so they can swing and rise.
+  // Shoulder plates in the robe's colours with a gold rim, a horn and a gem. Each arm hangs from a pivot at the
+  // shoulder and has a second pivot at the elbow.
   const arms = [];
   [-1, 1].forEach(function (side) {
-    const pad = add(rig, new THREE.IcosahedronGeometry(0.24, 0), iron, side * 0.43, 1.66, 0);
-    pad.scale.set(1.15, 0.8, 1.1);
-    add(rig, new THREE.TorusGeometry(0.2, 0.025, 5, 10), gold, side * 0.43, 1.6, 0).rotation.x = Math.PI / 2;
-    const horn = add(rig, new THREE.ConeGeometry(0.075, 0.42, 5), bone, side * 0.55, 1.9, 0.02);
-    horn.rotation.z = -side * 0.6;
-    const horn2 = add(rig, new THREE.ConeGeometry(0.05, 0.26, 5), bone, side * 0.38, 1.87, 0.08);
-    horn2.rotation.set(-0.3, 0, -side * 0.15);
-    add(rig, new THREE.OctahedronGeometry(0.05, 0), glow(0x7dffc0), side * 0.47, 1.72, -0.2);
+    const pad = add(rig, new THREE.IcosahedronGeometry(0.2, 1), robeDark, side * 0.42, 1.68, 0);
+    pad.scale.set(1.2, 0.72, 1.15);
+    add(rig, new THREE.TorusGeometry(0.21, 0.025, 5, 14), gold, side * 0.42, 1.62, 0).rotation.x = Math.PI / 2;
+    const horn = add(rig, new THREE.ConeGeometry(0.06, 0.36, 6), bone, side * 0.55, 1.86, 0.01);
+    horn.rotation.z = -side * 0.75;
+    add(rig, new THREE.OctahedronGeometry(0.045, 0), glow(0x7dffc0), side * 0.44, 1.71, -0.21);
 
     const arm = new THREE.Group();
-    arm.position.set(side * 0.44, 1.56, 0);
+    arm.position.set(side * 0.42, 1.58, 0);
     rig.add(arm);
-    add(arm, new THREE.CylinderGeometry(0.1, 0.13, 0.42, 7), robe, 0, -0.22, 0);
-    add(arm, new THREE.CylinderGeometry(0.13, 0.19, 0.24, 7), robeDark, 0, -0.5, 0);
-    add(arm, new THREE.CylinderGeometry(0.19, 0.19, 0.03, 7), gold, 0, -0.62, 0);
-    add(arm, new THREE.IcosahedronGeometry(0.085, 0), skin, 0, -0.68, 0);
-    arms.push(arm);
+    add(arm, new THREE.CylinderGeometry(0.095, 0.11, 0.38, 8), robe, 0, -0.18, 0);
+    const fore = new THREE.Group();
+    fore.position.set(0, -0.36, 0);
+    arm.add(fore);
+    add(fore, new THREE.CylinderGeometry(0.11, 0.17, 0.34, 8), robeDark, 0, -0.17, 0);
+    add(fore, new THREE.CylinderGeometry(0.175, 0.175, 0.03, 8), gold, 0, -0.34, 0);
+    add(fore, new THREE.IcosahedronGeometry(0.075, 0), skin, 0, -0.4, 0);
+    arms.push({ arm: arm, fore: fore });
   });
-  const armLeft = arms[0], armRight = arms[1];
+  const left = arms[0], right = arms[1];
 
-  // Head in a deep hood: only the eyes show.
-  add(rig, new THREE.IcosahedronGeometry(0.165, 1), skin, 0, 1.88, -0.01);
-  const hood = add(rig, new THREE.IcosahedronGeometry(0.24, 1), robeDark, 0, 1.92, 0.05);
-  hood.scale.set(1, 1.08, 1.12);
-  add(rig, new THREE.CylinderGeometry(0.2, 0.235, 0.12, 9, 1, true), lining, 0, 1.86, -0.09).rotation.x = 0.35;
-  const tip = add(rig, new THREE.ConeGeometry(0.12, 0.36, 6), robeDark, 0, 2.03, 0.27);
+  // Head: the hood covers the top and back and leaves the face free; the eyes glow.
+  add(rig, new THREE.IcosahedronGeometry(0.15, 1), skin, 0, 1.94, -0.03);
+  const hood = add(rig, new THREE.IcosahedronGeometry(0.215, 1), robeDark, 0, 1.97, 0.07);
+  hood.scale.set(1, 1.08, 1.05);
+  const rim = add(rig, new THREE.TorusGeometry(0.165, 0.04, 6, 14), robe, 0, 1.96, -0.09);
+  rim.rotation.x = 0.18;
+  const tip = add(rig, new THREE.ConeGeometry(0.11, 0.32, 6), robeDark, 0, 2.06, 0.27);
   tip.rotation.x = 1.95;
-  [-1, 1].forEach(function (s) { add(rig, new THREE.SphereGeometry(0.022, 6, 4), glow(0xa8ffd8), s * 0.06, 1.9, -0.17); });
+  [-1, 1].forEach(function (s) { add(rig, new THREE.SphereGeometry(0.022, 6, 4), glow(0xa8ffd8), s * 0.055, 1.96, -0.175); });
 
   // Staff in the right hand: a dark shaft, a bone claw, a crystal floating in it.
   const staff = new THREE.Group();
-  staff.position.set(0.0, -0.68, -0.08);
-  armRight.add(staff);
+  staff.position.set(0.0, -0.4, -0.06);
+  right.fore.add(staff);
   add(staff, new THREE.CylinderGeometry(0.035, 0.045, 2.3, 6), wood, 0, 0.42, 0);
   add(staff, new THREE.CylinderGeometry(0.055, 0.055, 0.14, 6), gold, 0, 0.0, 0);
   add(staff, new THREE.CylinderGeometry(0.06, 0.04, 0.12, 6), iron, 0, 1.5, 0);
@@ -95,7 +105,8 @@ export function makeWarlock() {
   shine.position.set(0, 1.86, 0);
   staff.add(shine);
 
-  // While a spell is being cast the crystal grows and takes the colour of its school, and the arms rise.
+  // While a spell is being cast the crystal grows and takes the colour of its school, the free hand reaches
+  // forward and the staff is thrust toward the target. (Turning an arm by a positive angle swings its hand forward.)
   const IDLE = new THREE.Color(0x7dffc0), SHADOW = new THREE.Color(0xb07cff), FIRE = new THREE.Color(0xff9a3d);
   let stride = 0, casting = 0;
   function update(dt, time, moving, jumpHeight, school) {
@@ -103,10 +114,13 @@ export function makeWarlock() {
     casting += ((school ? 1 : 0) - casting) * Math.min(1, dt * 9);
     const swing = moving ? Math.sin(stride) : 0, breath = Math.sin(time * 1.6) * 0.012;
     rig.position.y = jumpHeight + (moving ? Math.abs(Math.sin(stride)) * 0.06 : breath);
-    rig.rotation.x = moving ? -0.07 : casting * 0.05;
-    armLeft.rotation.x = swing * 0.5 - casting * 1.45 + Math.sin(time * 9) * 0.05 * casting;
-    armLeft.rotation.z = casting * 0.25;
-    armRight.rotation.x = -0.22 - swing * 0.18 - casting * 0.5;
+    rig.rotation.x = moving ? -0.07 : -casting * 0.04;
+    left.arm.rotation.x = 0.06 + swing * 0.5 + casting * (1.05 + Math.sin(time * 9) * 0.05);
+    left.arm.rotation.z = casting * 0.28;
+    left.fore.rotation.x = 0.22 + (moving ? 0.25 : 0) + casting * 0.35;
+    right.arm.rotation.x = 0.14 - swing * 0.16 + casting * 0.5;
+    right.fore.rotation.x = 0.4 + casting * 0.3;
+    staff.rotation.x = -(0.1 + casting * 0.4) - right.arm.rotation.x - right.fore.rotation.x;   // the staff stays nearly upright
     cape.rotation.x = 0.06 + (moving ? 0.3 + Math.sin(stride * 0.5) * 0.06 : Math.sin(time * 1.1) * 0.02);
     const target = school === 'fire' ? FIRE : school ? SHADOW : IDLE;
     crystalMaterial.color.lerp(target, Math.min(1, dt * 12));

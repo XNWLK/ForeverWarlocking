@@ -267,7 +267,7 @@ function onCombatEvent(e) {
 
   if (lands && fx && fx.bolt) {
     hud.event(e, anchor, true);
-    if (e.pet) spot.set(pet.state.x, 0.85, pet.state.z); else spot.copy(staffAt);
+    if (e.pet) spot.set(pet.state.x, 0.65, pet.state.z); else spot.copy(staffAt);
     boltsAt[ti]++;
     effects.bolt(spot, dummy.chestAt, fx.bolt, function () {
       boltsAt[ti]--;
@@ -529,8 +529,8 @@ function frame() {
     const fx = SPELL_FX[casting.key];
     effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, S.cast ? (S.t - S.cast.start) / (S.cast.end - S.cast.start) : 0.6, time, player, dt);
   } else effects.casting(null, 0, 0, time, player, dt);
-  for (let i = 1; i <= targets; i++) {
-    effects.setMarks(i, SPOTS[i], combat.alive(i) ? {
+  for (let i = 1; i <= 3; i++) {                           // all three, so a dummy that is no longer there loses its marks
+    effects.setMarks(i, SPOTS[i], i <= targets && combat.alive(i) ? {
       immolate: combat.dotLeft('immolate', i) > 0, corruption: combat.dotLeft('corruption', i) > 0, siphonLife: combat.dotLeft('siphonLife', i) > 0,
       baneOfAgony: combat.dotLeft('baneOfAgony', i) > 0, baneOfDoom: combat.dotLeft('baneOfDoom', i) > 0,
       coe: combat.debuff(i, 'coe'), havoc: combat.havocOn() === i
@@ -563,8 +563,9 @@ function frame() {
 
   renderer.render(scene, camera);
 
-  for (let i = 1; i <= targets; i++) {
+  for (let i = 1; i <= 3; i++) {
     const anchor = anchors[i];
+    if (i > targets) { anchor.visible = false; continue; }  // a dummy that is gone takes its damage numbers with it
     head.copy(dummies[i].headAt).project(camera);
     anchor.visible = head.z < 1 && Math.abs(head.x) < 1.1 && Math.abs(head.y) < 1.1;
     anchor.x = (head.x * 0.5 + 0.5) * window.innerWidth;

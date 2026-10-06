@@ -495,6 +495,7 @@ export function createEffects(scene) {
     });
   }
   function clear() {
+    for (let ti = 1; ti <= 3; ti++) for (const name in marks[ti]) marks[ti][name].holder.visible = false;
     live.forEach(remove);
     live.length = 0;
     flashes.forEach(function (f) { f.left = 0; f.lamp.intensity = 0; });

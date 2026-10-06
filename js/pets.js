@@ -8,8 +8,8 @@ const RUN_SPEED = 9;            // a little faster than you, so it catches up
 const FOLLOW_BACK = 1.5, FOLLOW_LEFT = 1.7;
 const MELEE_SPOT = 2.4;         // where the Succubus stands, measured from the middle of its dummy
 
-// The Imp: a small hunched fiend that hovers on a lick of fel fire. Big ears, little wings, a tail with a burning
-// tip, and a ball of fire between its hands while it casts.
+// The Imp: a small hunched fiend that scampers along on two clawed feet. Big ears, little wings (too small to fly
+// with), a tail with a burning tip, and a ball of fire between its hands while it casts.
 function makeImp() {
   const root = new THREE.Group(), rig = new THREE.Group();
   root.add(rig, groundShadow(0.42));
@@ -35,10 +35,15 @@ function makeImp() {
     wing.scale.z = 0.12;
     wing.rotation.set(0.3, side * 0.5, side * 0.9);
     wing.userData.side = side;
-    add(rig, new THREE.CylinderGeometry(0.05, 0.065, 0.28, 5), dark, side * 0.13, 0.2, 0.02);       // legs
-    add(rig, new THREE.ConeGeometry(0.07, 0.16, 4), claw, side * 0.13, 0.05, -0.05).rotation.x = -1.3;
+    const leg = new THREE.Group();                                                                  // legs swing from the hip
+    leg.position.set(side * 0.13, 0.36, 0.02);
+    rig.add(leg);
+    add(leg, new THREE.CylinderGeometry(0.055, 0.065, 0.3, 5), dark, 0, -0.16, 0);
+    add(leg, new THREE.ConeGeometry(0.07, 0.18, 4), claw, 0, -0.31, -0.07).rotation.x = -1.3;
+    leg.userData.leg = side;
   });
   const wings = rig.children.filter(function (m) { return m.userData.side; });
+  const legs = rig.children.filter(function (m) { return m.userData.leg; });
   const arms = [-1, 1].map(function (side) {
     const arm = new THREE.Group();
     arm.position.set(side * 0.26, 0.68, -0.04);
@@ -53,11 +58,6 @@ function makeImp() {
   rig.add(tail);
   add(tail, new THREE.CylinderGeometry(0.03, 0.045, 0.45, 4), dark, 0, 0.12, 0.16).rotation.x = -0.9;
   const tailFlame = add(tail, new THREE.ConeGeometry(0.06, 0.2, 5), glow(0x9dff6a), 0, 0.3, 0.36);
-  const under = add(root, new THREE.ConeGeometry(0.16, 0.42, 6), light(0x7dff8a, 0.6), 0, 0.12, 0);   // the fire it floats on
-  under.rotation.x = Math.PI;
-  const underGlow = halo(0x7dff8a, 1.0, 0.45);
-  underGlow.position.y = 0.2;
-  root.add(underGlow);
   const fire = add(rig, new THREE.IcosahedronGeometry(0.13, 0), glow(0xffa23d), 0, 0.62, -0.42);
   const fireGlow = halo(0xff8a2a, 1.2, 0.8);
   fireGlow.position.copy(fire.position);
@@ -67,17 +67,20 @@ function makeImp() {
   let throwing = 0;
   function update(dt, time, moving, cast) {
     throwing = Math.max(0, throwing - dt * 4);
-    rig.position.y = 0.22 + Math.sin(time * (moving ? 11 : 3.2)) * (moving ? 0.07 : 0.05);
-    rig.rotation.x = moving ? -0.22 : -0.05 + cast * 0.12;
+    // On its feet: a quick hopping scamper with a waddle while it runs, a little bounce on the spot otherwise.
+    const step = time * 15;
+    rig.position.y = moving ? Math.abs(Math.sin(step)) * 0.09 : Math.abs(Math.sin(time * 2.6)) * 0.02;
+    rig.rotation.x = moving ? -0.25 : -0.05 - cast * 0.1;
+    rig.rotation.z = moving ? Math.sin(step) * 0.12 : 0;
     head.rotation.z = Math.sin(time * 1.7) * 0.08;
-    wings.forEach(function (w) { w.rotation.z = w.userData.side * (0.9 + Math.sin(time * 16) * 0.35); });
-    arms.forEach(function (arm) {
-      arm.rotation.x = -cast * 1.5 - throwing * 0.9 + (moving ? Math.sin(time * 11) * 0.4 : 0);
+    legs.forEach(function (leg) { leg.rotation.x = moving ? Math.sin(step) * leg.userData.leg * 0.8 : 0; });
+    wings.forEach(function (w) { w.rotation.z = w.userData.side * (0.9 + Math.sin(time * (moving ? 9 : 2.4)) * (moving ? 0.25 : 0.1)); });
+    arms.forEach(function (arm) {                           // a positive angle swings the hand forward
+      arm.rotation.x = cast * 1.5 + throwing * 0.9 + (moving ? Math.sin(step) * -arm.userData.side * 0.6 : 0);
       arm.rotation.z = arm.userData.side * (0.25 - cast * 0.45);
     });
     tail.rotation.y = Math.sin(time * 2.6) * 0.5;
     tailFlame.scale.y = 1 + Math.sin(time * 19) * 0.3;
-    under.scale.set(1 + Math.sin(time * 23) * 0.15, 1 + Math.sin(time * 17) * 0.25, 1 + Math.sin(time * 23) * 0.15);
     fire.visible = fireGlow.visible = cast > 0;
     fire.scale.setScalar(0.25 + cast * 1.15 + Math.sin(time * 25) * 0.08);
     fire.rotation.y = time * 6;
