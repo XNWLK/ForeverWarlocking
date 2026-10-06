@@ -10,6 +10,8 @@ const RING = new THREE.RingGeometry(0.82, 1, 40);
 const THIN_RING = new THREE.RingGeometry(0.93, 1, 48);
 const FLAME = new THREE.ConeGeometry(0.5, 1, 5);
 const SLASH = new THREE.PlaneGeometry(1, 0.12);
+const BEAM = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
+const STRAW = new THREE.BoxGeometry(0.03, 0.22, 0.03);
 
 // How each spell looks. cast = colour of what gathers at the staff and of the circle at your feet; bolt = it flies
 // to the target; land / apply / tick = what plays on the target when it hits, is put on, or ticks.
@@ -189,6 +191,31 @@ export function createEffects(scene) {
     });
   }
   const lookAt = new THREE.Vector3();      // where the camera is (strokes face it); set every picture
+  // A thin line of light from your staff to the target that is gone in a blink: what an instant spell looks like on
+  // its way (spells that fly as a bolt do not need it).
+  const UP = new THREE.Vector3(0, 1, 0), along = new THREE.Vector3();
+  function streak(from, to, color) {
+    let age = 0;
+    const life = 0.2, material = light(color, 0.9), coreMaterial = light(0xffffff, 0.9);
+    const mesh = new THREE.Mesh(BEAM, material), core = new THREE.Mesh(BEAM, coreMaterial), holder = new THREE.Group();
+    const a = from.clone(), b = to.clone();
+    along.subVectors(b, a);
+    const length = along.length();
+    holder.position.copy(a);
+    holder.quaternion.setFromUnitVectors(UP, along.normalize());
+    holder.add(mesh, core);
+    spawn(holder, [material, coreMaterial], function (dt) {
+      age += dt;
+      const k = age / life, lead = Math.min(1, k * 2.5), tail = Math.max(0, k * 1.6 - 0.6);      // the line runs out to the target, then its tail follows
+      holder.position.lerpVectors(a, b, (lead + tail) / 2);
+      mesh.scale.set(0.09 * (1 - k * 0.6), Math.max(0.01, length * (lead - tail)), 0.09 * (1 - k * 0.6));
+      core.scale.set(0.03, Math.max(0.01, length * (lead - tail)), 0.03);
+      material.opacity = 0.75 * (1 - k * k);
+      coreMaterial.opacity = 0.9 * (1 - k);
+      return k >= 1;
+    });
+    puff(a, color, 0.9, 0.22, 0, 0.3, 0, 0.6);
+  }
 
   // A bolt from `from` to `to`; `arrive` is called when it gets there. Shadow bolts drag two dark moons round them,
   // fire leaves flames behind, a death coil trails pale wisps.
@@ -326,6 +353,22 @@ export function createEffects(scene) {
     lash: function (p) { stroke(p.at, 0xff8ad8, 2.4, 0.4, 0.2); ball(p.at, 0xd06cff, 0.9, 0.25); sparks(p.at, 0xff8ad8, 5, 0.8); },
     slash: function (p) { stroke(p.at, 0xffffff, 1.5, -0.6 + Math.random() * 1.2, 0.15); },
     brand: function (p) { ring(p.at, 0xff5ca8, 0.2, 1.3, 0.3, true, 0); ball(p.at, 0xff5ca8, 0.7, 0.2); },
+    straw: function (p) {                         // bits of straw knocked out of the dummy
+      for (let i = 0; i < (p.many ? 7 : 3); i++) {
+        const life = 0.5 + Math.random() * 0.4, vx = (Math.random() - 0.5) * 5, vz = (Math.random() - 0.5) * 5;
+        let vy = 1.5 + Math.random() * 3, age = 0;
+        const material = new THREE.MeshBasicMaterial({ color: 0xd8bd6a, transparent: true }), mesh = new THREE.Mesh(STRAW, material);
+        mesh.position.copy(p.at);
+        mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+        spawn(mesh, [material], function (dt) {
+          age += dt; vy -= 11 * dt;
+          mesh.position.x += vx * dt; mesh.position.y = Math.max(0.05, mesh.position.y + vy * dt); mesh.position.z += vz * dt;
+          mesh.rotation.x += dt * 7; mesh.rotation.z += dt * 5;
+          material.opacity = Math.min(1, 2 * (1 - age / life));
+          return age >= life;
+        });
+      }
+    },
     death: function (p) { ball(p.at, 0xffffff, 2.6, 0.5); ring(feet.set(p.at.x, 0.08, p.at.z), 0xb79bff, 0.5, 5, 0.7, false); sparks(p.at, 0xd8ccff, 24, 1.4); flash(p.at, 0xffffff, 200); }
   };
   // p: { at: where on the target, caster: where your staff is, color, crit }
@@ -360,6 +403,10 @@ export function createEffects(scene) {
     for (let i = 0; i <= 3; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 3; g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * size * 0.26, c + Math.sin(a) * size * 0.26); }
     g.stroke();
   });
+  // The spell itself gathering at the crystal: a ball of the spell's colour that grows as the cast bar fills.
+  const chargeMaterial = light(0xffffff, 0.75), charge = new THREE.Mesh(BALL, chargeMaterial), chargeGlow = halo(0xffffff, 1, 0.6);
+  charge.visible = chargeGlow.visible = false;
+  group.add(charge, chargeGlow);
   const castCircleMaterial = new THREE.MeshBasicMaterial({ map: circleMap, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const castCircle = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), castCircleMaterial);
   castCircle.rotation.x = -Math.PI / 2;
@@ -379,7 +426,15 @@ export function createEffects(scene) {
       mote.scale.setScalar(0.035 + progress * 0.04);
       mote.rotation.y = turn;
     }
-    if (at) { moteMaterial.color.set(color); castCircleMaterial.color.set(color); }
+    charge.visible = chargeGlow.visible = !!at;
+    if (at) {
+      moteMaterial.color.set(color); castCircleMaterial.color.set(color); chargeMaterial.color.set(color); chargeGlow.material.color.set(color);
+      const size = 0.08 + progress * 0.22 + Math.sin(time * 31) * 0.012;
+      charge.position.copy(at); chargeGlow.position.copy(at);
+      charge.scale.setScalar(size);
+      chargeGlow.scale.setScalar(0.8 + progress * 2.2);
+      chargeGlow.material.opacity = 0.35 + progress * 0.4;
+    }
     castCircle.visible = castShown > 0.02;
     if (ground) castCircle.position.set(ground.x, 0.07, ground.z);
     castCircle.scale.setScalar(2.2 + castShown * 1.4);
@@ -501,5 +556,5 @@ export function createEffects(scene) {
     flashes.forEach(function (f) { f.left = 0; f.lamp.intensity = 0; });
   }
 
-  return { play: play, bolt: bolt, meteor: meteor, ball: ball, ring: ring, casting: casting, setMarks: setMarks, update: update, clear: clear, count: function () { return live.length; } };
+  return { streak: streak, play: play, bolt: bolt, meteor: meteor, ball: ball, ring: ring, casting: casting, setMarks: setMarks, update: update, clear: clear, count: function () { return live.length; } };
 }

@@ -108,19 +108,22 @@ export function makeWarlock() {
   // While a spell is being cast the crystal grows and takes the colour of its school, the free hand reaches
   // forward and the staff is thrust toward the target. (Turning an arm by a positive angle swings its hand forward.)
   const IDLE = new THREE.Color(0x7dffc0), SHADOW = new THREE.Color(0xb07cff), FIRE = new THREE.Color(0xff9a3d);
-  let stride = 0, casting = 0;
+  // When a spell goes off (the end of a cast, or an instant) the staff arm is thrust forward for a moment.
+  let stride = 0, casting = 0, thrust = 0;
   function update(dt, time, moving, jumpHeight, school) {
     stride = moving ? stride + dt * 10.5 : 0;
     casting += ((school ? 1 : 0) - casting) * Math.min(1, dt * 9);
+    thrust = Math.max(0, thrust - dt * 3.4);
+    const push = Math.sin(Math.min(1, thrust * 1.15) * Math.PI);
     const swing = moving ? Math.sin(stride) : 0, breath = Math.sin(time * 1.6) * 0.012;
     rig.position.y = jumpHeight + (moving ? Math.abs(Math.sin(stride)) * 0.06 : breath);
-    rig.rotation.x = moving ? -0.07 : -casting * 0.04;
-    left.arm.rotation.x = 0.06 + swing * 0.5 + casting * (1.05 + Math.sin(time * 9) * 0.05);
+    rig.rotation.x = (moving ? -0.07 : -casting * 0.04) - push * 0.07;
+    left.arm.rotation.x = 0.06 + swing * 0.5 + casting * (1.05 + Math.sin(time * 9) * 0.05) + push * 0.55;
     left.arm.rotation.z = casting * 0.28;
     left.fore.rotation.x = 0.22 + (moving ? 0.25 : 0) + casting * 0.35;
-    right.arm.rotation.x = 0.14 - swing * 0.16 + casting * 0.5;
-    right.fore.rotation.x = 0.4 + casting * 0.3;
-    staff.rotation.x = -(0.1 + casting * 0.4) - right.arm.rotation.x - right.fore.rotation.x;   // the staff stays nearly upright
+    right.arm.rotation.x = 0.14 - swing * 0.16 + casting * 0.5 + push * 0.75;
+    right.fore.rotation.x = 0.4 + casting * 0.3 - push * 0.15;
+    staff.rotation.x = -(0.1 + casting * 0.4) - right.arm.rotation.x - right.fore.rotation.x - push * 0.55;   // the staff stays nearly upright, and tips forward in a thrust
     cape.rotation.x = 0.06 + (moving ? 0.3 + Math.sin(stride * 0.5) * 0.06 : Math.sin(time * 1.1) * 0.02);
     const target = school === 'fire' ? FIRE : school ? SHADOW : IDLE;
     crystalMaterial.color.lerp(target, Math.min(1, dt * 12));
@@ -135,7 +138,7 @@ export function makeWarlock() {
   // Where the crystal is in the world (bolts and beams start here).
   function orbPosition(target) { return crystal.getWorldPosition(target); }
 
-  return { root: root, update: update, orbPosition: orbPosition };
+  return { root: root, update: update, orbPosition: orbPosition, release: function () { thrust = 1; } };
 }
 
 // The training dummy: a straw-stuffed figure roped to a post, a horned bucket helm, a round shield for a chest and a
@@ -189,6 +192,17 @@ export function makeDummy() {
     horn.rotation.z = -side * 0.75;
   });
 
+  // A torn red scarf round the neck; its two tails stir a little, and whip about when the dummy is hit.
+  add(body, new THREE.CylinderGeometry(0.26, 0.3, 0.12, 9), red, 0, 2.3, 0);
+  const tails = [[-0.16, 0.5, 0.25], [0.02, 0.38, -0.2]].map(function (t) {
+    const tail = new THREE.Group();
+    tail.position.set(t[0], 2.28, -0.27);
+    body.add(tail);
+    add(tail, new THREE.BoxGeometry(0.13, t[1], 0.02), red, 0, -t[1] / 2, 0);
+    tail.userData.lean = t[2];
+    return tail;
+  });
+
   // Shield on the chest with painted rings and an iron boss; a wooden sword on the right arm.
   [[0.46, 0.06, woodDark], [0.4, 0.07, white], [0.28, 0.08, red], [0.15, 0.09, white]].forEach(function (ring) {
     const disc = add(body, new THREE.CylinderGeometry(ring[0], ring[0], ring[1], 16), ring[2], 0, 1.74, 0.42);
@@ -223,15 +237,23 @@ export function makeDummy() {
 
   // A hit makes the dummy rock back; at zero health it falls over until the next fight.
   // The red circle shows only under the dummy you have targeted.
-  let rock = 0, rockSpeed = 0, fallen = 0, dead = false, selected = true;
-  function hit(strength) { rockSpeed -= 1.6 * strength; }
+  // It also wobbles to one side or the other, so no two hits look the same.
+  let rock = 0, rockSpeed = 0, roll = 0, rollSpeed = 0, fallen = 0, dead = false, selected = true;
+  function hit(strength) { rockSpeed -= 1.6 * strength; rollSpeed += (Math.random() - 0.5) * 2.2 * strength; }
   function setDead(value) { dead = value; circle.visible = selected && !dead; }
   function setSelected(value) { selected = value; circle.visible = selected && !dead; }
   function update(dt, time) {
     rockSpeed += (-rock * 140 - rockSpeed * 9) * dt;       // a damped spring
     rock += rockSpeed * dt;
+    rollSpeed += (-roll * 110 - rollSpeed * 7) * dt;
+    roll += rollSpeed * dt;
     fallen += ((dead ? 1 : 0) - fallen) * Math.min(1, dt * 6);
     body.rotation.x = rock - fallen * 1.45;
+    body.rotation.z = roll * (1 - fallen);
+    if (time != null) tails.forEach(function (tail, i) {
+      tail.rotation.x = -0.12 + Math.sin(time * 1.3 + i * 2) * 0.05 - rock * 2.2;
+      tail.rotation.z = tail.userData.lean + Math.sin(time * 0.9 + i) * 0.04 - roll * 2.5;
+    });
     if (time != null) circle.material.opacity = 0.75 + Math.sin(time * 4) * 0.15;
   }
 

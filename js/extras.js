@@ -1,12 +1,14 @@
 // The bar on the right and what it switches on or opens:
 //   - the rotation panel (what the sim plays), the race against the sim, mistake callouts;
 //   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM;
-//   - latency, fight presets, and copying the combat log.
-// Challenges (drills and the seeded fight) have a window of their own, opened by the gold button at the top.
+//   - latency, fight presets, the volume, a link to share, and copying the combat log.
+// Challenges (drills, scripted encounters and the seeded fight) have a window of their own, opened by the gold
+// button on the left.
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
 import { setTip } from './tooltip.js';
 import { ACTION_SPELLS } from './combat.js';
+import { ENCOUNTERS, simFight } from './encounter.js';
 
 // Drills: short fights with one thing to practise. They do not change your saved fight settings.
 export const DRILLS = [
@@ -27,7 +29,7 @@ export const PRESETS = [
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
 
-const SHOW_DEFAULT = { rotation: false, race: true, callouts: false };
+const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false };
 const FROM_SIM = 'Read-only: this comes from the Warlock SIM. To change it, change it there and bring the codes over with Import.';
 const TREES = [['affliction', 'Affliction'], ['demonology', 'Demonology'], ['destruction', 'Destruction']];
 const STATS = [
@@ -68,14 +70,15 @@ function copyText(text, button) {
   else fallback();
 }
 
-// handlers: onChallenge(challenge or null), onPreset(preset), onLatency(ms), fullLog() -> text, log(text, kind)
+// handlers: onChallenge(challenge or null), onPreset(preset), onLatency(ms), onVolume(0..1), shareLink() -> address,
+//           fullLog() -> text, log(text, kind)
 export function createExtras(WL, handlers) {
   let character = null, config = null, leftOut = [], challenge = null;
   function show() { return Object.assign({}, SHOW_DEFAULT, getSetting('show') || {}); }
 
   // ---------- the switches ----------
   const rotationPanel = byId('rotationPanel'), race = byId('race');
-  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts') };
+  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint') };
   function applyShow() {
     const s = show();
     Object.keys(switches).forEach(function (k) { switches[k].checked = !!s[k]; });
@@ -99,6 +102,7 @@ export function createExtras(WL, handlers) {
     list.textContent = '';
     build.rotation.forEach(function (action) {
       const li = document.createElement('li'), spell = (ACTION_SPELLS[action] || [])[0];
+      li.dataset.action = action;                          // the sim's next cast lights up its line
       const icon = spell && WL.ICONS[spell];
       if (icon) { const img = document.createElement('img'); img.src = icon; img.alt = ''; li.appendChild(img); }
       else li.appendChild(el('span', null, 'no-icon'));
@@ -215,6 +219,11 @@ export function createExtras(WL, handlers) {
     handlers.onLatency(ms);
   });
   latency.addEventListener('keydown', function (e) { if (e.key === 'Enter') latency.blur(); e.stopPropagation(); });
+  const volume = byId('volume');
+  volume.value = String(Math.round(100 * (getSetting('volume') == null ? 0.6 : getSetting('volume'))));
+  volume.addEventListener('input', function () { handlers.onVolume(Math.max(0, Math.min(100, Number(volume.value) || 0)) / 100); });
+  volume.addEventListener('change', function () { volume.blur(); });
+  byId('btnShare').addEventListener('click', function () { byId('btnShare').blur(); copyText(handlers.shareLink(), byId('btnShare')); });
   PRESETS.forEach(function (p) {
     const button = el('button', p.name);
     button.type = 'button';
@@ -227,8 +236,17 @@ export function createExtras(WL, handlers) {
   // seeded fight.
   const challengeWindow = byId('challenges'), challengeButton = byId('btnChallenges'), cards = {};
   function best(id) { const all = getSetting('drills') || {}; return all[id] || null; }
+  // What main.js gets for a card: the drill itself, or an encounter with its script and the even fight the sim plays.
+  function asChallenge(d) {
+    return d.script ? Object.assign({ drill: true, encounter: true, sim: simFight(d), share: 'encounter:' + d.id }, d)
+                    : Object.assign({ drill: true, share: 'drill:' + d.id }, d);
+  }
+  function seeded(word) {
+    return { id: 'seed', seeded: true, name: 'Seeded fight "' + word + '"', word: word, seed: seedNumber(word), targets: 1, share: 'seed:' + word,
+             text: 'Two minutes on one dummy with the dice fixed by the seed.', fight: { timed: true, seconds: 120 } };
+  }
   function fillDrills() {
-    DRILLS.forEach(function (d) {
+    DRILLS.concat(ENCOUNTERS).forEach(function (d) {
       let card = cards[d.id];
       if (!card) {
         const box = el('div', null, 'card'), head = el('h4'), grade = el('b'), record = el('small'), button = el('button');
@@ -237,10 +255,10 @@ export function createExtras(WL, handlers) {
         button.addEventListener('click', function () {
           const running = challenge && challenge.id === d.id;
           challengeWindow.hidden = true;
-          handlers.onChallenge(running ? null : Object.assign({ drill: true }, d));
+          handlers.onChallenge(running ? null : asChallenge(d));
         });
         box.append(head, el('p', d.text), record, button);
-        byId('drills').appendChild(box);
+        byId(d.script ? 'encounters' : 'drills').appendChild(box);
         card = cards[d.id] = { box: box, grade: grade, record: record, button: button };
       }
       const b = best(d.id), running = !!challenge && challenge.id === d.id;
@@ -267,8 +285,7 @@ export function createExtras(WL, handlers) {
     const word = seedBox.value.trim() || '1';
     seedBox.blur(); byId('seedStart').blur();
     challengeWindow.hidden = true;
-    handlers.onChallenge({ id: 'seed', seeded: true, name: 'Seeded fight "' + word + '"', word: word, seed: seedNumber(word), targets: 1,
-                           text: 'Two minutes on one dummy with the dice fixed by the seed.', fight: { timed: true, seconds: 120 } });
+    handlers.onChallenge(seeded(word));
   });
   byId('challengeEnd').addEventListener('click', function () { handlers.onChallenge(null); });
   byId('btnCopyLog').addEventListener('click', function () { byId('btnCopyLog').blur(); copyText(handlers.fullLog(), byId('btnCopyLog')); });
@@ -351,7 +368,7 @@ export function createExtras(WL, handlers) {
       fillDrills();
       const tag = byId('challengeTag');
       tag.hidden = !challenge;
-      if (challenge) byId('challengeText').textContent = (challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
+      if (challenge) byId('challengeText').textContent = (challenge.encounter ? 'Encounter: ' : challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
       latency.value = String(getSetting('latency') || 0);
       if (!sheet.hidden && openTab) showSheet(openTab);
       lastRace = '';
@@ -366,6 +383,18 @@ export function createExtras(WL, handlers) {
     // An event from the casting rules (only what the callouts need to know).
     event: function (e, combat) { if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t; },
     refreshDrills: fillDrills,
+    show: show,
+    // A challenge named in a share link ('drill:opener', 'encounter:fireDance', 'seed:word'): start it. False when
+    // there is no such challenge.
+    play: function (spec) {
+      const cut = String(spec).indexOf(':'), kind = String(spec).slice(0, cut), id = String(spec).slice(cut + 1);
+      const found = kind === 'seed' ? (id ? seeded(id.slice(0, 24)) : null)
+        : (kind === 'drill' ? DRILLS : kind === 'encounter' ? ENCOUNTERS : []).filter(function (d) { return d.id === id; }).map(asChallenge)[0];
+      if (!found) return false;
+      if (found.seeded) seedBox.value = found.word;
+      handlers.onChallenge(found);
+      return true;
+    },
     sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden; },
     closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; },
     copy: copyText

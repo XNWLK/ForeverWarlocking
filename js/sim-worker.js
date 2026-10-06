@@ -8,11 +8,14 @@
 // casts and damage per spell, how long each DoT was up, time without a cast, Life Taps.
 self.window = self;
 
+// The page starts this file with its version in the address (?v=...); the same goes on every file fetched here, so
+// the worker never mixes old and new files after an update.
+var version = self.location.search || '';
 var request = new XMLHttpRequest();
-request.open('GET', '../vendor/warlock-sim/manifest.json', false);
+request.open('GET', '../vendor/warlock-sim/manifest.json' + version, false);
 request.send();
 var files = JSON.parse(request.responseText).files.filter(function (f) { return !/icons|tooltips/.test(f); });
-importScripts.apply(null, files.map(function (f) { return '../vendor/warlock-sim/' + f; }));
+importScripts.apply(null, files.map(function (f) { return '../vendor/warlock-sim/' + f + version; }));
 
 self.onmessage = function (e) {
   var job = e.data, WL = self.WL, cfg = job.config, result = null, seconds;
@@ -35,13 +38,19 @@ self.onmessage = function (e) {
   }
   // The race and the review's graph: how much damage the sim has done by each second, averaged over a number of
   // its fights (each with other dice).
-  var curve = null;
+  // The review's timeline also shows what the sim cast in the first of those fights (job.seed: a seeded fight plays
+  // it with the same dice as you).
+  var curve = null, casts = null;
   try {
     var count = Math.max(1, Math.ceil(seconds)), sums = new Array(count + 1).fill(0), RUNS = 40;
     cfg.fight.duration = seconds;
     for (var n = 0; n < RUNS; n++) {
-      var one = WL.simulateOnce(job.build, job.race, cfg, { seed: 1000 + n * 7919, log: true });
+      var one = WL.simulateOnce(job.build, job.race, cfg, { seed: n === 0 && job.seed != null ? job.seed : 1000 + n * 7919, log: true });
       (one.log || []).forEach(function (line) { if (line.dmg > 0) sums[Math.min(count, Math.floor(line.t) + 1)] += line.dmg; });
+      if (n === 0) {
+        casts = (one.log || []).filter(function (line) { return line.type === 'cast' && !/^(summon:|demonicSacrifice|felDomination)/.test(line.spell); })
+          .map(function (line) { return { t: line.t, k: line.spell, d: line.channel || line.castTime || 0, ch: line.channel ? 1 : 0 }; });
+      }
     }
     curve = [0];
     for (var i = 1; i <= count; i++) curve.push(curve[i - 1] + sums[i] / RUNS);
@@ -51,5 +60,5 @@ self.onmessage = function (e) {
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
   self.postMessage({ id: job.id, dps: result.dps, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve });
+                     idle: result.mana.idleSecAvg, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, casts: casts });
 };

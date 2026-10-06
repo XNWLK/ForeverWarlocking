@@ -1,4 +1,5 @@
 // The three panels that are more than a list: fight options, import from the DPS sim, and the review after a fight.
+import { drawTimeline } from './timeline.js';
 
 function byId(id) { return document.getElementById(id); }
 function whole(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -81,6 +82,13 @@ export function createPanels(handlers) {
         copy.type = 'button';
         copy.addEventListener('click', function () { d.copy(c.line, copy); });
         line.appendChild(copy);
+        if (c.link) {
+          const link = el('button', 'Copy a link to this fight');
+          link.type = 'button';
+          link.title = 'Whoever opens the link gets the same build, race and challenge';
+          link.addEventListener('click', function () { d.copy(c.link, link); });
+          line.appendChild(link);
+        }
       }
       body.appendChild(line);
     }
@@ -91,6 +99,12 @@ export function createPanels(handlers) {
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
     else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
     body.appendChild(head);
+    // Your best in this very fight (same build, race, dummies and fight options), outside challenges.
+    if (d.best) {
+      const b = d.best;
+      body.appendChild(el('p', b.record ? (b.previous ? 'A new best for this fight. Before: ' + whole(b.previous.dps) + ' DPS.' : 'Your first result for this fight: it is your best for now.')
+        : 'Your best in this fight: ' + whole(b.best.dps) + ' DPS' + (b.best.pct ? ' (' + b.best.pct + '% of the sim).' : '.'), 'best-line' + (b.record ? ' record' : '')));
+    }
 
     // Damage over time: you against the sim's average fight.
     const yourCurve = d.curve || [], simCurve = sim && sim.curve ? sim.curve : null;
@@ -118,6 +132,15 @@ export function createPanels(handlers) {
       if (simCurve) { const s = el('span', 'The sim (average of its fights)'); s.insertBefore(el('i', null, 'sim'), s.firstChild); key.appendChild(s); }
       key.appendChild(el('span', '0 s to ' + span + ' s, up to ' + whole(top) + ' damage'));
       body.appendChild(key);
+    }
+
+    // The fight from left to right: your casts, the sim's, and when each DoT was up.
+    if (d.record && d.record.casts.length) {
+      body.appendChild(el('h3', 'Timeline'));
+      body.appendChild(drawTimeline({ record: d.record, seconds: d.seconds, simCasts: sim && sim.casts, spells: d.spells, icon: d.icon,
+                                      racialName: d.racialName, targets: d.targets, dummyName: d.dummyName, width: Math.min(640, window.innerWidth * 0.92) - 32 - 112 }));
+      body.appendChild(el('p', 'Red: nothing was cast. Grey: you were made to move. A dim picture: the cast was stopped. "The sim" is one of its own fights' +
+        (d.sameDice ? ', with the same dice as yours.' : ', with other dice than yours: read it for the order of things, not second by second.') + ' Hover anything to read it.', 'graph-key'));
     }
 
     // Where the time went.

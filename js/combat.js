@@ -806,9 +806,87 @@ export function createCombat(opts) {
     if (!S.over && ((ctx && ctx.moving) || forcedMove()) && (S.cast || S.channel)) interrupt('moving');
   }
 
+  // ---------- what the sim would cast next (a hint for practice; no part of the fight's rules) ----------
+  // The build's priority list is asked the way the engine asks it, about the fight as it will stand at the moment
+  // you are free again (a spell you are still casting counts as landed). The engine's boss is the lowest-numbered
+  // dummy still standing, its extra targets the others in order. Two things the engine does are left out: near the
+  // end of a fight it works out whether a DoT still pays for itself (here its older rule: two ticks must fit), and it
+  // times cooldowns around Bane of Doom's explosion.
+  // remaining: seconds the fight still lasts (Infinity when nobody knows).
+  // Returns null when the list has nothing to cast, else { key, target, action (its line in the list, or null),
+  // racial (true = the sim would use the race's cooldown first) }.
+  function simWould(remaining) {
+    if (S.over) return null;
+    const standing = [];
+    for (let i = 1; i <= N; i++) if (!T[i].dead) standing.push(i);
+    if (!standing.length) return null;
+    const boss = standing[0], c = S.cast, at = Math.max(S.t, readyAt());
+    const landing = c && table[c.key].ticks && SPELLS[c.key].kind !== 'channel' ? { key: c.key, target: c.target, left: SPELLS[c.key].duration } : null;
+    function leftOn(ti, key) {
+      if (landing && landing.key === key && landing.target === ti) return landing.left;
+      const d = T[ti].dots[key];
+      return d && d.expires > at + EPS ? d.expires - at : 0;
+    }
+    const buffs = Object.assign({}, S.buffs);
+    ['coe', 'isb', 'brand'].forEach(function (k) { if (T[boss].deb[k] != null) buffs[k] = T[boss].deb[k]; });
+    if (c && c.key === 'soulFire') delete buffs.decimation;
+    if (c && isSB(c.key)) delete buffs.shadowTrance;
+    const havoc = S.havoc && S.havoc.expires > at + EPS && !T[S.havoc.target].dead ? S.havoc.target : 0;
+    const wantsHavoc = standing.length >= 2 && !!table.baneOfHavoc && tv('baneOfHavoc') > 0;
+    let mana = S.mana - (c ? c.cost : 0), shards = S.shards;
+    if (c && SPELLS[c.key].shards && !c.decimation) shards -= SPELLS[c.key].shards;
+    if (wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false };
+
+    const view = {
+      t: at, remaining: remaining == null ? Infinity : remaining, cfg: cfg, build: build,
+      mana: mana, maxMana: stats.maxMana, shards: shards, cds: S.cds, buffs: buffs,
+      targetHpPct: T[boss].hpPct, brandCharges: T[boss].brandCharges,
+      multiTargets: standing.length, havocTarget: havoc ? standing.indexOf(havoc) + 1 : wantsHavoc ? 2 : 0, nextTarget: 0, actionIndex: 0,
+      has: function (k) { return !!table[k]; },
+      ready: function (k) { return !S.cds[k] || S.cds[k] <= at + EPS; },
+      buff: function (n) { return buffs[n] != null && buffs[n] > at + EPS; },
+      dotLeft: function (k) { return leftOn(boss, k); },
+      xDotLeft: function (ti, k) { return standing[ti - 1] ? leftOn(standing[ti - 1], k) : 0; },
+      xDebLeft: function (ti, n) { const t = T[standing[ti - 1]], e = t && t.deb[n]; return e != null && e > at + EPS ? e - at : 0; },
+      castTime: castTime, gcd: gcd,
+      dotWorth: function () { return null; },
+      canSwap: function () { return false; },
+      tapGain: function () { return (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100); },
+      petSpellCost: function () { return P && P.c.spell ? P.c.spell.cost : Infinity; },
+      petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : Infinity; }
+    };
+    const made = forcedMove(at) || !!(lastCtx && lastCtx.forced), ft = fightTime(at);
+    function fits(k) {                                     // made to move: only instants, and no cast that runs into the next phase
+      const len = SPELLS[k].kind === 'channel' ? SPELLS[k].duration : castTime(k);
+      if (len <= EPS) return true;
+      if (made) return false;
+      if (!MOVE || ft < 0) return true;
+      return ft + len <= (Math.floor((ft + EPS) / MOVE.every) + 1) * MOVE.every + EPS;
+    }
+    const list = WL.effectiveRotation(build, { fight: { multiDot: standing.length > 1, targets: standing.length } });
+    let found = null;
+    for (let i = 0; i < list.length && !found; i++) {
+      const a = WL.ACTIONS[list[i]];
+      if (!a) continue;
+      view.nextTarget = 0; view.actionIndex = i;
+      const k = a.pick(view);
+      if (k && table[k] && fits(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
+    }
+    const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false };
+    if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS ? tap : null;
+    if (found.key === 'lifeTap') return found;
+    if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) ? null : tap;
+    const open = list.indexOf('bane') < 0 || leftOn(boss, 'baneOfDoom') > 0 || leftOn(boss, 'baneOfAgony') > 0;
+    found.racial = !!racialOf('cooldown') && view.ready('racial') && SPELLS[found.key].kind !== 'utility' && open;
+    return found;
+  }
+
   reset(opts.seed);
 
   return {
+    simWould: simWould,
+    // You take one hit now (a scripted fight's own hits; the same rule as config.fight.hitEvery).
+    hit: function () { if (!S.over && S.fightStart !== null) takeHit(); },
     stats: stats, table: table, spells: SPELLS, build: build, raceKey: raceKey, targetCount: N,
     get state() { return S; },
     get result() { return res; },
@@ -849,7 +927,7 @@ export const ACTION_SPELLS = {
   soulFire: ['soulFire'], soulFireShards: ['soulFire'],
   shadowTrance: ['shadowBolt'], isbUpkeep: ['shadowBolt'], shadowBoltSpread: ['shadowBolt'], shadowBolt: ['shadowBolt'],
   lifeTapPet: ['lifeTap'], lifeTapBelow: ['lifeTap'],
-  wrack: ['wrack'], incinerate: ['incinerate'], drainLife: ['drainLife'],
+  wrack: ['wrack'], wrackDots: ['wrack'], incinerate: ['incinerate'], drainLife: ['drainLife'],
   hellfire: ['hellfire'], rainOfFire: ['rainOfFire']
 };
 const NOT_ON_BAR = { drainSoul: true };    // Drain Soul is not used

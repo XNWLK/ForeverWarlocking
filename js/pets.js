@@ -89,47 +89,74 @@ function makeImp() {
   return { root: root, update: update, strike: function () { throwing = 1; } };
 }
 
-// The Succubus: tall and lithe, curved horns, long hair, bat wings, hooves, a tail, and a whip that cracks forward.
+// The Succubus: tall and lithe, curved horns, long hair, bat wings, hooves, a tail, and a whip that hangs coiled
+// from her hand and cracks forward when she strikes. Her legs swing from the hip and bend at the knee when she runs.
 function makeSuccubus() {
   const root = new THREE.Group(), rig = new THREE.Group();
   root.add(rig, groundShadow(0.6));
   const skin = flat(0xcf86b8), skinDark = flat(0xa5628f), cloth = flat(0x351846), hair = flat(0x1b1024), bone = flat(0xd9d2bf);
   const wing = flat(0x55285c), membrane = flat(0x7d3a78), leather = flat(0x2a1a14), gold = flat(0xd2a83c);
 
-  [-1, 1].forEach(function (side) {
-    add(rig, new THREE.CylinderGeometry(0.11, 0.075, 0.52, 6), skin, side * 0.13, 0.86, 0);          // thigh
-    add(rig, new THREE.CylinderGeometry(0.075, 0.05, 0.46, 6), skinDark, side * 0.13, 0.38, 0.03);    // shin
-    add(rig, new THREE.CylinderGeometry(0.06, 0.085, 0.16, 5), leather, side * 0.13, 0.08, 0);        // hoof
-    add(rig, new THREE.CylinderGeometry(0.085, 0.085, 0.04, 6), gold, side * 0.13, 0.6, 0.02);        // anklet band
+  // Legs: thigh from the hip, shin from the knee, a hoof and a gold anklet.
+  const legs = [-1, 1].map(function (side) {
+    const leg = new THREE.Group(), knee = new THREE.Group();
+    leg.position.set(side * 0.13, 1.1, 0);
+    rig.add(leg);
+    add(leg, new THREE.CylinderGeometry(0.11, 0.08, 0.5, 7), skin, 0, -0.25, 0);
+    knee.position.set(0, -0.5, 0);
+    leg.add(knee);
+    add(knee, new THREE.CylinderGeometry(0.078, 0.05, 0.46, 7), skinDark, 0, -0.23, 0.01);
+    add(knee, new THREE.CylinderGeometry(0.06, 0.09, 0.15, 6), leather, 0, -0.53, -0.01);
+    add(knee, new THREE.CylinderGeometry(0.065, 0.065, 0.035, 7), gold, 0, -0.42, 0.01);
+    return { leg: leg, knee: knee, side: side };
   });
-  add(rig, new THREE.CylinderGeometry(0.2, 0.25, 0.26, 8), cloth, 0, 1.12, 0);                         // hips
-  const sash = add(rig, new THREE.BoxGeometry(0.14, 0.5, 0.03), cloth, 0, 0.88, -0.2);
-  sash.rotation.x = 0.12;
-  add(rig, new THREE.CylinderGeometry(0.255, 0.255, 0.05, 8), gold, 0, 1.24, 0);
-  add(rig, new THREE.CylinderGeometry(0.2, 0.15, 0.36, 8), skin, 0, 1.44, 0);                          // waist
-  add(rig, new THREE.CylinderGeometry(0.22, 0.2, 0.22, 8), cloth, 0, 1.66, 0);                         // chest wrap
-  add(rig, new THREE.CylinderGeometry(0.09, 0.16, 0.14, 7), skin, 0, 1.82, 0);                         // shoulders to neck
 
+  // Hips with a gold belt and a sash front and back, a bare waist, a chest wrap, shoulders, a collar.
+  const body = new THREE.Group();
+  rig.add(body);
+  add(body, new THREE.CylinderGeometry(0.2, 0.25, 0.26, 9), cloth, 0, 1.12, 0);
+  const sash = add(body, new THREE.BoxGeometry(0.15, 0.56, 0.03), cloth, 0, 0.84, -0.21);
+  sash.rotation.x = 0.1;
+  add(body, new THREE.BoxGeometry(0.155, 0.04, 0.035), gold, 0, 0.58, -0.235);
+  const sashBack = add(body, new THREE.BoxGeometry(0.2, 0.46, 0.03), cloth, 0, 0.9, 0.22);
+  sashBack.rotation.x = -0.12;
+  add(body, new THREE.CylinderGeometry(0.255, 0.255, 0.05, 9), gold, 0, 1.24, 0);
+  add(body, new THREE.OctahedronGeometry(0.05, 0), glow(0xff8ad8), 0, 1.24, -0.26).scale.set(0.9, 1.2, 0.5);
+  add(body, new THREE.CylinderGeometry(0.2, 0.15, 0.36, 9), skin, 0, 1.44, 0);
+  add(body, new THREE.CylinderGeometry(0.22, 0.2, 0.22, 9), cloth, 0, 1.66, 0);
+  add(body, new THREE.CylinderGeometry(0.225, 0.225, 0.03, 9), gold, 0, 1.76, 0);
+  add(body, new THREE.CylinderGeometry(0.09, 0.2, 0.13, 8), skin, 0, 1.83, 0);
+  add(body, new THREE.CylinderGeometry(0.062, 0.07, 0.1, 7), skin, 0, 1.92, 0);
+  add(body, new THREE.CylinderGeometry(0.075, 0.075, 0.03, 7), gold, 0, 1.9, 0);
+
+  // Head: long hair, horns that sweep back and curl up, glowing eyes.
   const head = new THREE.Group();
-  head.position.set(0, 2.0, 0);
-  rig.add(head);
-  add(head, new THREE.IcosahedronGeometry(0.16, 1), skin, 0, 0, -0.01);
-  const locks = add(head, new THREE.IcosahedronGeometry(0.19, 0), hair, 0, 0.03, 0.06);
-  locks.scale.set(1.05, 1.1, 1.1);
-  add(head, new THREE.ConeGeometry(0.16, 0.7, 6), hair, 0, -0.3, 0.16).rotation.x = -0.25;             // hair down the back
+  head.position.set(0, 2.06, 0);
+  body.add(head);
+  add(head, new THREE.IcosahedronGeometry(0.155, 1), skin, 0, 0, -0.01).scale.set(0.95, 1.05, 1);
+  const locks = add(head, new THREE.IcosahedronGeometry(0.19, 1), hair, 0, 0.035, 0.06);
+  locks.scale.set(1.05, 1.08, 1.1);
+  const mane = new THREE.Group();
+  mane.position.set(0, -0.02, 0.14);
+  head.add(mane);
+  add(mane, new THREE.ConeGeometry(0.17, 0.8, 7), hair, 0, -0.34, 0.04).rotation.x = -0.2;
   [-1, 1].forEach(function (side) {
-    const horn = add(head, new THREE.ConeGeometry(0.05, 0.36, 5), bone, side * 0.15, 0.2, 0.02);
-    horn.rotation.set(-0.5, 0, -side * 0.75);
-    add(head, new THREE.SphereGeometry(0.02, 5, 4), glow(0xff8ad8), side * 0.06, 0.0, -0.16);
+    add(head, new THREE.ConeGeometry(0.05, 0.42, 5), hair, side * 0.15, -0.2, 0.0).rotation.set(0.1, 0, side * 0.12);       // a lock by the cheek
+    const horn = add(head, new THREE.ConeGeometry(0.05, 0.3, 6), bone, side * 0.14, 0.17, 0.05);
+    horn.rotation.set(-0.9, 0, -side * 0.55);
+    const hornTip = add(head, new THREE.ConeGeometry(0.032, 0.24, 5), bone, side * 0.235, 0.33, 0.17);
+    hornTip.rotation.set(0.2, 0, -side * 0.25);
+    add(head, new THREE.SphereGeometry(0.02, 6, 4), glow(0xff8ad8), side * 0.058, 0.005, -0.15);
   });
 
-  // Bat wings: a bony arm with two leaves of membrane each; they open and close slowly.
+  // Bat wings: a bony arm with two leaves of membrane each; they open and close slowly and fold while she runs.
   const wings = [-1, 1].map(function (side) {
     const w = new THREE.Group();
     w.position.set(side * 0.12, 1.72, 0.14);
-    rig.add(w);
+    body.add(w);
     const armBone = add(w, new THREE.CylinderGeometry(0.025, 0.035, 0.8, 4), wing, side * 0.3, 0.3, 0.05);
     armBone.rotation.z = -side * 0.75;
+    add(w, new THREE.ConeGeometry(0.03, 0.14, 4), bone, side * 0.58, 0.62, 0.05).rotation.z = -side * 0.75;     // the claw at the wing's wrist
     const a = add(w, new THREE.ConeGeometry(0.34, 0.9, 3), membrane, side * 0.42, 0.05, 0.08);
     a.scale.z = 0.08; a.rotation.z = side * 0.35;
     const b = add(w, new THREE.ConeGeometry(0.26, 0.7, 3), membrane, side * 0.72, 0.18, 0.1);
@@ -138,41 +165,79 @@ function makeSuccubus() {
     return w;
   });
 
-  const tail = new THREE.Group();
+  const tail = new THREE.Group(), tailEnd = new THREE.Group();
   tail.position.set(0, 1.05, 0.2);
-  rig.add(tail);
-  add(tail, new THREE.CylinderGeometry(0.025, 0.045, 0.7, 4), skinDark, 0, -0.2, 0.26).rotation.x = -0.95;
-  add(tail, new THREE.ConeGeometry(0.06, 0.16, 3), skinDark, 0, -0.42, 0.58).rotation.x = -1.9;
+  body.add(tail);
+  add(tail, new THREE.CylinderGeometry(0.028, 0.045, 0.5, 5), skinDark, 0, -0.13, 0.19).rotation.x = -0.95;
+  tailEnd.position.set(0, -0.27, 0.39);
+  tail.add(tailEnd);
+  add(tailEnd, new THREE.CylinderGeometry(0.018, 0.028, 0.4, 5), skinDark, 0, -0.04, 0.19).rotation.x = -1.35;
+  add(tailEnd, new THREE.ConeGeometry(0.06, 0.16, 3), skinDark, 0, -0.06, 0.44).rotation.x = -1.7;
 
-  const armLeft = new THREE.Group();
-  armLeft.position.set(-0.24, 1.76, 0);
-  rig.add(armLeft);
-  add(armLeft, new THREE.CylinderGeometry(0.05, 0.04, 0.62, 5), skin, 0, -0.3, 0);
-  armLeft.rotation.z = -0.25;
+  // Arms bend at the elbow; gold bracers. The right hand holds the whip.
+  function makeArm(side) {
+    const arm = new THREE.Group(), fore = new THREE.Group();
+    arm.position.set(side * 0.24, 1.78, 0);
+    body.add(arm);
+    add(arm, new THREE.IcosahedronGeometry(0.065, 0), skin, 0, 0, 0);
+    add(arm, new THREE.CylinderGeometry(0.05, 0.042, 0.32, 6), skin, 0, -0.16, 0);
+    fore.position.set(0, -0.32, 0);
+    arm.add(fore);
+    add(fore, new THREE.CylinderGeometry(0.042, 0.034, 0.3, 6), skin, 0, -0.15, 0);
+    add(fore, new THREE.CylinderGeometry(0.046, 0.042, 0.1, 6), gold, 0, -0.22, 0);
+    add(fore, new THREE.IcosahedronGeometry(0.045, 0), skin, 0, -0.33, 0);
+    return { arm: arm, fore: fore };
+  }
+  const left = makeArm(-1), right = makeArm(1);
+  add(right.fore, new THREE.CylinderGeometry(0.028, 0.028, 0.16, 5), leather, 0, -0.36, -0.02);          // the whip's handle
+  // The whip: three pieces, each hanging from the one before, so it can hang in a curl and straighten out in a crack.
+  const whip = [];
+  let holder = right.fore, at = -0.44;
+  [[0.55, 0.02, 0.014], [0.55, 0.014, 0.009], [0.5, 0.009, 0.004]].forEach(function (piece) {
+    const joint = new THREE.Group();
+    joint.position.set(0, at, holder === right.fore ? -0.02 : 0);
+    holder.add(joint);
+    add(joint, new THREE.CylinderGeometry(piece[1], piece[2], piece[0], 4), leather, 0, -piece[0] / 2, 0);
+    whip.push(joint);
+    holder = joint; at = -piece[0];
+  });
+  const crack = add(whip[2], new THREE.IcosahedronGeometry(0.09, 0), light(0xff8ad8, 0.0), 0, -0.5, 0);
+  const crackGlow = halo(0xff8ad8, 1.3, 0.0);
+  crackGlow.position.set(0, -0.5, 0);
+  whip[2].add(crackGlow);
 
-  // The whip arm swings forward on an attack; the whip trails a bright line while it cracks.
-  const arm = new THREE.Group();
-  arm.position.set(0.24, 1.76, 0);
-  rig.add(arm);
-  add(arm, new THREE.CylinderGeometry(0.05, 0.04, 0.62, 5), skin, 0, -0.3, 0);
-  add(arm, new THREE.CylinderGeometry(0.03, 0.03, 0.16, 5), leather, 0, -0.62, -0.02);
-  const whip = add(arm, new THREE.CylinderGeometry(0.02, 0.006, 1.7, 4), leather, 0, -0.66, -0.9);
-  whip.rotation.x = Math.PI / 2;
-  const crack = add(arm, new THREE.CylinderGeometry(0.05, 0.01, 1.7, 5, 1, true), light(0xff8ad8, 0.0), 0, -0.66, -0.9);
-  crack.rotation.x = Math.PI / 2;
-
-  let swing = 0;
+  let swing = 0, stride = 0;
   function update(dt, time, moving) {
-    swing = Math.max(0, swing - dt * 3.5);
-    rig.position.y = moving ? Math.abs(Math.sin(time * 11)) * 0.06 : Math.sin(time * 2) * 0.015;
-    rig.rotation.x = moving ? -0.1 : -swing * 0.14;
-    rig.rotation.y = moving ? 0 : Math.sin(time * 1.3) * 0.06;
-    arm.rotation.x = 0.35 + Math.sin(swing * Math.PI) * 1.6;
-    armLeft.rotation.x = moving ? Math.sin(time * 11) * 0.5 : 0.1;
-    crack.material.opacity = Math.sin(swing * Math.PI) * 0.8;
-    wings.forEach(function (w) { w.rotation.y = w.userData.side * (0.35 + Math.sin(time * 1.8) * 0.18 + swing * 0.4); });
+    swing = Math.max(0, swing - dt * 3.2);
+    stride = moving ? stride + dt * 11 : 0;
+    const step = Math.sin(stride), k = Math.sin(swing * Math.PI), late = Math.sin(Math.max(0, Math.min(1, swing * 1.25)) * Math.PI);
+    rig.position.y = moving ? Math.abs(Math.cos(stride)) * 0.05 : Math.sin(time * 2) * 0.012;
+    rig.rotation.x = moving ? -0.12 : -k * 0.12;
+    body.rotation.y = moving ? step * 0.1 : Math.sin(time * 1.3) * 0.07 - k * 0.35;       // she turns into the strike
+    body.rotation.z = moving ? 0 : Math.sin(time * 1.3) * 0.025;
+    legs.forEach(function (l) {
+      const phase = stride + (l.side > 0 ? 0 : Math.PI);
+      l.leg.rotation.x = moving ? Math.sin(phase) * 0.7 : l.side * 0.04;
+      l.knee.rotation.x = moving ? -Math.max(0, -Math.cos(phase)) * 0.9 : 0;
+    });
+    // The whip arm: thrown forward in a strike; the whip follows, straightening piece by piece.
+    right.arm.rotation.x = 0.25 + k * 1.75 + (moving ? -step * 0.3 : 0);
+    right.arm.rotation.z = 0.12;
+    right.fore.rotation.x = 0.35 + (moving ? 0.3 : 0) - k * 0.3;
+    whip[0].rotation.x = (0.35 + Math.sin(time * 1.9) * 0.06) * (1 - k) - right.fore.rotation.x * (1 - k) * 0.6;
+    whip[1].rotation.x = (0.75 + Math.sin(time * 2.3 + 1) * 0.1) * (1 - late);
+    whip[2].rotation.x = (1.1 + Math.sin(time * 2.7 + 2) * 0.14) * (1 - late);
+    whip[1].rotation.z = Math.sin(time * 1.4) * 0.12 * (1 - late);
+    crack.material.opacity = late * late * 0.9;
+    crackGlow.material.opacity = late * late * 0.8;
+    left.arm.rotation.x = moving ? step * 0.5 : 0.08 + k * 0.4;
+    left.arm.rotation.z = -0.2 - (moving ? 0 : 0.12);
+    left.fore.rotation.x = moving ? 0.5 : 0.9;                                           // hand toward her hip when she stands
+    wings.forEach(function (w) { w.rotation.y = w.userData.side * (moving ? 0.75 : 0.35 + Math.sin(time * 1.8) * 0.18 + k * 0.45); });
     tail.rotation.y = Math.sin(time * 2.2) * 0.45;
-    head.rotation.y = Math.sin(time * 0.9) * 0.12;
+    tailEnd.rotation.y = Math.sin(time * 2.2 - 0.9) * 0.6;
+    mane.rotation.x = moving ? 0.35 : Math.sin(time * 1.1) * 0.03;
+    head.rotation.y = moving ? 0 : Math.sin(time * 0.9) * 0.14 + k * 0.2;
   }
   return { root: root, update: update, strike: function () { swing = 1; } };
 }

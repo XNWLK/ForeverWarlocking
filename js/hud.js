@@ -3,16 +3,9 @@
 import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
 import { setTip, initTips, refreshTips } from './tooltip.js';
+import { keyCombo, mouseCombo, wheelCombo, comboLabel, isModifier } from './keys.js';
 
 export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG', 'KeyC', 'KeyV', 'KeyB'];
-// What to print on a slot for a key, when the browser cannot tell us the letter on the keyboard in use.
-function plainLabel(code) {
-  const m = /^(?:Key|Digit)(.)$/.exec(code);
-  if (m) return m[1];
-  const named = { Space: 'Space', Escape: 'Esc', Tab: 'Tab', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', CapsLock: 'Caps', Backspace: 'Back' };
-  if (named[code]) return named[code];
-  return code.replace('Numpad', 'N').replace('Arrow', '').replace('Bracket', '').replace('Backquote', '`').replace('Minus', '-').replace('Equal', '=').slice(0, 4);
-}
 const LOG_LINES = 9;
 
 function byId(id) { return document.getElementById(id); }
@@ -61,7 +54,7 @@ function span(seconds) {
 }
 const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
 const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
-const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
+export const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
 export function createHud(WL, handlers) {
   const hud = byId('hud'), logLines = byId('logLines'), floaters = byId('floaters');
@@ -78,8 +71,10 @@ export function createHud(WL, handlers) {
   };
   let codes = ACTION_CODES.slice(), layout = null, slots = [], character = null, currentTarget = 1, lastCombat = null;
   initTips();
-  function labelFor(code) { const k = layout && layout.get(code); return k ? k.toUpperCase() : plainLabel(code); }
-  function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = labelFor(codes[i]); }); }
+  // A key with its modifiers in full ("Shift+1", "Mouse 4"), and the short form that fits on a slot ("S-1", "M4").
+  function labelFor(code) { return comboLabel(code, layout, false); }
+  function slotLabel(code) { return comboLabel(code, layout, true); }
+  function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = slotLabel(codes[i]); }); }
 
   // With several dummies each gets a number after its name.
   function dummyName(ti) { return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : ''); }
@@ -247,7 +242,7 @@ export function createHud(WL, handlers) {
   // Keybinds: every key in one list. Click a key, press the new one.
   const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'],
     ['strafeLeft', 'Step left'], ['strafeRight', 'Step right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
-    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow']];
+    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight']];
   let binds = {}, capture = null;                          // capture = the key we are waiting for: { id, button }
   function bindRow(holder, id, text, code) {
     const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');
@@ -259,7 +254,7 @@ export function createHud(WL, handlers) {
     button.addEventListener('click', function () {
       if (capture) showBinds();
       capture = { id: id, button: button };
-      button.textContent = 'press a key';
+      button.textContent = 'press it';
       button.className = 'waiting';
       button.blur();
     });
@@ -304,21 +299,34 @@ export function createHud(WL, handlers) {
     if (capture) {                                         // the Keybinds panel is waiting for a key
       e.preventDefault();
       e.stopImmediatePropagation();
+      if (isModifier(e.code)) return;                      // Shift, Ctrl or Alt held: the key that follows is the one
       const id = capture.id;
       capture = null;
-      if (e.code === 'Escape') showBinds(); else handlers.onRebind(id, e.code);
+      if (e.code === 'Escape') showBinds(); else handlers.onRebind(id, keyCombo(e));
       return;
     }
     if (!editing) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if (e.code === 'Escape') { setEditing(false); return; }
-    if (picked < 0 || e.repeat) return;
+    if (picked < 0 || e.repeat || isModifier(e.code)) return;
     const slot = picked;
     slots[slot].button.classList.remove('picked');
     picked = -1;
-    handlers.onRebind(slot, e.code);
+    handlers.onRebind(slot, keyCombo(e));
   }, true);
+  // The same for a mouse button (middle, or a thumb button) and for the wheel with a modifier held.
+  function waiting() { return capture ? capture.id : editing && picked >= 0 ? picked : null; }
+  function take(e, combo) {
+    const id = waiting();
+    if (id === null || !combo) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (capture) capture = null; else { slots[picked].button.classList.remove('picked'); picked = -1; }
+    handlers.onRebind(id, combo);
+  }
+  window.addEventListener('mousedown', function (e) { take(e, mouseCombo(e)); }, true);
+  window.addEventListener('wheel', function (e) { take(e, wheelCombo(e)); }, { capture: true, passive: false });
   el.petAttack.addEventListener('click', function () { el.petAttack.blur(); handlers.onPet('attack'); });
   el.petFollow.addEventListener('click', function () { el.petFollow.blur(); handlers.onPet('follow'); });
 
@@ -373,7 +381,7 @@ export function createHud(WL, handlers) {
         setTip(button, function () { return spellTip(i); });
       }
       button.addEventListener('click', function () { button.blur(); if (editing) pickSlot(i); else if (key) handlers.onPress(key); });
-      slot.kbd.textContent = labelFor(code);
+      slot.kbd.textContent = slotLabel(code);
       button.appendChild(slot.kbd);
       el.bar.appendChild(button);
       return slot;
@@ -423,6 +431,14 @@ export function createHud(WL, handlers) {
     rows.push([s.kind === 'channel' ? 'Channeled, ' + span(s.duration) : cast > 0.005 ? span(cast) + ' cast' : 'Instant', e.cd ? span(e.cd) + ' cooldown' : '']);
     if (s.shards) rows.push(['Reagent: Soul Shard', '']);
     const notes = [yours(key)];
+    if (key === 'lifeTap') {                               // what a tap gives you, and when the sim taps with this build
+      const better = talentValue('improvedLifeTap', 'manaPct') || 0;
+      notes.push({ text: 'For you: about ' + whole((s.manaBase + c.stats.spi) * (1 + better / 100)) + ' mana a tap.', yours: true });
+      ['lifeTapBelow', 'lifeTapPet'].forEach(function (action) {
+        if (c.build.rotation.indexOf(action) >= 0 && WL.actionLabel) notes.push('This build in the sim: ' + WL.actionLabel(c.build, action) + '.');
+      });
+      notes.push('The sim also taps whenever mana is too low for the next spell.');
+    }
     if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));
     if (key === 'baneOfHavoc') notes.push('Not on the global cooldown.');
     notes.push(keyLine);
@@ -522,7 +538,8 @@ export function createHud(WL, handlers) {
       setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');
     } else setText(el.targetHealth, amount(Math.ceil(cur.health), cur.maxHealth));
     const phase = combat.movePhase(), banner = moveBanner;
-    if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
+    if (ctx.banner) { banner.hidden = false; setClass(banner, 'soon', !!ctx.banner.soon); setText(banner, ctx.banner.text); }   // a scripted fight says what is happening
+    else if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
     else if (phase && phase.next != null && phase.next <= 3) { banner.hidden = false; setClass(banner, 'soon', true); setText(banner, 'Move in ' + phase.next.toFixed(1)); }
     else if (!banner.hidden) banner.hidden = true;
     moveFloats(now);
@@ -639,6 +656,21 @@ export function createHud(WL, handlers) {
     return key;
   }
 
+  // The sim's next cast, lit up on the bar (key: a spell or null; racial: the race's cooldown goes first).
+  function setHint(key, racial) {
+    slots.forEach(function (slot) {
+      const on = !!slot.key && (slot.key === key || (racial && slot.key === 'racial'));
+      setClass(slot.button, 'hint', on);
+    });
+  }
+  // Your best in the fight that is set up now (text, or '' when there is none yet).
+  function setBest(text, hint) {
+    const dd = byId('meterBest');
+    dd.textContent = text || '–';
+    dd.title = hint || '';
+    delete dd.dataset.tip;
+  }
+
   // The DPS sim's result for this dummy: null while it is being worked out.
   let simAverage = null;
   function setSimAverage(result) {
@@ -749,7 +781,8 @@ export function createHud(WL, handlers) {
 
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
-    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound,
+    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound, setHint: setHint, setBest: setBest,
+    labelFor: labelFor,
     fullLog: function () { return everything.join('\n'); },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
     setBinds: function (map) { binds = map; if (character) showBinds(); },

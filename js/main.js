@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { buildChamber, makeRangeRings, HALF } from './chamber.js';
 import { makeWarlock, makeDummy, makeBeam } from './models.js';
 import { createControls } from './controls.js';
-import { createHud, ACTION_CODES } from './hud.js';
+import { createHud, ACTION_CODES, RACIAL_ICON } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
 import { getSetting, setSetting } from './settings.js';
 import { createPet } from './pets.js';
@@ -11,6 +11,11 @@ import { createEffects, SPELL_FX } from './effects.js';
 import { createPanels } from './panels.js';
 import { createSound } from './sound.js';
 import { createExtras, gradeFor } from './extras.js';
+import { keyCombo, mouseCombo, wheelCombo, hasModifier, isMouse, plainKey } from './keys.js';
+import { createRecorder } from './record.js';
+import { createEncounter } from './encounter.js';
+import { createAids } from './aids.js';
+import { makeLink, readLink } from './share.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -53,20 +58,31 @@ const effects = createEffects(scene);
 
 // Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
 const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
-                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '' };
+                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '' };
 const binds = Object.assign({}, DEFAULT_BINDS, getSetting('binds') || {});
+// Walking and jumping are keys you hold: they take a plain key. Everything else also takes a key with Shift, Ctrl or
+// Alt held, a mouse button, or the wheel with a modifier (js/keys.js).
+const MOVE_BINDS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'jump'];
+const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset'];
 
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
-const controls = createControls(canvas, camera, { half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds });
+const controls = createControls(canvas, camera, {
+  half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds,
+  claimed: function (e) { const combo = keyCombo(e); return combo !== e.code && bound(combo); },   // Shift+W is a spell's key: do not walk
+  onWheel: function (e) { const combo = wheelCombo(e); return !!combo && act(combo); }
+});
 
 // ---------- the character and the fight ----------
 let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
 let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
-const sound = createSound(getSetting('sound') === true);   // off until you switch it on (Xn)
+const sound = createSound(getSetting('sound') === true, getSetting('volume'));   // off until you switch it on (Xn)
+const recorder = createRecorder();                          // what happened when, for the review's timeline
 // A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
 // settings alone. null = your own settings.
 let challenge = null;
 let myCurve = [0];                                         // your damage by the end of each second of this fight (for the review's graph)
+let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
+let prevCast = null, castStopped = false, humming = false, bannerKind = '';
 let keyCodes = ACTION_CODES.slice();
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -152,6 +168,10 @@ const hud = createHud(WL, {
   },
   // A new key for a slot (id = its number) or for another action (id = its name). A key that is in use trades places.
   onRebind: function (id, code) {
+    if (MOVE_BINDS.indexOf(id) >= 0) {
+      if (isMouse(code)) { hud.showError('Walking and jumping take a plain key'); hud.setBinds(binds); return; }
+      if (hasModifier(code)) code = plainKey(code);
+    }
     if (/^Arrow/.test(code)) { hud.showError('The arrow keys always move you'); hud.setBinds(binds); return; }
     const old = typeof id === 'number' ? keyCodes[id] : binds[id];
     keyCodes.forEach(function (c, i) { if (c === code && i !== id) keyCodes[i] = old; });
@@ -185,7 +205,7 @@ const extras = createExtras(WL, {
     challenge = next;
     hud.closePanels();
     newCharacter();
-    if (next) { hud.log((next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts with your first cast. "End" at the top goes back to your own fight.'); }
+    if (next) { hud.log((next.encounter ? 'Encounter: ' : next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts with your first cast. "End" at the top goes back to your own fight.'); }
     else hud.log('Back to your own fight settings.');
   },
   onPreset: function (p) {
@@ -201,9 +221,75 @@ const extras = createExtras(WL, {
     newCharacter();
     hud.log(ms ? 'Latency: ' + ms + ' ms. Every key press arrives that much later; the sim average waits as long after each cast.' : 'No latency.');
   },
+  onVolume: function (value) { setSetting('volume', value); sound.setVolume(value); },
+  shareLink: shareLink,
   fullLog: function () { return hud.fullLog(); },
   log: function (text, kind) { hud.log(text, kind); }
 });
+
+// What a spell's picture is (the race's cooldown has its own).
+function iconFor(key) {
+  if (key === 'racial') return character && character.racial ? WL.ICONS[RACIAL_ICON[character.racial.name]] || '' : '';
+  return WL.ICONS[key] || '';
+}
+const aids = createAids(WL, { icon: iconFor, hint: function (key, racial) { hud.setHint(key, racial); } });
+const burnAt = new THREE.Vector3();
+const encounter = createEncounter(scene, { burn: function (x, z) { effects.play('burn', { at: burnAt.set(x, 0.9, z) }); } });
+
+// A link that opens this page with the fight you have set up (and the challenge you are in).
+function shareLink() {
+  const custom = !!character.build.custom;
+  return makeLink({ build: custom ? 'custom' : character.build.key, race: character.raceKey, dummies: getSetting('dummies'), health: getSetting('dummyHealth'),
+                    fight: getSetting('fight'), latency: getSetting('latency'), buildCode: custom ? getSetting('buildCode') : '',
+                    settingsCode: getSetting('settingsCode'), challenge: challenge ? challenge.share : '' });
+}
+
+// ---------- your best per fight ----------
+// A fight you set up yourself is told apart by everything that changes its numbers: build, race, dummies, how it
+// ends, movement and hits, imported gear and buffs, latency. Challenges keep their own bests (per drill).
+function hash(text) { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); }
+function fightKey() {
+  const f = fightOptions(), b = character.build, code = getSetting('settingsCode'), late = Number(getSetting('latency')) || 0;
+  return [b.custom ? 'c' + hash(getSetting('buildCode')) : b.key, character.raceKey, targets, f.timed ? 't' + f.seconds : 'h' + character.dummyHealth,
+          f.moveEvery > 0 && f.moveDuration > 0 ? 'm' + f.moveEvery + '-' + f.moveDuration : '', f.hitEvery > 0 ? 'x' + f.hitEvery : '',
+          code ? 's' + hash(code) : '', late ? 'l' + late : ''].join('|');
+}
+function showBest() {
+  if (challenge) {
+    const b = challenge.drill ? (getSetting('drills') || {})[challenge.id] : null;
+    hud.setBest(b ? b.grade + ' \u00b7 ' + b.pct + '%' : '', b ? 'Your best in this challenge: ' + b.dps.toLocaleString('en-US') + ' DPS, ' + b.pct + '% of the sim' : 'No result yet in this challenge');
+    return;
+  }
+  const b = (getSetting('bests') || {})[fightKey()];
+  hud.setBest(b ? b.dps.toLocaleString('en-US') + ' DPS' : '', b ? 'Your best in the fight that is set up now' + (b.pct ? ': ' + b.pct + '% of the sim' : '') : 'No result yet for the fight that is set up now');
+}
+// Once the fight is over: is this your best? Returns { record, best, previous } (null in a challenge or an empty fight).
+function settleBest() {
+  if (challenge || !combat.state.over) return null;
+  const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
+  if (!(dps > 0)) return null;
+  const pct = simResult ? Math.round(100 * dps / simResult.dps) : 0;
+  if (fightBest) {
+    if (fightBest.record && !fightBest.best.pct && pct) {  // the sim's number came in after the fight ended
+      fightBest.best.pct = pct;
+      const all = Object.assign({}, getSetting('bests'));
+      all[fightKey()] = fightBest.best;
+      setSetting('bests', all);
+      showBest();
+    }
+    return fightBest;
+  }
+  const all = Object.assign({}, getSetting('bests')), key = fightKey(), old = all[key] || null, mine = { dps: Math.round(dps), pct: pct, at: Date.now() };
+  if (!old || mine.dps > old.dps) {
+    all[key] = mine;
+    const keys = Object.keys(all);
+    if (keys.length > 300) keys.sort(function (a, b) { return all[a].at - all[b].at; }).slice(0, keys.length - 300).forEach(function (k) { delete all[k]; });
+    setSetting('bests', all);
+    fightBest = { record: true, best: mine, previous: old };
+  } else fightBest = { record: false, best: old, previous: null };
+  showBest();
+  return fightBest;
+}
 
 const panels = createPanels({
   onFight: function (options) {
@@ -246,6 +332,7 @@ const panels = createPanels({
 // What a finished drill or seeded fight comes to: its grade against the sim, and a line to pass on.
 function challengeResult() {
   if (!challenge || !combat.state.over || !simResult) return challenge ? { name: challenge.name, waiting: true } : null;
+  if (challengeOut) return challengeOut;
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0, pct = Math.round(100 * dps / simResult.dps);
   const out = { name: challenge.name, grade: gradeFor(pct), pct: pct, dps: dps };
   out.line = 'Forever Warlocking · ' + challenge.name + ' · ' + character.build.short + ' · ' + WL.RACES[character.raceKey].name + ' · ' +
@@ -254,13 +341,17 @@ function challengeResult() {
     const all = Object.assign({}, getSetting('drills')), old = all[challenge.id];
     if (!old || pct > old.pct) { all[challenge.id] = { grade: out.grade, pct: pct, dps: Math.round(dps) }; setSetting('drills', all); out.record = true; extras.refreshDrills(); }
     out.best = all[challenge.id];
+    showBest();
   }
+  out.link = shareLink();
+  challengeOut = out;
   return out;
 }
 function showReview() {
   if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
   panels.showReview({
-    curve: myCurve, challenge: challengeResult(), copy: extras.copy,
+    curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
+    record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
     timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
@@ -273,7 +364,7 @@ function askSimAverage() {
   hud.setSimAverage(null);
   try {
     if (!simWorker) {
-      simWorker = new Worker('js/sim-worker.js');
+      simWorker = new Worker('js/sim-worker.js' + new URL(import.meta.url).search);   // the same version as this file
       simWorker.onmessage = function (e) {
         if (e.data.id !== simJob) return;
         simResult = e.data;
@@ -282,9 +373,11 @@ function askSimAverage() {
       };
       simWorker.onerror = function () { simWorker = null; };
     }
-    const fight = fightOptions();
-    simWorker.postMessage({ id: ++simJob, build: clone(character.build), race: character.raceKey, config: clone(config), targets: targets,
-                            health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds });
+    const fight = fightOptions(), simConfig = clone(config);
+    if (challenge && challenge.sim) Object.assign(simConfig.fight, challenge.sim);   // an encounter: the even fight the sim plays instead
+    simWorker.postMessage({ id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: targets,
+                            health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
+                            seed: challenge && challenge.seeded ? challenge.seed : null });
   } catch (e) {
     simWorker = null;                                     // no workers here: the meter just keeps showing a dash
   }
@@ -302,6 +395,7 @@ function onCombatEvent(e) {
     myCurve[second] += e.amount;
   }
   extras.event(e, combat);
+  recorder.event(e, combat);
   const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
   if (e.pet && lands && e.key !== 'pet:brand') pet.strike();
@@ -309,8 +403,13 @@ function onCombatEvent(e) {
   // Sounds.
   if (e.type === 'cast') {
     if (e.key === 'lifeTap') sound.play('lifeTap');
-    else if (e.castTime > 0 || e.channel) sound.play(combat.spells[e.key].school === 'fire' ? 'castFire' : 'castShadow');
+    else if (e.castTime > 0 || e.channel) {                // a swell as it starts, and a hum for as long as it lasts
+      sound.play(combat.spells[e.key].school === 'fire' ? 'castFire' : 'castShadow');
+      sound.casting(combat.spells[e.key].school, e.channel || e.castTime, !!e.channel);
+      humming = true;
+    }
   } else if (e.type === 'fail') sound.play('error');
+  else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled') sound.play('stopped'); }
   else if (e.type === 'tick') sound.play('tick');
   else if (e.type === 'apply') sound.play('apply');
   else if (e.type === 'proc') sound.play('proc');
@@ -324,6 +423,12 @@ function onCombatEvent(e) {
   // Where your staff's crystal is right now (life drawn from the target flows back to it).
   warlock.orbPosition(staffAt);
   const where = { at: dummy.chestAt, caster: staffAt, color: fx && fx.color, crit: !!e.crit && e.type === 'hit' };
+  // An instant spell: the staff arm is thrust forward, and a line of light runs to the target (unless it flies as a bolt).
+  const instant = (e.type === 'cast' && !(e.castTime > 0) && !e.channel && e.key !== 'lifeTap') || (e.type === 'apply' && e.key === 'baneOfHavoc');
+  if (instant) {
+    warlock.release();
+    if (!(fx && fx.bolt) && !combat.spells[e.key].aoe) effects.streak(staffAt, dummy.chestAt, fx ? fx.cast : 0xffffff);
+  }
 
   if (lands && fx && fx.bolt) {
     hud.event(e, anchor, true);
@@ -331,7 +436,7 @@ function onCombatEvent(e) {
     boltsAt[ti]++;
     effects.bolt(spot, dummy.chestAt, fx.bolt, function () {
       boltsAt[ti]--;
-      if (e.type === 'hit') { warlock.orbPosition(staffAt); effects.play(fx.land, where); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); hitSound(e); }
+      if (e.type === 'hit') { warlock.orbPosition(staffAt); effects.play(fx.land, where); effects.play('straw', { at: dummy.chestAt, many: !!e.crit }); dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1); hitSound(e); }
       hud.floatFor(e, anchor);
       if (deathWaiting[ti] && boltsAt[ti] === 0) { deathWaiting[ti] = false; dummy.setDead(true); effects.play('death', where); }
     });
@@ -342,6 +447,7 @@ function onCombatEvent(e) {
   if (e.type === 'hit') {
     dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1);
     if (fx && fx.land) effects.play(fx.land, where);
+    effects.play('straw', { at: dummy.chestAt, many: !!e.crit });
   } else if (e.type === 'tick') {
     dummy.hit(0.25);
     if (fx && fx.tick) effects.play(fx.tick, where);
@@ -354,7 +460,12 @@ function onCombatEvent(e) {
     effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2, controls.player.z) });
   } else if (e.type === 'death') {
     if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
-    if (e.last) window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself
+    if (e.last) {
+      const fight = combat, mine = settleBest(), drill = challengeResult();
+      const better = (mine && mine.record && mine.previous) || (drill && drill.record);
+      window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
+      window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself
+    }
   }
 }
 
@@ -414,6 +525,9 @@ function newCharacter() {
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
+  aids.setCharacter(character);
+  encounter.start(challenge && challenge.encounter ? challenge : null);
+  showBest();
 
   // The dummies in the room, and what you cannot walk through.
   colliders.length = fixedColliders;
@@ -436,6 +550,10 @@ function newCharacter() {
 
 function resetFight() {
   combat.reset();
+  recorder.reset();
+  encounter.reset();
+  sound.stopCasting();
+  fightBest = null; challengeOut = null; prevCast = null; castStopped = false; humming = false; bannerKind = '';
   myCurve = [0];
   fightClock = 0;
   for (let i = 1; i <= 3; i++) { dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
@@ -478,19 +596,43 @@ function clickScene(x, y) {
   if (best) setTarget(best);
 }
 
-// Keys: Escape closes what is open; the rest is whatever the Keybinds panel says.
+// ---------- keys and mouse buttons ----------
+// Is this key, button or wheel turn (with its modifiers) bound to an action?
+function bound(combo) { return !!combo && (keyCodes.indexOf(combo) >= 0 || ACTION_BINDS.some(function (k) { return binds[k] === combo; })); }
+// Does what it is bound to. True when it was bound to something.
+function act(combo) {
+  if (!combo) return false;
+  if (combo === binds.cancel) { combat.cancel(); return true; }
+  if (combo === binds.nextTarget) { nextTarget(); return true; }
+  if (combo === binds.petAttack) { combat.update(fightClock, ctx); combat.petCommand('attack'); return true; }
+  if (combo === binds.petFollow) { combat.update(fightClock, ctx); combat.petCommand('follow'); return true; }
+  if (combo === binds.reset) { resetFight(); hud.log('Fight reset.'); return true; }
+  const slot = keyCodes.indexOf(combo);
+  if (slot < 0) return false;
+  press(character.bar[slot]);
+  return true;
+}
+function typing(e) { return e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement; }
+function usesAlt() { return keyCodes.concat(ACTION_BINDS.map(function (k) { return binds[k]; })).some(function (c) { return /(^|\+)Alt\+/.test(c || ''); }); }
+// Escape closes what is open; the rest is whatever the Keybinds panel says.
 window.addEventListener('keydown', function (e) {
-  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+  if (e.metaKey || typing(e)) return;
+  const combo = keyCombo(e);
+  if (e.repeat) { if (bound(combo)) e.preventDefault(); return; }
   if (e.code === 'Escape' && extras.sheetOpen()) { extras.closeSheet(); return; }
   if (e.code === 'Escape' && (panels.reviewOpen() || hud.anyPanelOpen())) { if (panels.reviewOpen()) panels.hideReview(); else hud.closePanels(); return; }
-  if (e.code === binds.cancel) { combat.cancel(); return; }
-  if (e.code === binds.nextTarget) { e.preventDefault(); nextTarget(); return; }
-  if (binds.petAttack && e.code === binds.petAttack) { e.preventDefault(); combat.update(fightClock, ctx); combat.petCommand('attack'); return; }
-  if (binds.petFollow && e.code === binds.petFollow) { e.preventDefault(); combat.update(fightClock, ctx); combat.petCommand('follow'); return; }
-  const slot = keyCodes.indexOf(e.code);
-  if (slot < 0) return;
-  e.preventDefault();
-  press(character.bar[slot]);
+  if (act(combo)) e.preventDefault();                      // also keeps the browser from acting on Ctrl+S, Alt+D and the like
+  else if (/^Alt/.test(e.code) && usesAlt()) e.preventDefault();   // Alt by itself would open the browser's menu
+});
+window.addEventListener('keyup', function (e) { if (/^Alt/.test(e.code) && usesAlt()) e.preventDefault(); });
+// The middle button and the thumb buttons. The thumb buttons never take you a page back or forward here.
+window.addEventListener('mousedown', function (e) {
+  if (e.button === 3 || e.button === 4) e.preventDefault();
+  const combo = mouseCombo(e);
+  if (combo && !typing(e) && act(combo)) e.preventDefault();
+});
+['mouseup', 'auxclick'].forEach(function (type) {
+  window.addEventListener(type, function (e) { if (e.button === 3 || e.button === 4 || (e.button === 1 && bound(mouseCombo(e)))) e.preventDefault(); });
 });
 
 function resize() {
@@ -503,7 +645,21 @@ resize();
 
 const savedKeys = getSetting('keys');
 if (Array.isArray(savedKeys) && savedKeys.length === ACTION_CODES.length) keyCodes = savedKeys.slice();
-readCustomBuild();
+// Opened from a share link: its setup replaces the one saved in this browser (keys, names and switches stay yours).
+const shared = readLink();
+if (shared) {
+  if (shared.buildCode) { setSetting('buildCode', shared.buildCode); setSetting('build', 'custom'); }
+  else if (shared.build && shared.build !== 'custom') setSetting('build', shared.build);
+  if (shared.race) setSetting('race', shared.race);
+  if (shared.dummies) setSetting('dummies', shared.dummies);
+  if (shared.health) setSetting('dummyHealth', shared.health);
+  if (shared.fight) setSetting('fight', shared.fight);
+  if (shared.latency != null || shared.fight) setSetting('latency', shared.latency || 0);
+  if (shared.fight) setSetting('settingsCode', shared.settingsCode || '');
+}
+// A share link pasted into the address bar while the page is open only changes the part after the #: load it properly.
+window.addEventListener('hashchange', function () { if (/(^#|&)v=1(&|$)/.test(window.location.hash)) window.location.reload(); });
+if (readCustomBuild().length && getSetting('build') === 'custom') setSetting('build', null);   // a code that cannot be played here
 newCharacter();
 hud.setKeys(keyCodes);
 hud.setBinds(binds);
@@ -513,6 +669,10 @@ hud.setRings(getSetting('rings'));
 hud.log('You enter the fel chamber.', 'proc');
 hud.log('Build: ' + character.build.short + '.');
 hud.log('Cast with the keys on the action bar. Hover a spell or a buff to read it.');
+if (shared) {
+  hud.log('Opened from a link: ' + character.build.short + ', ' + WL.RACES[character.raceKey].name + ', ' + targets + (targets > 1 ? ' dummies.' : ' dummy.'), 'proc');
+  if (shared.challenge && !extras.play(shared.challenge)) hud.log('The challenge in the link is not known here.');
+}
 
 // ---------- a safeguard for weak graphics chips ----------
 // When the picture stays under about 45 a second, draw it with less detail (fewer pixels, stretched to the window).
@@ -558,7 +718,13 @@ function frame() {
 
   controls.update(dt);
   const player = controls.player;
-  ctx.moving = player.moving || player.height > 0;         // a jump counts as moving: it stops the spell you are casting
+  // A scripted fight says when you are made to move, lands its fire and its hits, and says what to show.
+  const script = encounter.update(dt, time, player, combat);
+  ctx.forced = script.forced; ctx.banner = script.banner;
+  if (script.forced && !combat.state.over) combat.result.track.moved += Math.min(0.25, elapsed);
+  const kind = script.banner ? script.banner.text.replace(/[\d.\s]+/g, '') : '';
+  if (kind !== bannerKind) { bannerKind = kind; if (script.banner) sound.play(script.banner.soon ? 'warn' : 'move'); }
+  ctx.moving = player.moving || player.height > 0 || script.forced;   // a jump counts as moving: it stops the spell you are casting
   for (let i = 1; i <= 3; i++) ctx.distances[i] = Math.hypot(player.x - SPOTS[i].x, player.z - SPOTS[i].z);
 
   // The pet walks first, so the casting rules know whether it is in range of its dummy.
@@ -579,6 +745,11 @@ function frame() {
 
   const S = combat.state, casting = S.cast || S.channel;
   const school = casting ? combat.spells[casting.key].school : null;
+  recorder.sample(combat, targets, mustMove || script.forced);
+  // A cast that ended by itself (not stopped) goes off: the staff arm is thrust forward. The casting hum ends with it.
+  if (prevCast && S.cast !== prevCast && !castStopped) warlock.release();
+  prevCast = S.cast; castStopped = false;
+  if (humming && !casting) { humming = false; sound.stopCasting(); }
   warlock.root.position.set(player.x, 0, player.z);
   warlock.root.rotation.y = player.yaw;
   warlock.update(dt, time, player.moving, player.height, school);
@@ -639,12 +810,15 @@ function frame() {
   }
   hud.render(combat, ctx, time, anchors);
   extras.render(combat, time, simResult);
+  aids.render(combat, time, extras.show(), simResult);
 }
 renderer.setAnimationLoop(frame);
 
 // For checks from the browser console.
 window.FW = {
   extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
+  recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
+  get keyCodes() { return keyCodes; }, binds: binds,
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,

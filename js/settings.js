@@ -9,7 +9,9 @@ const DEFAULTS = {
   binds: null,                         // your own keys for walking, jumping, targeting, the pet, stopping a cast
   show: null,                          // the switches in the bar on the right: { rotation, race, callouts }
   latency: 0,                          // milliseconds every key press takes to arrive
-  drills: {}                           // your best result per drill: { id: { grade, pct, dps } }
+  drills: {},                          // your best result per drill or encounter: { id: { grade, pct, dps } }
+  bests: {},                           // your best result per fight you set up yourself: { fight: { dps, pct, at } }
+  volume: 0.6                          // how loud the sounds are, 0 to 1
 };
 
 let saved = {};

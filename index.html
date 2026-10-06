@@ -4,29 +4,60 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forever Warlocking</title>
-<link rel="stylesheet" href="css/game.css">
+<link rel="stylesheet" href="css/game.css?v=77c52ca15e">
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js" } }
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js",
+    "./js/aids.js": "./js/aids.js?v=77c52ca15e",
+    "./js/chamber.js": "./js/chamber.js?v=77c52ca15e",
+    "./js/combat.js": "./js/combat.js?v=77c52ca15e",
+    "./js/controls.js": "./js/controls.js?v=77c52ca15e",
+    "./js/effects.js": "./js/effects.js?v=77c52ca15e",
+    "./js/encounter.js": "./js/encounter.js?v=77c52ca15e",
+    "./js/extras.js": "./js/extras.js?v=77c52ca15e",
+    "./js/hud.js": "./js/hud.js?v=77c52ca15e",
+    "./js/keys.js": "./js/keys.js?v=77c52ca15e",
+    "./js/kit.js": "./js/kit.js?v=77c52ca15e",
+    "./js/main.js": "./js/main.js?v=77c52ca15e",
+    "./js/models.js": "./js/models.js?v=77c52ca15e",
+    "./js/names.js": "./js/names.js?v=77c52ca15e",
+    "./js/panels.js": "./js/panels.js?v=77c52ca15e",
+    "./js/pets.js": "./js/pets.js?v=77c52ca15e",
+    "./js/record.js": "./js/record.js?v=77c52ca15e",
+    "./js/settings.js": "./js/settings.js?v=77c52ca15e",
+    "./js/share.js": "./js/share.js?v=77c52ca15e",
+    "./js/sound.js": "./js/sound.js?v=77c52ca15e",
+    "./js/timeline.js": "./js/timeline.js?v=77c52ca15e",
+    "./js/tooltip.js": "./js/tooltip.js?v=77c52ca15e"
+  }
+}
 </script>
 <!-- Fetch the 3D library and every game file at once instead of one after the other. List new js/ files here too. -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js">
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.min.js">
-<link rel="modulepreload" href="js/main.js">
-<link rel="modulepreload" href="js/chamber.js">
-<link rel="modulepreload" href="js/models.js">
-<link rel="modulepreload" href="js/controls.js">
-<link rel="modulepreload" href="js/hud.js">
-<link rel="modulepreload" href="js/names.js">
-<link rel="modulepreload" href="js/combat.js">
-<link rel="modulepreload" href="js/settings.js">
-<link rel="modulepreload" href="js/pets.js">
-<link rel="modulepreload" href="js/effects.js">
-<link rel="modulepreload" href="js/panels.js">
-<link rel="modulepreload" href="js/sound.js">
-<link rel="modulepreload" href="js/kit.js">
-<link rel="modulepreload" href="js/tooltip.js">
-<link rel="modulepreload" href="js/extras.js">
+<link rel="modulepreload" href="js/main.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/chamber.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/models.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/controls.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/hud.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/names.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/combat.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/settings.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/pets.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/effects.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/panels.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/sound.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/kit.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/tooltip.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/extras.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/keys.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/record.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/timeline.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/encounter.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/share.js?v=77c52ca15e">
+<link rel="modulepreload" href="js/aids.js?v=77c52ca15e">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -47,7 +78,7 @@
 
   <!-- Left, under the links: the Challenges button, a thing of its own -->
   <div id="challengeBar" class="toolbar">
-    <div class="group"><button type="button" id="btnChallenges" class="gold" title="Drills graded against the sim, and the seeded fight">Challenges</button></div>
+    <div class="group"><button type="button" id="btnChallenges" class="gold" title="Drills and scripted encounters graded against the sim, and the seeded fight">Challenges</button></div>
   </div>
 
   <!-- Top right: one slim bar with everything you set up before a fight; its panels open under it -->
@@ -104,9 +135,9 @@
     </div>
     <div class="panel keys" id="keysPanel" hidden>
       <h2>Keybinds</h2>
-      <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places.</p>
+      <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places. Spells, targeting, the pet and Reset also take a key with Shift, Ctrl or Alt held, the middle mouse button, the thumb buttons, and the wheel with a modifier.</p>
       <div class="binds"><div id="bindsLeft"></div><div id="bindsRight"></div></div>
-      <p class="hint">Mouse: hold right to steer, hold left to look around, both buttons walk forward, the wheel zooms. Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots.</p>
+      <p class="hint">Mouse: hold right to steer, hold left to look around, both buttons walk forward, the wheel zooms. Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots. A few combinations belong to the browser and never reach the game (Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Tab, and Ctrl+1 to 9 in some browsers).</p>
       <button type="button" id="bindsReset" class="wide">All keys back to default</button>
     </div>
   </section>
@@ -118,6 +149,8 @@
       <label class="switch"><input type="checkbox" id="swRotation"><span>Rotation panel</span></label>
       <label class="switch"><input type="checkbox" id="swRace"><span>Race the sim live</span></label>
       <label class="switch"><input type="checkbox" id="swCallouts"><span>Mistake callouts</span></label>
+      <label class="switch" title="A bar for each of your DoTs that is running, shortest first. Gold means: the sim would cast it again now."><input type="checkbox" id="swDotBars"><span>DoT timers</span></label>
+      <label class="switch" title="Shows what the sim's priority list would cast in your place right now, and lights it up on your bar. For learning a rotation; switch it off to test yourself."><input type="checkbox" id="swHint"><span>The sim's next cast</span></label>
     </details>
     <details>
       <summary>Your character</summary>
@@ -135,8 +168,12 @@
       <div class="stack" id="presets"></div>
     </details>
     <details>
-      <summary>Combat log</summary>
-      <button type="button" id="btnCopyLog" class="wide">Copy the whole log</button>
+      <summary>Sound, link, log</summary>
+      <label class="range" title="How loud the sounds are. The Sound button at the top switches them on and off.">Volume <input type="range" id="volume" min="0" max="100" step="5" value="60"></label>
+      <div class="stack">
+        <button type="button" id="btnShare" title="Copies an address that opens this page with your build, race, dummies and fight options already set (and the challenge you are in)">Copy a link to this setup</button>
+        <button type="button" id="btnCopyLog">Copy the whole log</button>
+      </div>
     </details>
   </aside>
 
@@ -156,16 +193,18 @@
   <!-- Bottom centre, from the top down: cast bar, buffs and debuffs, you / your pet / your target, action bar -->
   <section id="bottomCentre">
     <div id="editStrip" class="panel edit-strip" hidden>
-      <span id="editText">Click two slots to swap them. Click a slot and press a key to give it that key.</span>
+      <span id="editText">Click two slots to swap them. Click a slot and press a key (or a mouse button) to give it that key.</span>
       <button type="button" id="editReset">Back to default</button>
       <button type="button" id="editDone">Done</button>
     </div>
+    <div id="simHint" class="sim-hint" hidden><span>The sim would cast</span><img id="simHintIcon" alt=""><b id="simHintText"></b></div>
     <div id="errorText" class="error-text" aria-live="polite"></div>
     <div id="castBar" class="castbar idle"><i id="castFill"></i><b id="castText"></b></div>
 
     <div id="auraRow">
       <span class="auras" id="playerBuffs"></span>
       <span class="auras large" id="targetDebuffs"></span>
+      <div id="dotBars" class="dotbars" hidden></div>
     </div>
 
     <div id="frames">
@@ -217,6 +256,7 @@
       <dt>Damage</dt><dd id="meterDamage">0</dd>
       <dt>Time</dt><dd id="meterTime">0:00</dd>
       <dt title="What the DPS sim's priority list reaches on these dummies with the same character">Sim average</dt><dd id="meterSim">&ndash;</dd>
+      <dt title="Your best result in the fight that is set up now: this build, race, dummies and fight options">Your best</dt><dd id="meterBest">&ndash;</dd>
       <dt id="meterDummiesLabel" hidden>Per dummy</dt><dd id="meterDummies" hidden></dd>
     </dl>
     <div id="race" class="race" hidden>
@@ -236,9 +276,12 @@
 </section>
 <section id="challenges" class="review sheet" hidden>
   <header><h2>Challenges</h2><button type="button" id="challengesClose">Close</button></header>
-  <p class="hint">Short fights with one thing to practise. Each is graded against what the sim reaches in the very same fight: S from 100%, A from 95%, B from 88%, C from 78%. Your own fight settings stay as they are; "End" at the top of the screen takes you back to them.</p>
+  <p class="hint">Fights with one thing to practise. Each is graded against what the sim reaches in the very same fight: S from 100%, A from 95%, B from 88%, C from 78%. Your own fight settings stay as they are; "End" at the top of the screen takes you back to them.</p>
   <h3>Drills</h3>
   <div class="cards" id="drills"></div>
+  <h3>Encounters</h3>
+  <p class="hint">Scripted fights: things happen at set moments. The sim cannot follow a script, so it plays a fight of the same length with about as much moving and as many hits, spread evenly.</p>
+  <div class="cards" id="encounters"></div>
   <h3>Seeded fight</h3>
   <div class="card wide-card">
     <p>Two minutes on one dummy with the dice fixed by a seed: everyone who types the same seed gets the same rolls, so results can be compared. The box starts with today's date. After the fight, "Copy the result" in the review gives you one line to pass on.</p>
@@ -260,24 +303,24 @@
 <div id="fatal" hidden></div>
 
 <!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->
-<script src="vendor/warlock-sim/data/consumables.js"></script>
-<script src="vendor/warlock-sim/data/config.js"></script>
-<script src="vendor/warlock-sim/data/talents.js"></script>
-<script src="vendor/warlock-sim/data/spells.js"></script>
-<script src="vendor/warlock-sim/data/races.js"></script>
-<script src="vendor/warlock-sim/data/builds.js"></script>
-<script src="vendor/warlock-sim/engine/stats.js"></script>
-<script src="vendor/warlock-sim/engine/spelltable.js"></script>
-<script src="vendor/warlock-sim/engine/rng.js"></script>
-<script src="vendor/warlock-sim/engine/resist.js"></script>
-<script src="vendor/warlock-sim/engine/rotation.js"></script>
-<script src="vendor/warlock-sim/engine/sim.js"></script>
-<script src="vendor/warlock-sim/engine/custom-builds.js"></script>
-<script src="vendor/warlock-sim/engine/settings-code.js"></script>
-<script src="vendor/warlock-sim/data/icons.js"></script>
-<script src="vendor/warlock-sim/data/tooltips.js"></script>
+<script src="vendor/warlock-sim/data/consumables.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/config.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/talents.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/spells.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/races.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/builds.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/stats.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/spelltable.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/rng.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/resist.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/rotation.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/sim.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/custom-builds.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/engine/settings-code.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/icons.js?v=77c52ca15e"></script>
+<script src="vendor/warlock-sim/data/tooltips.js?v=77c52ca15e"></script>
 <!-- The ready builds ranked by their DPS in the DPS sim (tools/gen-build-order.js) -->
-<script src="data/build-order.js"></script>
+<script src="data/build-order.js?v=77c52ca15e"></script>
 
 <script>
 // Shown when the 3D library or the game code cannot start (module errors do not reach the page otherwise).
@@ -288,6 +331,6 @@ window.addEventListener('error', function (e) {
   box.textContent = 'Forever Warlocking could not start: ' + (e.message || 'a file did not load') + '. Check your connection and reload.';
 }, true);
 </script>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=77c52ca15e"></script>
 </body>
 </html>

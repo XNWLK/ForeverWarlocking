@@ -19,7 +19,9 @@ function wrapAngle(a) {
 }
 
 // world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional),
-//          binds: { forward, back, turnLeft, turnRight, strafeLeft, strafeRight, jump } - key codes, may change any time }
+//          binds: { forward, back, turnLeft, turnRight, strafeLeft, strafeRight, jump } - key codes, may change any time,
+//          claimed(keyEvent) -> true when that key with its modifiers is bound to an action (optional),
+//          onWheel(wheelEvent) -> true when the wheel was used for an action instead of zooming (optional) }
 // The arrow keys always move you as well.
 export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
@@ -40,8 +42,9 @@ export function createControls(canvas, camera, world) {
       code === B.strafeLeft || code === B.strafeRight || code === B.jump;
   }
   window.addEventListener('keydown', function (e) {
-    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (e.metaKey) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;   // typing must not walk the character
+    if (world.claimed && world.claimed(e)) return;        // this key with the modifier held is bound to something else
     if (e.target instanceof HTMLButtonElement && e.code === 'Space') e.target.blur();
     if (isMoveKey(e.code)) { keys.add(e.code); e.preventDefault(); }
   });
@@ -86,6 +89,7 @@ export function createControls(canvas, camera, world) {
   });
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
+    if (world.onWheel && world.onWheel(e)) return;        // the wheel with a modifier held may be bound to an action
     view.distance = Math.min(30, Math.max(3, view.distance * (e.deltaY > 0 ? 1.12 : 0.89)));
   }, { passive: false });
 

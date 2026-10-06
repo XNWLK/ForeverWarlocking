@@ -9,8 +9,10 @@ time and see how your rotation does.
 dummy with your Imp or Succubus: cast bar, global cooldown, DoTs, procs, execute phase, mana, a combat log and a
 damage meter that also shows what the DPS sim reaches on the same dummy. One, two or three dummies, with target
 switching, Bane of Havoc, Rain of Fire and Hellfire. After a fight a review shows where you lost time against the
-sim. You can import your own build and settings from the DPS sim, change the action bar and its keys, and set timed
-fights, movement phases and hits taken.
+sim, with a timeline of what you cast and when. You can import your own build and settings from the DPS sim, change
+the action bar and its keys (also with Shift, Ctrl or Alt, and mouse buttons), and set timed fights, movement phases
+and hits taken. Challenges are graded against the sim: drills, scripted encounters and a seeded fight. Practice aids
+you can switch on: the sim's rotation, its next cast, DoT timers, mistake callouts. A link shares your setup.
 
 It uses the same spell values, talents and mechanics as Xn's Forever Warlock Sim, the DPS simulator; a copy of that
 sim's data and engine lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).
@@ -22,6 +24,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/serve.ps1
 ```
 
 Then open http://localhost:8770/.
+
+After changing any file the page loads, run `node tools/stamp.js`: it gives every address in `index.html` a
+version made from the files' contents, so a browser never mixes old and new files after an update.
 
 ## Notice
 

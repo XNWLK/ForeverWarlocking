@@ -108,6 +108,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .switch input:checked { background: rgba(185, 138, 255, 0.45) !important; }
 .switch input:checked::after { left: 14px; background: #fff; }
 .stack { display: grid; gap: 3px; }
+#side label.range { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+#side label.range input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; accent-color: var(--accent); }
 .stack button { text-align: left; }
 .seed { display: flex; gap: 4px; }
 .seed input { flex: 1; min-width: 0; }
@@ -122,6 +124,28 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .chip { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 12px; max-width: 520px; background: var(--glass); border-color: rgba(240, 207, 122, 0.45); font-size: 12px; }
 .callout { min-height: 18px; font-size: 14px; font-weight: 600; color: var(--gold); text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.5s; }
 .callout.show { opacity: 1; transition: none; }
+
+.rotation li.now { color: #7dffc0; font-weight: 600; }
+.rotation li.now::before { content: '\25B6'; color: #7dffc0; }
+
+/* The sim's next cast: a line above the cast bar, and a green edge on the spell's button. */
+.sim-hint { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: 11px; background: rgba(13, 7, 20, 0.72); box-shadow: 0 0 0 1px rgba(125, 255, 192, 0.4); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.sim-hint img { width: 16px; height: 16px; border-radius: 3px; }
+.sim-hint b { color: #7dffc0; font-weight: 600; }
+.slot.hint { border-color: #7dffc0; box-shadow: 0 0 0 2px #7dffc0 inset, 0 0 9px rgba(125, 255, 192, 0.55); }
+
+/* DoT timers: a stack of bars above your target's debuffs, growing upward. */
+#auraRow { position: relative; }
+.dotbars { position: absolute; right: 0; bottom: 36px; width: 186px; display: flex; flex-direction: column-reverse; gap: 2px; pointer-events: none; }
+.dotbar { position: relative; display: flex; align-items: center; gap: 5px; height: 16px; padding-right: 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.6); overflow: hidden; font-size: 11px; line-height: 16px; text-shadow: 0 1px 1px #000; }
+.dotbar i { position: absolute; inset: 0 auto 0 0; background: rgba(140, 90, 230, 0.62); }
+.dotbar.fire i { background: rgba(225, 115, 45, 0.62); }
+.dotbar img { position: relative; flex: none; width: 16px; height: 16px; }
+.dotbar span { position: relative; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dotbar b { position: relative; flex: none; font-variant-numeric: tabular-nums; }
+.dotbar.other { opacity: 0.72; }
+.dotbar.soon { box-shadow: 0 0 0 1px var(--gold) inset; }
+.dotbar.soon b { color: var(--gold); }
 
 /* The race against the sim, in the damage meter. */
 .race { margin-top: 8px; display: grid; gap: 3px; }
@@ -345,6 +369,32 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .wide-card { max-width: 100%; }
 #challenges input { user-select: text; font: inherit; font-size: 12px; color: var(--ink); background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
 #challenges input:focus { outline: 1px solid var(--accent); }
+/* The timeline in the review: names on the left, the fight scrolling sideways on the right. */
+.timeline { display: grid; grid-template-columns: 112px 1fr; margin-top: 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); overflow: hidden; }
+.tl-names { padding: 4px 0 12px; border-right: 1px solid var(--line); }
+.tl-name { display: flex; align-items: center; padding: 0 6px; font-size: 10px; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-scroll { overflow-x: auto; overflow-y: hidden; padding: 4px 0 4px 8px; scrollbar-width: thin; }
+.tl-inner { position: relative; }
+.tl-row { position: absolute; left: 0; right: 0; }
+.tl-row i { position: absolute; display: block; }
+.tl-axis span { position: absolute; top: 1px; padding-left: 3px; border-left: 1px solid var(--line-bright); font-size: 9px; line-height: 12px; color: var(--ink-dim); }
+.tl-casts img, .tl-casts b { position: absolute; top: 4px; width: 17px; height: 17px; border-radius: 3px; box-shadow: 0 0 0 1px #000; z-index: 1; }
+.tl-casts b { background: #3a2a4c; font-size: 10px; line-height: 17px; text-align: center; }
+.tl-casts img.off { top: 14px; width: 13px; height: 13px; z-index: 2; }
+.tl-casts img.stopped { filter: grayscale(1) brightness(0.55); }
+.tl-casts img:hover { z-index: 3; box-shadow: 0 0 0 1px var(--gold); }
+.tl-casts i { top: 24px; height: 5px; border-radius: 2px; background: #e2ae36; }
+.tl-casts i.chan { background: #43b96c; }
+.tl-casts i.stopped { background: #7a4a44; }
+.tl-casts i.idle { top: 2px; height: 28px; border-radius: 3px; background: rgba(255, 70, 60, 0.28); box-shadow: 0 0 0 1px rgba(255, 110, 100, 0.5) inset; }
+.tl-casts i.moved { top: 2px; height: 28px; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(200, 200, 215, 0.22) 0 4px, transparent 4px 8px); }
+.tl-casts.sim img { opacity: 0.8; }
+.tl-casts.sim i { opacity: 0.6; }
+.tl-aura i { top: 3px; height: 7px; border-radius: 3px; background: rgba(160, 110, 240, 0.85); }
+.tl-aura.fire i { background: rgba(230, 120, 50, 0.85); }
+.best-line { margin: 4px 0 0; font-size: 12px; color: var(--ink-dim); }
+.best-line.record { color: var(--gold); font-weight: 600; }
+.challenge-line button { flex: none; }
 /* The graph and the challenge line in the review. */
 .graph { display: block; width: 100%; height: 150px; margin-top: 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); }
 .graph-key { display: flex; gap: 14px; margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); }
