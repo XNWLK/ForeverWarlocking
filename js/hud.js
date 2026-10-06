@@ -223,6 +223,10 @@ export function createHud(WL, handlers) {
   ringsButton.addEventListener('click', function () { setRings(!ringsButton.classList.contains('on')); handlers.onRings(ringsButton.classList.contains('on')); });
   function setRings(on) { ringsButton.classList.toggle('on', on); ringsButton.setAttribute('aria-pressed', String(on)); }
   byId('btnReset').addEventListener('click', function () { handlers.onReset(); });
+  // Top left: each button opens its address in a new tab.
+  document.querySelectorAll('#links button[data-link]').forEach(function (button) {
+    button.addEventListener('click', function () { button.blur(); window.open(button.dataset.link, '_blank', 'noopener'); });
+  });
   const soundButton = byId('btnSound');
   function setSound(on) { soundButton.classList.toggle('on', on); soundButton.setAttribute('aria-pressed', String(on)); }
   soundButton.addEventListener('click', function () { soundButton.blur(); const on = !soundButton.classList.contains('on'); setSound(on); handlers.onSound(on); });

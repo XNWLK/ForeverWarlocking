@@ -67,12 +67,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
 .toolbar button.on { background: rgba(185, 138, 255, 0.14); }
 .label { font-size: 11px; color: var(--ink-dim); margin-right: 4px; }
-/* Top left: links to this project's code and to the Warlock SIM. */
+/* Top left: buttons that open this project's code and the Warlock SIM. */
 #links { position: absolute; left: 14px; top: 12px; z-index: 2; }
-#hud a { pointer-events: auto; }
-.toolbar a { font-size: 12px; color: var(--ink); text-decoration: none; padding: 4px 9px; border-radius: 6px; }
-.toolbar a:hover { background: rgba(255, 255, 255, 0.1); color: var(--accent); }
-.toolbar a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #buildLabel { max-width: 220px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
