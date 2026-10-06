@@ -48,6 +48,7 @@ for (const scene of SCENES) {
 
         const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });
         const problems = [];
+        let manaOff = 0;
         let freeSince = 0;                 // when the caster became free after the last cast (the engine waits from there)
         combat.petCommand('attack', 1);
         combat.update(0, ctx);
@@ -72,6 +73,14 @@ for (const scene of SCENES) {
           const extra = /^x(\d):(.+)$/.exec(entry.spell || '');
           const key = entry.type === 'racial' ? 'racial' : extra ? extra[2] : entry.spell;
           combat.setTarget(key === 'baneOfHavoc' ? 2 : extra ? Number(extra[1]) : 1);
+          // Mana at the moment of this cast. The engine logs it (in whole numbers) right after taking the spell's price
+          // and before the spell lands, so what it had before is that plus the price. This is what proves that mana
+          // regeneration (MP5 and the 5-second rule) is the same here. Life Tap and the race's cooldown are left out
+          // (they are logged after what they give).
+          if (entry.type === 'cast' && key !== 'lifeTap' && combat.table[key] && entry.mana != null && manaOff < 3) {
+            const before = combat.state.mana, engine = entry.mana + combat.cost(key);
+            if (Math.abs(before - engine) > 1) { manaOff++; problems.push('mana before ' + entry.spell + ' at ' + entry.t + ' s: engine ' + engine.toFixed(1) + ', here ' + before.toFixed(1)); }
+          }
           const result = combat.press(key, ctx);
           if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
           freeSince = Math.max(combat.readyAt(), combat.state.channel ? combat.state.channel.end : 0);
@@ -97,5 +106,5 @@ for (const scene of SCENES) {
   }
 }
 
-console.log(failures ? 'FAIL: ' + failures + ' of ' + fights + ' fights differ' : 'OK: ' + fights + ' fights, same damage as the engine in every one');
+console.log(failures ? 'FAIL: ' + failures + ' of ' + fights + ' fights differ' : 'OK: ' + fights + ' fights, same damage and mana as the engine in every one');
 process.exit(failures ? 1 : 0);

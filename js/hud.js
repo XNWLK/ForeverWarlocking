@@ -538,6 +538,8 @@ export function createHud(WL, handlers) {
     const mana = Math.min(S.mana, c.stats.maxMana);
     setText(el.mana, amount(mana, c.stats.maxMana));
     setWidth(el.manaFill, 100 * mana / c.stats.maxMana);
+    // A light edge on the mana bar while Spirit is giving mana back (no mana spent for 5 seconds).
+    setClass(el.manaFill.parentElement, 'regen', !S.over && combat.spiritIn() === 0 && mana < c.stats.maxMana - 0.5);
     if (combat.timed) {
       const left = combat.timeLeft();
       setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');

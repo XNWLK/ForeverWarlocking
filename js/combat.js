@@ -69,6 +69,11 @@ export function createCombat(opts) {
   const armorRed = WL.armorReduction(cfg);
   const petMeleeRange = opts.petMeleeRange || 5;
   const havocPct = table.baneOfHavoc ? SPELLS.baneOfHavoc.havocPct / 100 : 0;
+  // The 5-second rule (Xn, 2026-10-06; as in the engine): Spirit gives mana back only while you have spent none for
+  // FSR seconds - (8 + Spirit / 4) every 2 seconds, counted evenly. A spell with a cast time spends its mana when the
+  // cast is complete, an instant or a channel when it starts. Life Tap costs health, not mana: it does not restart the
+  // 5 seconds. Nothing before the first mana is spent in a fight. (MP5 from gear and buffs always runs, as before.)
+  const FSR = cb.fsrSeconds > 0 ? cb.fsrSeconds : 0, SPI_REGEN = FSR ? (cb.spiritRegenBase + cb.spiritRegenPerSpi * stats.spi) / 2 : 0;
 
   const tvCache = {};
   function tv(key, field) {
@@ -89,6 +94,7 @@ export function createCombat(opts) {
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, shards: cfg.fight.startingShards,
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
+      lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, petSent: false,
       target: 1, havoc: null,
       fightStart: null, fightEnd: null, over: false, presses: []
@@ -100,7 +106,7 @@ export function createCombat(opts) {
     }
     S.targets = T;
     res = { total: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
-            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
+            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     P = makePet(build.pet);
     S.decideSeq = order++;
@@ -497,8 +503,9 @@ export function createCombat(opts) {
   // ---------- casting ----------
   // A cast bar's price is fixed when the cast starts (as in the engine) and paid at its end.
   function commit(key, startedWithDecimation, price) {
-    const s = SPELLS[key];
-    S.mana -= price != null ? price : effectiveCost(key);
+    const s = SPELLS[key], paid = price != null ? price : effectiveCost(key);
+    S.mana -= paid;
+    if (paid > 0) S.lastSpend = S.t;                       // the 5 seconds start again (a cast bar: at its end, which is now)
     let eurekaUsed = false, baseMult = 1;
     if (S.eurekaCharges > 0 && s.kind !== 'utility') { S.eurekaCharges--; S.eurekaPending++; eurekaUsed = true; }
     // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): +50% to the base value.
@@ -647,6 +654,7 @@ export function createCombat(opts) {
     if (S.mana < e.cost - 1e-6) return fail('baneOfHavoc', 'mana');
     if (distanceTo(ti, ctx) > e.range + EPS) return fail('baneOfHavoc', 'range');
     S.mana -= e.cost;
+    if (e.cost > 0) S.lastSpend = S.t;
     if (!check) { delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
     S.havoc = { target: ti, expires: S.t + SPELLS.baneOfHavoc.duration };
     row('baneOfHavoc').casts++;
@@ -733,6 +741,15 @@ export function createCombat(opts) {
       const gained = S.mana + stats.mp5 / 5 * span, cap = manaCap();
       if (fighting && gained > cap) res.track.wasted += gained - Math.max(cap, S.mana);
       S.mana = Math.min(cap, gained);
+    }
+    // Spirit, outside the 5 seconds after mana was last spent.
+    if (SPI_REGEN > 0 && S.lastSpend !== -Infinity) {
+      const start = Math.max(from, S.lastSpend + FSR);
+      if (to > start) {
+        const gained = S.mana + SPI_REGEN * (to - start), cap = manaCap();
+        if (fighting) { res.track.spirit += Math.min(cap, gained) - Math.min(cap, S.mana); if (gained > cap) res.track.wasted += gained - Math.max(cap, S.mana); }
+        S.mana = Math.min(cap, gained);
+      }
     }
     S.t = to;
     if (linear) {
@@ -919,6 +936,10 @@ export function createCombat(opts) {
       const k = Math.floor((ft + EPS) / MOVE.every), into = ft - k * MOVE.every;
       return k >= 1 && into < MOVE.dur ? { moving: true, left: MOVE.dur - into } : { moving: false, next: (k + 1) * MOVE.every - ft };
     },
+    // The 5-second rule: seconds until Spirit gives mana back again (0 = it does now; null = no mana spent yet, or
+    // this character has no Spirit regeneration).
+    spiritIn: function () { return !SPI_REGEN || S.lastSpend === -Infinity ? null : Math.max(0, S.lastSpend + FSR - S.t); },
+    spiritRate: SPI_REGEN,
     timeLeft: function () { return timed ? (S.fightStart === null ? linear : Math.max(0, endAt() - S.t)) : null; },
     racial: function () { return racialOf('cooldown'); },
     fightSeconds: function () { return S.fightStart === null ? 0 : (S.fightEnd !== null ? S.fightEnd : S.t) - S.fightStart; }

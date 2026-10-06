@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "f2e09a9",
-    "subject":  "Quick setup: hit-capped gear 1000 SP / 17% hit, Max uses Spellblasting",
+    "commit":  "b09258e",
+    "subject":  "5-second rule: Spirit regenerates mana while none was spent for 5 s",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-06 21:44",
+    "synced":  "2026-10-06 23:04",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

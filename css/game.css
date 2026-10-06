@@ -206,6 +206,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .bar.mana { --h: 12px; }
 .bar.mana i { background: var(--mana); }
 .bar.mana b { font-size: 10px; }
+.bar.mana.regen { box-shadow: 0 0 0 1px rgba(160, 195, 255, 0.85), 0 0 6px rgba(120, 165, 255, 0.5); }   /* Spirit is giving mana back */
 .bar.empty i { width: 0; }
 .hostile .bar.health { --h: 20px; }
 .hostile .bar.health i { background: var(--hostile); }
