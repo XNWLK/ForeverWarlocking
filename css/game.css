@@ -153,7 +153,9 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .pet .unit-body { gap: 3px; }
 .pet .unit-name { align-items: center; justify-content: flex-start; gap: 6px; font-size: 12px; color: #dcc6ff; }
 .pet .unit-sub { margin-left: auto; }
-.pet .bar { --h: 5px; border-radius: 3px; }
+.pet .bar { --h: 4px; border-radius: 3px; }
+.pet .bar.mana { --h: 11px; }                 /* the pet's mana carries its numbers; its health never changes */
+.pet .bar.mana b { font-size: 9px; }
 .pet-buttons { display: flex; gap: 4px; margin-top: 2px; }
 .pet-buttons button { flex: 1; padding: 1px 0; font-size: 11px; }
 .pet.none .bar, .pet.none .pet-buttons, .pet.none .portrait { display: none; }

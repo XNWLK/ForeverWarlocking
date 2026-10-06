@@ -17,6 +17,13 @@ const LOG_LINES = 9;
 
 function byId(id) { return document.getElementById(id); }
 function whole(n) { return Math.round(n).toLocaleString('en-US'); }
+// What a bar says: "650 / 1,000  65%". The percentage never says 0% while something is left, nor 100% when it is not
+// full. Very long numbers drop the maximum so the text still fits its bar.
+function amount(now, max) {
+  const pct = now <= 0 ? 0 : now >= max ? 100 : Math.max(1, Math.min(99, Math.round(100 * now / max)));
+  const full = whole(now) + ' / ' + whole(max) + '\u2002' + pct + '%';
+  return full.length <= 24 ? full : whole(now) + '\u2002' + pct + '%';
+}
 
 // Only touch the page when something really changed (this runs every picture).
 function setText(el, text) { if (el._text !== text) { el._text = text; el.textContent = text; } }
@@ -65,7 +72,7 @@ export function createHud(WL, handlers) {
     castBar: byId('castBar'), castFill: byId('castFill'), castText: byId('castText'), error: byId('errorText'),
     bar: byId('actionBar'), dps: byId('meterDps'), damage: byId('meterDamage'), time: byId('meterTime'), spells: byId('meterSpells'),
     buildLabel: byId('buildLabel'), sim: byId('meterSim'),
-    petFrame: byId('petFrame'), petSub: byId('petSub'), petManaFill: byId('petManaFill'),
+    petFrame: byId('petFrame'), petSub: byId('petSub'), petManaFill: byId('petManaFill'), petManaText: byId('petManaText'),
     petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow'),
     targetSub: byId('targetSub'), perDummy: byId('meterDummies'), perDummyLabel: byId('meterDummiesLabel')
   };
@@ -318,7 +325,7 @@ export function createHud(WL, handlers) {
     byId('petPortrait').src = c.build.pet ? WL.ICONS['pet_' + c.build.pet] || '' : '';
     byId('petPortrait').title = c.build.pet ? PET_KIND[c.build.pet] || '' : '';
     byId('playerSub').textContent = 'Level 60 ' + WL.RACES[c.raceKey].name;
-    el.health.textContent = whole(c.stats.maxHealth) + ' / ' + whole(c.stats.maxHealth);
+    el.health.textContent = amount(c.stats.maxHealth, c.stats.maxHealth);
     el.buildLabel.textContent = c.build.short;
     el.buildLabel.title = c.build.name;
     el.executeMark.style.left = c.executePct + '%';
@@ -502,12 +509,12 @@ export function createHud(WL, handlers) {
     }
 
     const mana = Math.min(S.mana, c.stats.maxMana);
-    setText(el.mana, whole(mana) + ' / ' + whole(c.stats.maxMana));
+    setText(el.mana, amount(mana, c.stats.maxMana));
     setWidth(el.manaFill, 100 * mana / c.stats.maxMana);
     if (combat.timed) {
       const left = combat.timeLeft();
       setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');
-    } else setText(el.targetHealth, whole(Math.ceil(cur.health)) + ' / ' + whole(cur.maxHealth));
+    } else setText(el.targetHealth, amount(Math.ceil(cur.health), cur.maxHealth));
     const phase = combat.movePhase(), banner = moveBanner;
     if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
     else if (phase && phase.next != null && phase.next <= 3) { banner.hidden = false; setClass(banner, 'soon', true); setText(banner, 'Move in ' + phase.next.toFixed(1)); }
@@ -534,6 +541,7 @@ export function createHud(WL, handlers) {
       const doing = S.over ? 'idle' : pet.active ? 'attacking' : pet.mode === 'attack' ? 'running in' : 'following';
       setText(el.petSub, doing);                           // what kind of demon it is shows in its picture
       setWidth(el.petManaFill, 100 * combat.petMana() / pet.maxMana);
+      setText(el.petManaText, amount(combat.petMana(), pet.maxMana));
       setClass(el.petAttack, 'on', pet.mode === 'attack');
       setClass(el.petFollow, 'on', pet.mode !== 'attack');
     }
