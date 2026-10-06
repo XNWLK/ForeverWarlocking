@@ -2,46 +2,46 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-10-06",
-  "simCommit": "708c17a",
+  "simCommit": "a09fced",
   "order": [
     {
       "key": "demo_pact_fire",
-      "dps": 722.4,
+      "dps": 723.9,
       "race": "undead"
     },
     {
       "key": "demo_pact_succ_sb",
-      "dps": 710.9,
-      "race": "human"
+      "dps": 711.5,
+      "race": "undead"
     },
     {
       "key": "aff_pact_succ_sb",
-      "dps": 692.7,
+      "dps": 697.2,
       "race": "undead"
     },
     {
       "key": "aff_pact_fire",
-      "dps": 681.3,
+      "dps": 682.9,
       "race": "undead"
     },
     {
       "key": "demo_pact_imp_sb",
-      "dps": 680.2,
+      "dps": 681.7,
       "race": "undead"
     },
     {
       "key": "demo_pact_succ_fire",
-      "dps": 669.2,
+      "dps": 675.8,
       "race": "undead"
     },
     {
       "key": "destro_incin_succ",
-      "dps": 656.1,
-      "race": "human"
+      "dps": 656.6,
+      "race": "undead"
     },
     {
       "key": "destro_incin_imp",
-      "dps": 627.7,
+      "dps": 629.8,
       "race": "undead"
     },
     {
@@ -51,23 +51,23 @@ window.FW_BUILD_ORDER = {
     },
     {
       "key": "aff_pact_succ_drain",
-      "dps": 601.6,
+      "dps": 606.2,
       "race": "undead"
     },
     {
       "key": "aff_succ_sb",
-      "dps": 601.1,
+      "dps": 602.4,
       "race": "undead"
     },
     {
       "key": "ds_ruin_classic",
-      "dps": 573.7,
-      "race": "human"
+      "dps": 574.3,
+      "race": "undead"
     },
     {
       "key": "wrack_succubus",
       "dps": 525.5,
-      "race": "human"
+      "race": "undead"
     }
   ]
 };

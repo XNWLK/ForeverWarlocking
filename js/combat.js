@@ -216,7 +216,7 @@ export function createCombat(opts) {
   }
 
   function deal(key, amount, crit, isTick, ti, extra) {
-    const rk = rowKey(ti, key), r = row(rk);
+    const rk = key === 'touchOfTheGrave' ? key : rowKey(ti, key), r = row(rk);   // the Undead proc has one row for all targets (as in the engine)
     r.dmg += amount; res.total += amount;
     if (isTick) { r.ticks++; if (crit) r.tickCrits++; } else { r.hits++; if (crit) r.crits++; }
     hurt(ti, amount);
@@ -264,13 +264,23 @@ export function createCombat(opts) {
     S.mana = Math.min(stats.maxMana, S.mana + JOW.mana);
     emit({ type: 'mana', source: 'Judgement of Wisdom', amount: S.mana - before });
   }
+  // Touch of the Grave (Undead): 5% of your maximum health - so it grows with Stamina - times every Shadow damage %:
+  // your Shadow auras (Demonic Sacrifice, Master Demonologist, Soul Link), Curse of the Elements and Improved Shadow
+  // Bolt on the target it hits, and Shadow and Flame while it is up. No spell power, none of the talents that name
+  // their own spells, no crit, no resist roll (Xn, 2026-10-06; as in the engine).
+  function togMult(ti) {
+    let m = (stats.mult.shadow || 1) * stats.mult.all;
+    if (debuff(ti, 'coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
+    if (debuff(ti, 'isb')) m *= 1 + tv('improvedShadowBolt', 'debuffPct') / 100;
+    if (buff('snfShadow')) m *= 1 + tv('shadowAndFlame', 'schoolPct') / 100;
+    return m;
+  }
   function touchOfTheGrave(ti) {
     const tog = racialOf('proc');
     if (tog && R.proc() * 100 < tog.chancePct) {
-      const amount = stats.maxHealth * tog.maxHealthPct / 100;
+      const amount = stats.maxHealth * tog.maxHealthPct / 100 * togMult(ti);
       row('touchOfTheGrave').casts++;
-      const on = check ? 1 : ti;                                      // the engine books it on the boss
-      if (alive(on)) deal('touchOfTheGrave', amount, false, false, on);
+      if (alive(ti)) deal('touchOfTheGrave', amount, false, false, ti);   // on the target the spell landed on
     }
   }
 
