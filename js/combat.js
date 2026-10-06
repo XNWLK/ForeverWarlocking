@@ -92,6 +92,16 @@ export function createCombat(opts) {
     return tvCache[id];
   }
   function racialOf(effect) { return race.racials.filter(function (r) { return r.effect === effect; })[0] || null; }
+  // Threat (Xn, 2026-10-07; as in the engine): 1 damage = 1 threat, Searing Pain twice that (less with Demonic Brand),
+  // all of it reduced by Suppression and by Blessing of Salvation / Tranquil Air Totem. Your pet's damage is the pet's
+  // threat, not yours. It changes nothing in the fight; it is counted so you can see it.
+  const THREAT_ALL = (1 - tv('suppression', 'threatPct') / 100) * WL.activeBuffs(cfg).reduce(function (m, b) { return m * (1 - (b.threatPct || 0) / 100); }, 1);
+  function threatMult(key) {
+    const s = SPELLS[key];
+    let m = THREAT_ALL * ((s && s.threatMult) || 1);
+    if (key === 'searingPain') m *= 1 - tv('demonicBrand', 'threatRedPct') / 100;
+    return m;
+  }
 
   let S, T, R, P, res, events, order, inst, queued, lastCtx = null, maxHealth = opts.dummyHealth || 50000;
 
@@ -116,7 +126,7 @@ export function createCombat(opts) {
       if (coeFromOthers && i === 1) T[i].deb.coe = Infinity;
     }
     S.targets = T;
-    res = { total: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
+    res = { total: 0, threat: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
             track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     P = makePet(build.pet);
@@ -124,7 +134,7 @@ export function createCombat(opts) {
   }
 
   // ---------- small helpers (same meaning as in the engine) ----------
-  function row(key) { return res.bySpell[key] || (res.bySpell[key] = { casts: 0, landed: 0, misses: 0, hits: 0, crits: 0, ticks: 0, tickCrits: 0, dmg: 0 }); }
+  function row(key) { return res.bySpell[key] || (res.bySpell[key] = { casts: 0, landed: 0, misses: 0, hits: 0, crits: 0, ticks: 0, tickCrits: 0, dmg: 0, threat: 0 }); }
   function ready(key) { return !S.cds[key] || S.cds[key] <= S.t + EPS; }
   function buff(name) { return S.buffs[name] != null && S.buffs[name] > S.t + EPS; }
   function debuff(ti, name) { const e = T[ti].deb[name]; return e != null && e > S.t + EPS; }
@@ -253,13 +263,16 @@ export function createCombat(opts) {
     emit(Object.assign({ type: isTick ? 'tick' : 'hit', key: key, target: ti, amount: amount, crit: crit, school: SPELLS[key] ? SPELLS[key].school : 'shadow' }, extra));
     // Bane of Havoc: a share of what you (not the pet) do to the other targets is also done to the one it sits on.
     const hav = havocOn();
+    let copied = 0;
     if (hav && havocPct && key.indexOf('pet:') !== 0 && ti !== hav && (linear || alive(hav))) {
-      const copied = amount * havocPct, h = row('baneOfHavoc');
+      const h = row('baneOfHavoc');
+      copied = amount * havocPct;
       h.dmg += copied; h.hits++; res.total += copied;
       hurt(hav, copied);
       emit({ type: 'havoc', key: 'baneOfHavoc', target: hav, amount: copied, school: 'shadow' });
       if (!linear && T[hav].health <= 0 && !T[hav].dead) kill(hav);
     }
+    if (key.indexOf('pet:') !== 0) { const threat = (amount + copied) * threatMult(key); r.threat += threat; res.threat += threat; }   // the Havoc copy counts for the spell that caused it
     if (!linear && T[ti].health <= 0 && !T[ti].dead) kill(ti);
   }
 
@@ -998,6 +1011,7 @@ export function createCombat(opts) {
       return Math.max(0, S.lastSpend + FSR - S.t, S.channel ? S.channel.end - S.t : 0);
     },
     spiritRate: SPI_REGEN,
+    threatMult: threatMult,                                // threat per damage of a spell, with everything that lowers it
     timeLeft: function () { return timed ? (S.fightStart === null ? linear : Math.max(0, endAt() - S.t)) : null; },
     racial: function () { return racialOf('cooldown'); },
     fightSeconds: function () { return S.fightStart === null ? 0 : (S.fightEnd !== null ? S.fightEnd : S.t) - S.fightStart; }

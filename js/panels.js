@@ -150,6 +150,7 @@ export function createPanels(handlers) {
     if (k.interrupts) notes.push(['Casts you stopped by moving', String(k.interrupts), '']);
     if (k.pushbacks) notes.push(['Pushed back by hits', k.pushbackTime.toFixed(1) + ' s (' + k.pushbacks + ' times)', sim && sim.pushbackTime != null ? sim.pushbackTime.toFixed(1) + ' s' : '']);
     notes.push(['Life Taps', String(k.lifeTaps), sim ? sim.lifeTaps.toFixed(1) : '']);
+    notes.push(['Threat a second', whole(d.seconds > 0 ? (res.threat || 0) / d.seconds : 0), sim && sim.tps != null ? whole(sim.tps) : '']);
     if (d.health) notes.push(['Lowest health (of ' + whole(d.health.max) + ')', whole(Math.max(0, d.health.min)), sim && sim.health ? whole(Math.max(0, sim.health.min)) + ' at its lowest in any fight' : '']);
     if (k.spirit >= 1 || (sim && sim.spirit >= 1)) notes.push(['Mana from Spirit (while none was spent for 5 s)', whole(k.spirit || 0), sim && sim.spirit != null ? whole(sim.spirit) : '']);
     if (k.wasted >= 1) notes.push(['Mana not regained (bar was full)', whole(k.wasted), '']);

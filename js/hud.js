@@ -65,7 +65,7 @@ export function createHud(WL, handlers) {
     debuffs: byId('targetDebuffs'), buffs: byId('playerBuffs'),
     castBar: byId('castBar'), castFill: byId('castFill'), castText: byId('castText'), error: byId('errorText'),
     bar: byId('actionBar'), dps: byId('meterDps'), damage: byId('meterDamage'), time: byId('meterTime'), spells: byId('meterSpells'),
-    buildLabel: byId('buildLabel'), sim: byId('meterSim'),
+    buildLabel: byId('buildLabel'), sim: byId('meterSim'), threat: byId('meterThreat'),
     petFrame: byId('petFrame'), petSub: byId('petSub'), petManaFill: byId('petManaFill'), petManaText: byId('petManaText'),
     petAttack: byId('btnPetAttack'), petFollow: byId('btnPetFollow'),
     targetSub: byId('targetSub'), perDummy: byId('meterDummies'), perDummyLabel: byId('meterDummiesLabel')
@@ -447,6 +447,7 @@ export function createHud(WL, handlers) {
     }
     if (s.selfDamage && lastCombat) notes.push('Every tick also burns you for ' + whole(Math.round(s.tickBase + s.tickCoef * e.sp)) + '. It stops by itself before a tick would kill you.');
     if (s.leech) notes.push('What it deals comes back to you as health.');
+    if (s.threatMult && lastCombat) notes.push('Causes ' + (Math.round(lastCombat.threatMult(key) * 100) / 100) + ' times its damage as threat.');
     if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));
     if (key === 'baneOfHavoc') notes.push('Not on the global cooldown.');
     notes.push(keyLine);
@@ -635,6 +636,7 @@ export function createHud(WL, handlers) {
       setText(el.dps, whole(time > 0.5 ? res.total / time : 0));
       setText(el.damage, whole(res.total));
       setText(el.time, Math.floor(time / 60) + ':' + String(Math.floor(time % 60)).padStart(2, '0'));
+      setText(el.threat, whole(time > 0.5 ? res.threat / time : 0) + ' a second');
       const sums = {};
       Object.keys(res.bySpell).forEach(function (k) {
         const base = k.replace(/^x\d:/, '');
