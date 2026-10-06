@@ -34,6 +34,7 @@ export const FAIL_TEXT = {
   range: 'Out of range',
   moving: "Can't do that while moving",
   shards: 'No Soul Shards',
+  health: 'Not enough health',
   immolate: 'Requires Immolate on the target',
   noRacial: 'Your race has nothing to use'
 };
@@ -73,6 +74,15 @@ export function createCombat(opts) {
   // FSR seconds - (8 + Spirit / 4) every 2 seconds, counted evenly. A spell with a cast time spends its mana when the
   // cast is complete, an instant or a channel when it starts. Nothing comes back while a channel runs. Life Tap costs health, not mana: it does not restart the
   // 5 seconds. Nothing before the first mana is spent in a fight. (MP5 from gear and buffs always runs, as before.)
+  // Your health (Xn, 2026-10-07; as in the engine). It starts full. Life Tap costs health and Hellfire hits you with
+  // every tick; it comes back from the healing you are given (config.fight.healAmount every healEvery seconds), from
+  // Drain Life, Siphon Life, Death Coil and Touch of the Grave (what they deal), and from a sacrificed Felhunter.
+  // Nothing may take you to 0: Life Tap needs more health than it costs, and Hellfire stops when its next tick would
+  // kill you. Hits you are made to take (config.fight.hitEvery) only push casts back, as before.
+  const HEAL = cfg.fight.healAmount > 0 && cfg.fight.healEvery > 0 ? { amt: cfg.fight.healAmount, every: cfg.fight.healEvery } : null;
+  const TAP_HP = SPELLS.lifeTap.healthCost || 0;
+  // Demonic Sacrifice of a Voidwalker (mana) or a Felhunter (health): a share of your maximum every few seconds.
+  const SAC = cfg.demonicSacrifice && stats.sacrificeActive && (build.sacrifice === 'voidwalker' || build.sacrifice === 'felhunter') ? cfg.demonicSacrifice : null;
   const FSR = cb.fsrSeconds > 0 ? cb.fsrSeconds : 0, SPI_REGEN = FSR ? (cb.spiritRegenBase + cb.spiritRegenPerSpi * stats.spi) / 2 : 0;
 
   const tvCache = {};
@@ -92,7 +102,8 @@ export function createCombat(opts) {
           vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), isb: WL.makeRng(seed0 ^ 0x9E3779B9),
           pet: WL.makeRng(seed0 ^ 0x165667B1), push: WL.makeRng(seed0 ^ 0x61C88647) };
     S = {
-      seed: seed0, t: 0, mana: stats.maxMana, shards: cfg.fight.startingShards,
+      seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
+      shards: Infinity,                                   // Soul Shards never run out (Xn, 2026-10-07)
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, petSent: false,
@@ -134,6 +145,11 @@ export function createCombat(opts) {
     return c;
   }
   function manaCap() { return stats.maxMana + (S.cast ? S.cast.cost : 0); }
+  function gainHealth(amount) { const before = S.health; S.health = Math.min(stats.maxHealth, S.health + amount); return S.health - before; }
+  function loseHealth(amount) { S.health -= amount; if (S.health < S.minHealth) S.minHealth = S.health; }
+  function canTap() { return S.health > TAP_HP; }
+  // What one tick of a spell that also hits you (Hellfire) does to you: its base damage, no talents, no crit.
+  function selfTick(key) { const s = SPELLS[key]; return s.selfDamage ? Math.round(s.tickBase + s.tickCoef * spNow(table[key])) : 0; }
   function executePhase(ti) { return T[ti || S.target].hpPct < cfg.fight.executePct; }
   // Seconds into the fight (the engine's clock): from the reset in the check, from your first action in play.
   function fightTime(t) { return check ? t : S.fightStart === null ? -1 : t - S.fightStart; }
@@ -150,6 +166,10 @@ export function createCombat(opts) {
   function beginFight() {
     if (S.fightStart !== null) return;
     S.fightStart = S.t;
+    // The healing you are given, and the sacrifice's ticks: all planned now when the fight has a set length (as the
+    // engine does), otherwise one at a time.
+    if (HEAL) { if (linear) for (let at = HEAL.every; at < linear - EPS; at += HEAL.every) push({ t: S.t + at, o: 0, type: 'heal' }); else push({ t: S.t + HEAL.every, o: 0, type: 'heal', again: true }); }
+    if (SAC) { if (linear) for (let at = SAC.every; at < linear - EPS; at += SAC.every) push({ t: S.t + at, o: 0, type: 'sacTick' }); else push({ t: S.t + SAC.every, o: 0, type: 'sacTick', again: true }); }
     if (HIT) push({ t: S.t + R.push() * HIT, o: 1, type: 'dmgTaken' });    // the first hit comes somewhere in the first interval
   }
   // Distances come from the scene; without them (the check script) everything is in range.
@@ -226,6 +246,10 @@ export function createCombat(opts) {
     r.dmg += amount; res.total += amount;
     if (isTick) { r.ticks++; if (crit) r.tickCrits++; } else { r.hits++; if (crit) r.crits++; }
     hurt(ti, amount);
+    if (key.indexOf('pet:') !== 0) {                       // Drain Life, Siphon Life, Death Coil, Touch of the Grave: what they deal comes back as health
+      const share = key === 'touchOfTheGrave' ? 1 : (SPELLS[key] && SPELLS[key].leech) || 0;
+      if (share) gainHealth(amount * share);
+    }
     emit(Object.assign({ type: isTick ? 'tick' : 'hit', key: key, target: ti, amount: amount, crit: crit, school: SPELLS[key] ? SPELLS[key].school : 'shadow' }, extra));
     // Bane of Havoc: a share of what you (not the pet) do to the other targets is also done to the one it sits on.
     const hav = havocOn();
@@ -331,6 +355,7 @@ export function createCombat(opts) {
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
+    if (s.selfDamage && !S.over) { const hurtYou = selfTick(key); loseHealth(hurtYou); emit({ type: 'selfHit', key: key, amount: hurtYou }); }
   }
 
   // A finished or instant cast arrives at its target. Returns true when it hit.
@@ -376,7 +401,7 @@ export function createCombat(opts) {
     }
     if (key === 'shadowburn' && tv('shadowAndFlame')) {
       S.buffs.snfFire = S.t + 20;
-      if (R.proc() * 100 < tv('shadowAndFlame', 'procPct')) { S.shards++; emit({ type: 'refund', key: 'soulShard' }); }
+      if (R.proc() * 100 < tv('shadowAndFlame', 'procPct')) { S.shards++; if (isFinite(S.shards)) emit({ type: 'refund', key: 'soulShard' }); }
     }
     if (S.over) return true;
     if (s.kind === 'hybrid' && !t.dead) applyDot(ti, key, { baseMult: baseMult || 1 });
@@ -535,6 +560,7 @@ export function createCombat(opts) {
     if (key === 'lifeTap') {
       const gain = (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100);
       const before = S.mana;
+      loseHealth(TAP_HP);
       S.mana = Math.min(stats.maxMana, S.mana + gain);
       row('lifeTap').casts++;
       res.track.lifeTaps++;
@@ -676,6 +702,8 @@ export function createCombat(opts) {
     if (!e) return 'unknown';
     if (key === 'baneOfHavoc') return !alive(ti) ? 'dead' : S.mana < e.cost - 1e-6 ? 'mana' : distanceTo(ti, ctx) > e.range + EPS ? 'range' : null;
     if (!ready(key)) return 'cooldown';
+    if (key === 'lifeTap' && TAP_HP && !canTap()) return 'health';
+    if (s.selfDamage && S.health <= selfTick(key)) return 'health';           // its first tick would kill you
     if (needsTarget(key) && !alive(ti)) return 'dead';
     if (key === 'conflagrate' && !(dotLeft('immolate', ti) > 0)) return 'immolate';
     if (s.shards && !(key === 'soulFire' && buff('decimation')) && S.shards < s.shards) return 'shards';
@@ -796,6 +824,20 @@ export function createCombat(opts) {
       if (ev.t > c.end + EPS) return;                    // cut off by a hit; the channel's end closes it
       if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target);
       if (!S.over && S.channel === c && ev.i === table[ev.key].ticks - 1) { if (c.eurekaHeld) eurekaRelease(); S.channel = null; }
+      else if (!S.over && S.channel === c && SPELLS[ev.key].selfDamage && S.health <= selfTick(ev.key)) {   // the next tick would kill you
+        if (c.eurekaHeld) eurekaRelease();
+        S.channel = null;
+        emit({ type: 'interrupt', key: ev.key, reason: 'health', channel: true });
+        S.decideSeq = order++;
+      }
+    } else if (ev.type === 'heal') {
+      const got = gainHealth(HEAL.amt);
+      emit({ type: 'heal', amount: got });
+      if (ev.again) push({ t: ev.t + HEAL.every, o: 0, type: 'heal', again: true });
+    } else if (ev.type === 'sacTick') {
+      if (build.sacrifice === 'voidwalker') S.mana = Math.min(stats.maxMana, S.mana + stats.maxMana * SAC.voidwalker.manaPct / 100);
+      else gainHealth(stats.maxHealth * SAC.felhunter.healthPct / 100);
+      if (ev.again) push({ t: ev.t + SAC.every, o: 0, type: 'sacTick', again: true });
     } else if (ev.type === 'petAct') {
       if (P && P.active && ev.gen === P.gen) petAct();
     } else if (ev.type === 'petLand') {
@@ -893,6 +935,14 @@ export function createCombat(opts) {
       if (!MOVE || ft < 0) return true;
       return ft + len <= (Math.floor((ft + EPS) / MOVE.every) + 1) * MOVE.every + EPS;
     }
+    // Hellfire is only started when its whole channel can be paid in health, counting the heals due during it.
+    function affordable(k) {
+      const s = SPELLS[k];
+      if (!s.selfDamage) return true;
+      const from = Math.max(ft, 0), until = from + s.duration;
+      const heals = HEAL ? HEAL.amt * (Math.floor((until + EPS) / HEAL.every) - Math.floor((from + EPS) / HEAL.every)) : 0;
+      return S.health + heals > selfTick(k) * table[k].ticks;
+    }
     const list = WL.effectiveRotation(build, { fight: { multiDot: standing.length > 1, targets: standing.length } });
     let found = null;
     for (let i = 0; i < list.length && !found; i++) {
@@ -900,12 +950,13 @@ export function createCombat(opts) {
       if (!a) continue;
       view.nextTarget = 0; view.actionIndex = i;
       const k = a.pick(view);
-      if (k && table[k] && fits(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
+      if (k === 'lifeTap' && !canTap()) continue;          // a Life Tap the list would like but has no health for
+      if (k && table[k] && fits(k) && affordable(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
     }
     const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false };
-    if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS ? tap : null;
+    if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS && canTap() ? tap : null;
     if (found.key === 'lifeTap') return found;
-    if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) ? null : tap;
+    if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) || !canTap() ? null : tap;   // no health for the tap: it waits for a heal
     const open = list.indexOf('bane') < 0 || leftOn(boss, 'baneOfDoom') > 0 || leftOn(boss, 'baneOfAgony') > 0;
     found.racial = !!racialOf('cooldown') && view.ready('racial') && SPELLS[found.key].kind !== 'utility' && open;
     return found;

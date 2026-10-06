@@ -434,7 +434,8 @@ export function createHud(WL, handlers) {
     const cost = lastCombat ? lastCombat.cost(key) : e.cost, cast = lastCombat ? lastCombat.castTime(key) : e.cast;
     const rows = [[cost > 0.5 ? whole(cost) + ' Mana' : '', e.range ? e.range + ' yd range' : '']];
     rows.push([s.kind === 'channel' ? 'Channeled, ' + span(s.duration) : cast > 0.005 ? span(cast) + ' cast' : 'Instant', e.cd ? span(e.cd) + ' cooldown' : '']);
-    if (s.shards) rows.push(['Reagent: Soul Shard', '']);
+    if (s.shards) rows.push(['Reagent: Soul Shard', 'never runs out']);
+    if (s.healthCost) rows.push(['Costs ' + whole(s.healthCost) + ' health', '']);
     const notes = [yours(key)];
     if (key === 'lifeTap') {                               // what a tap gives you, and when the sim taps with this build
       const better = talentValue('improvedLifeTap', 'manaPct') || 0;
@@ -444,6 +445,8 @@ export function createHud(WL, handlers) {
       });
       notes.push('The sim also taps whenever mana is too low for the next spell.');
     }
+    if (s.selfDamage && lastCombat) notes.push('Every tick also burns you for ' + whole(Math.round(s.tickBase + s.tickCoef * e.sp)) + '. It stops by itself before a tick would kill you.');
+    if (s.leech) notes.push('What it deals comes back to you as health.');
     if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));
     if (key === 'baneOfHavoc') notes.push('Not on the global cooldown.');
     notes.push(keyLine);
@@ -538,6 +541,11 @@ export function createHud(WL, handlers) {
     const mana = Math.min(S.mana, c.stats.maxMana);
     setText(el.mana, amount(mana, c.stats.maxMana));
     setWidth(el.manaFill, 100 * mana / c.stats.maxMana);
+    // Your health: Life Tap and Hellfire take it, the healing you are given and your leeching spells bring it back.
+    const health = Math.max(0, Math.min(S.health, c.stats.maxHealth));
+    setText(el.health, amount(health, c.stats.maxHealth));
+    setWidth(el.health.previousElementSibling, 100 * health / c.stats.maxHealth);
+    setClass(el.health.parentElement, 'low', health <= 2 * (c.spells.lifeTap.healthCost || 0));
     // A light edge on the mana bar while Spirit is giving mana back (no mana spent for 5 seconds).
     setClass(el.manaFill.parentElement, 'regen', !S.over && combat.spiritIn() === 0 && mana < c.stats.maxMana - 0.5);
     if (combat.timed) {
@@ -611,11 +619,12 @@ export function createHud(WL, handlers) {
       const why = key === 'racial' || S.over ? null : combat.blocked(key, ctx);
       setClass(slot.button, 'no-mana', why === 'mana');
       setClass(slot.button, 'no-range', why === 'range');
-      setClass(slot.button, 'unusable', why === 'shards' || why === 'immolate' || why === 'dead' || S.over);
+      setClass(slot.button, 'unusable', why === 'shards' || why === 'health' || why === 'immolate' || why === 'dead' || S.over);
       setClass(slot.button, 'active', !!((cast && cast.key === key) || (channel && channel.key === key)));
       setClass(slot.button, 'queued', combat.queuedKey === key);
       setClass(slot.button, 'proc', (key === 'shadowBolt' && combat.buff('shadowTrance')) || (key === 'soulFire' && combat.buff('decimation')));
-      setText(slot.count, c.spells[key] && c.spells[key].shards ? String(S.shards) : key === 'racial' && S.eurekaCharges ? String(S.eurekaCharges) : '');
+      // Soul Shards are shown only when they can run out (they do not, since the sim made them unlimited).
+      setText(slot.count, c.spells[key] && c.spells[key].shards && isFinite(S.shards) ? String(S.shards) : key === 'racial' && S.eurekaCharges ? String(S.eurekaCharges) : '');
     }
 
     // Damage meter, a few times a second.
@@ -771,7 +780,12 @@ export function createHud(WL, handlers) {
     } else if (e.type === 'refund') {
       log('Shadow and Flame returns the Soul Shard.', 'proc');
     } else if (e.type === 'interrupt') {
-      if (e.reason !== 'clipped' && e.reason !== 'dead') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
+      if (e.reason === 'health') { interruptedUntil = clock + 0.7; log(name + ' stops: its next tick would kill you.', 'miss'); }
+      else if (e.reason !== 'clipped' && e.reason !== 'dead') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
+    } else if (e.type === 'heal') {
+      if (e.amount >= 0.5) log('You are healed for ' + whole(e.amount) + '.', 'gain');
+    } else if (e.type === 'selfHit') {
+      // Hellfire burning you: it shows on your health bar
     } else if (e.type === 'pushback') {
       log(name + (e.channel ? ' cut short by ' : ' pushed back ') + e.lost.toFixed(1) + ' s.', 'miss');
     } else if (e.type === 'pushResist') {

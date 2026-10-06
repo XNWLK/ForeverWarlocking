@@ -366,6 +366,7 @@ function showReview() {
   panels.showReview({
     curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
+    health: { min: combat.state.minHealth, max: character.stats.maxHealth },
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
     timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
@@ -423,7 +424,7 @@ function onCombatEvent(e) {
       humming = true;
     }
   } else if (e.type === 'fail') sound.play('error');
-  else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled') sound.play('stopped'); }
+  else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled' || e.reason === 'health') sound.play('stopped'); }
   else if (e.type === 'tick') sound.play('tick');
   else if (e.type === 'apply') sound.play('apply');
   else if (e.type === 'proc') sound.play('proc');
@@ -500,7 +501,7 @@ function startingBuild() {
 function standingBuffs(build, stats) {
   const list = [];
   if (stats.sacrificeActive && build.sacrifice) {
-    const what = build.sacrifice === 'imp' ? 'Imp' : build.sacrifice === 'succubus' ? 'Succubus' : build.sacrifice;
+    const what = build.sacrifice.charAt(0).toUpperCase() + build.sacrifice.slice(1);      // Imp, Succubus, Voidwalker, Felhunter
     list.push({ key: 'sacrifice', icon: 'demonicSacrifice', name: 'Demonic Sacrifice (' + what + ')', desc: 'You sacrificed your ' + what + ' before the fight; its gift lasts the whole fight.', from: 'your talents' });
   }
   Object.keys(config.buffs).forEach(function (k) {

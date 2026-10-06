@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "b1c95fd",
-    "subject":  "5-second rule: no Spirit regeneration while channelling",
+    "commit":  "7b844e7",
+    "subject":  "Spell data comments for health and threat fields; README",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 00:01",
+    "synced":  "2026-10-07 01:44",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

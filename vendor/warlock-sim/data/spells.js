@@ -21,6 +21,8 @@
 //            spell that deals the damage (where the value and SP mod come from) (round 100, A79)
 //   noAgonizingFlames / noMalediction  the talent's spell data does not list this spell (A79)
 //   projectile  travels to the target: lands fight.travelMs after the cast (round 39, A65)
+//   healthCost  health the spell costs you (Life Tap) · selfDamage  every tick also hits you for its base damage (Hellfire)
+//   leech       share of the damage dealt that you get back as health · threatMult  threat per damage (default 1)   (round 119)
 window.WL = window.WL || {};
 
 WL.SPELLS = {
@@ -31,19 +33,19 @@ WL.SPELLS = {
   incinerate:   { id: 1293813, name: 'Incinerate',     school: 'fire',   tree: 'destruction', kind: 'direct',
                   base: 217, coef: 0.714, cast: 2.5, cost: 325, range: 30, immolateBonusPct: 25, talent: 'incinerate', projectile: true },
   searingPain:  { id: 17923,   name: 'Searing Pain',   school: 'fire',   tree: 'destruction', kind: 'direct',
-                  base: 114, coef: 0.429, cast: 1.5, cost: 168, range: 30 },
+                  base: 114, coef: 0.429, cast: 1.5, cost: 168, range: 30, threatMult: 2 },   // "Causes a high amount of threat" = twice its damage (Classic) [A84]
   conflagrate:  { id: 18932,   name: 'Conflagrate',    school: 'fire',   tree: 'destruction', kind: 'direct',
                   base: 282, coef: 0.429, cast: 0, cost: 255, range: 30, cd: 10, talent: 'conflagrate' },
   shadowburn:   { id: 18871,   name: 'Shadowburn',     school: 'shadow', tree: 'destruction', kind: 'direct',
                   base: 266, coef: 0.429, cast: 0, cost: 365, range: 30, cd: 15, shards: 1, talent: 'shadowburn' },
   soulFire:     { id: 17924,   name: 'Soul Fire',      school: 'fire',   tree: 'destruction', kind: 'direct',
                   base: 431, coef: 1.0, cast: 6.0, cost: 335, range: 30, cd: 60, shards: 1, projectile: true },
-  // AoE channels (round 100, user; A79). Damage = the triggered spell's Effect Value − 1 per tick and target. Hellfire's
-  // damage to yourself is not modelled (user). Talents from the spell data: Cataclysm, Ruin, Intensity, Destructive Reach
+  // AoE channels (round 100, user; A79). Damage = the triggered spell's Effect Value − 1 per tick and target. Hellfire
+  // also hits you with every tick (selfDamage, round 119: your health is simulated). Talents from the spell data: Cataclysm, Ruin, Intensity, Destructive Reach
   // (both); Malediction lists Hellfire but not Rain of Fire; Agonizing Flames lists Rain of Fire but not Hellfire.
   hellfire:     { id: 11684,   name: 'Hellfire',       school: 'fire',   tree: 'destruction', kind: 'channel', aoe: true, rank: 3,
                   tickBase: 206, tickCoef: 0.022, tickEvery: 1, duration: 15, cast: 0, cost: 1300, range: 0, radius: 10,
-                  effectSpell: 11682, noAgonizingFlames: true },
+                  effectSpell: 11682, noAgonizingFlames: true, selfDamage: true },   // selfDamage: every tick also hits you for its base damage (round 119)
   rainOfFire:   { id: 11678,   name: 'Rain of Fire',   school: 'fire',   tree: 'destruction', kind: 'channel', aoe: true, rank: 4,
                   tickBase: 220, tickCoef: 0.083, tickEvery: 2, duration: 8, cast: 0, cost: 1185, range: 30, radius: 8,
                   effectSpell: 1282385, noMalediction: true },
@@ -60,20 +62,20 @@ WL.SPELLS = {
   baneOfHavoc:  { id: 1225228, name: 'Bane of Havoc',  school: 'shadow', tree: 'affliction',  kind: 'utility',
                   cast: 0, cost: 69, range: 30, duration: 300, havocPct: 15, talent: 'baneOfHavoc' },
   siphonLife:   { id: 18881,   name: 'Siphon Life',    school: 'shadow', tree: 'affliction',  kind: 'dot',
-                  tickBase: 41, tickCoef: 0.05, tickEvery: 3, duration: 30, cast: 0, cost: 365, range: 30, talent: 'siphonLife' },
+                  tickBase: 41, tickCoef: 0.05, tickEvery: 3, duration: 30, cast: 0, cost: 365, range: 30, talent: 'siphonLife', leech: 1 },   // leech: share of the damage you get back as health (round 119)
   drainLife:    { id: 11700,   name: 'Drain Life',     school: 'shadow', tree: 'affliction',  kind: 'channel', drain: true,
-                  tickBase: 51, tickCoef: 0.10, tickEvery: 1, duration: 5, cast: 0, cost: 300, range: 20 },
+                  tickBase: 51, tickCoef: 0.10, tickEvery: 1, duration: 5, cast: 0, cost: 300, range: 20, leech: 1 },
   drainSoul:    { id: 11675,   name: 'Drain Soul',     school: 'shadow', tree: 'affliction',  kind: 'channel', drain: true,
                   tickBase: 84, tickCoef: 0.10, tickEvery: 3, duration: 15, cast: 0, cost: 290, range: 30 },
   wrack:        { id: 1316697, name: 'Wrack',          school: 'shadow', tree: 'affliction',  kind: 'channel', drain: true,
                   tickBase: 36, tickCoef: 0.143, tickEvery: 1, duration: 6, cast: 0, cost: 200, range: 30, talent: 'wrack',
-                  debuffPct: 10, debuffSpells: ['corruption', 'baneOfAgony'] },   // [A18]
+                  debuffPct: 10, debuffSpells: ['corruption', 'baneOfAgony', 'siphonLife', 'baneOfDoom'] },   // [A18]
   deathCoil:    { id: 17926,   name: 'Death Coil',     school: 'shadow', tree: 'affliction',  kind: 'direct',
-                  base: 454, coef: 0.214, cast: 0, cost: 600, range: 30, cd: 120, projectile: true },
+                  base: 454, coef: 0.214, cast: 0, cost: 600, range: 30, cd: 120, projectile: true, leech: 1 },
   curseOfElements: { id: 1311680, name: 'Curse of the Elements', school: 'shadow', tree: 'affliction', kind: 'utility',
                   cast: 0, cost: 200, range: 30, duration: 300, dmgTakenPct: 10 },            // [A34]
   lifeTap:      { id: 11689,   name: 'Life Tap',       school: 'shadow', tree: 'affliction',  kind: 'utility',
-                  cast: 0, cost: 0, range: 0, manaBase: 430 },                                  // [A12] mana = (430 + Spirit) * (1 + ImpLT)
+                  cast: 0, cost: 0, range: 0, manaBase: 430, healthCost: 430 },   // round 119: "Converts 430 health into …"                                  // [A12] mana = (430 + Spirit) * (1 + ImpLT)
 };
 
 // AQ20 book ranks (round 42, user): taught only by Grimoire items that drop in Ruins of Ahn'Qiraj (Wowhead Forever:

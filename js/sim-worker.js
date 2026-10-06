@@ -60,5 +60,5 @@ self.onmessage = function (e) {
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
   self.postMessage({ id: job.id, dps: result.dps, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, casts: casts });
+                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, casts: casts });
 };

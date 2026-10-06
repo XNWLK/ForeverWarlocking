@@ -93,6 +93,12 @@ for (const scene of SCENES) {
           const a = sim.bySpell[key] ? sim.bySpell[key].dmg : 0, b = mine.bySpell[key] ? mine.bySpell[key].dmg : 0;
           if (!(Math.abs(a - b) <= 1e-6 * Math.max(1, a))) problems.push(key + ': engine ' + a.toFixed(1) + ', here ' + b.toFixed(1));
         }
+        // Your health: where it ended and how low it went (Life Tap, Hellfire, heals, leech).
+        if (sim.health) {
+          const S = combat.state;
+          if (Math.abs(S.health - sim.health.end) > 1e-6 * Math.max(1, sim.health.end)) problems.push('health at the end: engine ' + sim.health.end.toFixed(1) + ', here ' + S.health.toFixed(1));
+          if (Math.abs(S.minHealth - sim.health.min) > 1e-6 * Math.max(1, Math.abs(sim.health.min))) problems.push('lowest health: engine ' + sim.health.min.toFixed(1) + ', here ' + S.minHealth.toFixed(1));
+        }
         if (!(Math.abs(sim.total - mine.total) <= 1e-6 * Math.max(1, sim.total))) problems.push('total: engine ' + sim.total.toFixed(1) + ', here ' + mine.total.toFixed(1));
 
         fights++;
@@ -106,5 +112,5 @@ for (const scene of SCENES) {
   }
 }
 
-console.log(failures ? 'FAIL: ' + failures + ' of ' + fights + ' fights differ' : 'OK: ' + fights + ' fights, same damage and mana as the engine in every one');
+console.log(failures ? 'FAIL: ' + failures + ' of ' + fights + ' fights differ' : 'OK: ' + fights + ' fights, same damage, mana and health as the engine in every one');
 process.exit(failures ? 1 : 0);

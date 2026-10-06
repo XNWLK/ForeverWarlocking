@@ -203,6 +203,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .bar i { position: absolute; inset: 0 auto 0 0; width: 100%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -6px 6px rgba(0, 0, 0, 0.16); }
 .bar b { position: relative; display: block; text-align: center; font-size: 11px; line-height: var(--h); font-weight: 600; font-variant-numeric: tabular-nums; text-shadow: 0 1px 1px #000; }
 .bar.health i { background: var(--health); }
+.bar.health.low i { background: #c9a12e; }               /* not much left for Life Taps */
 .bar.mana { --h: 12px; }
 .bar.mana i { background: var(--mana); }
 .bar.mana b { font-size: 10px; }
@@ -423,12 +424,15 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .touch #bottomCentre { display: contents; }
 .touch #frames { position: absolute; left: 50%; top: calc(6px + var(--st)); transform: translateX(-50%); width: var(--top-width); grid-template-columns: 1fr 1fr; gap: 5px; }
 .touch .unit { padding: 4px 8px 6px; gap: 6px; border-radius: 9px; }
-.touch .portrait, .touch #playerFrame .bar.health { display: none; }
+.touch .portrait { display: none; }
+.touch #playerFrame .bar.health { --h: 10px; }
+.touch #playerFrame .bar.health b { font-size: 9px; }
 .touch .unit-name { font-size: 11px; }
 .touch .unit-sub { font-size: 10px; }
 .touch .unit-body { gap: 3px; }
-.touch #playerFrame .bar.mana { --h: 16px; }
-.touch #playerFrame .bar.mana b { font-size: 10px; }
+.touch #playerFrame .bar.mana { --h: 10px; }
+.touch #playerFrame .bar.mana b { font-size: 9px; }
+.touch #playerFrame .unit-body { gap: 2px; }
 .touch .hostile .bar.health { --h: 16px; }
 .touch #auraRow { position: absolute; left: 50%; top: calc(60px + var(--st)); transform: translateX(-50%); width: var(--top-width); min-height: 0; align-items: flex-start; gap: 8px; pointer-events: none; }
 .touch #playerBuffs { max-width: 48%; }
