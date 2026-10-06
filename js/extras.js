@@ -1,7 +1,8 @@
 // The bar on the right and what it switches on or opens:
 //   - the rotation panel (what the sim plays), the race against the sim, mistake callouts;
 //   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM;
-//   - latency, fight presets, drills and the seeded fight, and copying the combat log.
+//   - latency, fight presets, and copying the combat log.
+// Challenges (drills and the seeded fight) have a window of their own, opened by the gold button at the top.
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
 import { setTip } from './tooltip.js';
@@ -222,27 +223,36 @@ export function createExtras(WL, handlers) {
   });
 
   // ---------- drills and the seeded fight ----------
-  const drillButtons = {};
+  // Challenges have a window of their own (the gold button at the top): a card per drill with your best, and the
+  // seeded fight.
+  const challengeWindow = byId('challenges'), challengeButton = byId('btnChallenges'), cards = {};
   function best(id) { const all = getSetting('drills') || {}; return all[id] || null; }
   function fillDrills() {
     DRILLS.forEach(function (d) {
-      let button = drillButtons[d.id];
-      if (!button) {
-        button = drillButtons[d.id] = document.createElement('button');
+      let card = cards[d.id];
+      if (!card) {
+        const box = el('div', null, 'card'), head = el('h4'), grade = el('b'), record = el('small'), button = el('button');
+        head.append(el('span', d.name), grade);
         button.type = 'button';
-        button.append(el('span', d.name), el('small'));
-        button.addEventListener('click', function () { button.blur(); handlers.onChallenge(challenge && challenge.id === d.id ? null : Object.assign({ drill: true }, d)); });
-        setTip(button, function () {
-          const b = best(d.id);
-          return { title: d.name, right: 'Drill', text: d.text, notes: ['Graded against the sim in the same fight: S from 100%, A from 95%, B from 88%, C from 78%.', b ? 'Your best: ' + b.grade + ' (' + b.pct + '% of the sim, ' + whole(b.dps) + ' DPS).' : 'Not played yet.'] };
+        button.addEventListener('click', function () {
+          const running = challenge && challenge.id === d.id;
+          challengeWindow.hidden = true;
+          handlers.onChallenge(running ? null : Object.assign({ drill: true }, d));
         });
-        byId('drills').appendChild(button);
+        box.append(head, el('p', d.text), record, button);
+        byId('drills').appendChild(box);
+        card = cards[d.id] = { box: box, grade: grade, record: record, button: button };
       }
-      const b = best(d.id);
-      button.lastChild.textContent = b ? b.grade + ' ' + b.pct + '%' : '';
-      button.classList.toggle('on', !!challenge && challenge.id === d.id);
+      const b = best(d.id), running = !!challenge && challenge.id === d.id;
+      card.grade.textContent = b ? b.grade : '';
+      card.record.textContent = b ? 'Your best: ' + b.pct + '% of the sim, ' + whole(b.dps) + ' DPS' : 'Not played yet';
+      card.button.textContent = running ? 'End' : b ? 'Play again' : 'Start';
+      card.box.classList.toggle('on', running);
     });
+    challengeButton.classList.toggle('on', !!challenge);
   }
+  challengeButton.addEventListener('click', function () { challengeButton.blur(); fillDrills(); challengeWindow.hidden = !challengeWindow.hidden; });
+  byId('challengesClose').addEventListener('click', function () { challengeWindow.hidden = true; });
   const seedBox = byId('seed'), today = new Date();
   seedBox.value = String(today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate());   // today's date: everyone who keeps it plays the same fight
   seedBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') byId('seedStart').click(); e.stopPropagation(); });
@@ -256,6 +266,7 @@ export function createExtras(WL, handlers) {
   byId('seedStart').addEventListener('click', function () {
     const word = seedBox.value.trim() || '1';
     seedBox.blur(); byId('seedStart').blur();
+    challengeWindow.hidden = true;
     handlers.onChallenge({ id: 'seed', seeded: true, name: 'Seeded fight "' + word + '"', word: word, seed: seedNumber(word), targets: 1,
                            text: 'Two minutes on one dummy with the dice fixed by the seed.', fight: { timed: true, seconds: 120 } });
   });
@@ -355,8 +366,8 @@ export function createExtras(WL, handlers) {
     // An event from the casting rules (only what the callouts need to know).
     event: function (e, combat) { if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t; },
     refreshDrills: fillDrills,
-    sheetOpen: function () { return !sheet.hidden; },
-    closeSheet: function () { sheet.hidden = true; },
+    sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden; },
+    closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; },
     copy: copyText
   };
 }

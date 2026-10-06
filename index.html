@@ -49,6 +49,9 @@
   <section id="topBar">
     <div class="toolbar">
       <div class="group">
+        <button type="button" id="btnChallenges" class="gold" title="Drills graded against the sim, and the seeded fight">Challenges</button>
+      </div>
+      <div class="group">
         <span class="label">Dummies</span>
         <div class="seg">
           <button type="button" data-dummies="1">1</button>
@@ -128,13 +131,6 @@
       <label title="How long each key press takes to arrive, as on a slow connection. The sim average waits just as long after each cast.">Latency <input type="number" id="latency" min="0" max="1000" step="10" value="0"> ms</label>
       <p class="hint">Presets (they replace your fight settings):</p>
       <div class="stack" id="presets"></div>
-    </details>
-    <details>
-      <summary>Challenges</summary>
-      <p class="hint">Drills, graded against the sim. Your own fight settings stay as they are.</p>
-      <div class="stack drills" id="drills"></div>
-      <p class="hint">Seeded fight: the same dice for everyone who types the same seed.</p>
-      <div class="seed"><input type="text" id="seed" maxlength="24" spellcheck="false" aria-label="Seed"><button type="button" id="seedStart">Start</button></div>
     </details>
     <details>
       <summary>Combat log</summary>
@@ -235,6 +231,17 @@
 <section id="review" class="review" hidden>
   <header><h2>Fight review</h2><button type="button" id="reviewClose">Close</button></header>
   <div id="reviewBody"></div>
+</section>
+<section id="challenges" class="review sheet" hidden>
+  <header><h2>Challenges</h2><button type="button" id="challengesClose">Close</button></header>
+  <p class="hint">Short fights with one thing to practise. Each is graded against what the sim reaches in the very same fight: S from 100%, A from 95%, B from 88%, C from 78%. Your own fight settings stay as they are; "End" at the top of the screen takes you back to them.</p>
+  <h3>Drills</h3>
+  <div class="cards" id="drills"></div>
+  <h3>Seeded fight</h3>
+  <div class="card wide-card">
+    <p>Two minutes on one dummy with the dice fixed by a seed: everyone who types the same seed gets the same rolls, so results can be compared. The box starts with today's date. After the fight, "Copy the result" in the review gives you one line to pass on.</p>
+    <div class="seed"><input type="text" id="seed" maxlength="24" spellcheck="false" aria-label="Seed"><button type="button" id="seedStart">Start</button></div>
+  </div>
 </section>
 <section id="sheet" class="review sheet" hidden>
   <header>
