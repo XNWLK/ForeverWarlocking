@@ -404,5 +404,116 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .challenge-line b { font-size: 26px; line-height: 1; color: var(--gold); }
 .challenge-line span { flex: 1; }
 
+/* --- Touch screens (phones, tablets without a mouse) ---------------------------------------------------------
+   html gets the class "touch" (js/touch.js). The same pieces as on a desktop, placed for thumbs: you and your
+   target at the top, the stick bottom left, the spells in a grid bottom right, the cast bar between them, and one
+   Menu button that holds the bars from the top and the right. Sizes are in the screen's own units; the whole layer
+   is scaled so that a phone's short side is 390 of them. */
+#touch { display: none; }
+.touch #touch { display: contents; }
+.touch #hud { --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px); --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px);
+  --mid: calc(146px + var(--sl) + (100% - 146px - 330px - var(--sl) - var(--sr)) / 2); --top-width: min(400px, calc(100% - 260px)); }
+.touch, .touch body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.touch #hud button, .touch #hud .aura, .touch #hud label, .touch #meter { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.touch .slot img, .touch .aura img { pointer-events: none; }
+.touch #combatLog, .touch #petFrame, .touch #editStrip, .touch #btnKeys, .touch #btnEdit, .touch #keysPanel, .touch .slot kbd, .touch .slot.empty { display: none !important; }
+
+/* Top: your DPS (tap it for the review), you and your target, the Menu button. */
+.touch #bottomCentre { display: contents; }
+.touch #frames { position: absolute; left: 50%; top: calc(6px + var(--st)); transform: translateX(-50%); width: var(--top-width); grid-template-columns: 1fr 1fr; gap: 5px; }
+.touch .unit { padding: 4px 8px 6px; gap: 6px; border-radius: 9px; }
+.touch .portrait, .touch #playerFrame .bar.health { display: none; }
+.touch .unit-name { font-size: 11px; }
+.touch .unit-sub { font-size: 10px; }
+.touch .unit-body { gap: 3px; }
+.touch #playerFrame .bar.mana { --h: 16px; }
+.touch #playerFrame .bar.mana b { font-size: 10px; }
+.touch .hostile .bar.health { --h: 16px; }
+.touch #auraRow { position: absolute; left: 50%; top: calc(60px + var(--st)); transform: translateX(-50%); width: var(--top-width); min-height: 0; align-items: flex-start; gap: 8px; pointer-events: none; }
+.touch #playerBuffs { max-width: 48%; }
+.touch .aura { width: 18px; height: 18px; border-radius: 4px; }
+.touch .aura b { font-size: 9px; line-height: 10px; }
+.touch .auras.large .aura { width: 26px; height: 26px; }
+.touch .auras.large .aura b { font-size: 11px; line-height: 12px; }
+.touch .dotbars { bottom: auto; top: 30px; width: 150px; flex-direction: column; }
+.touch #topCentre { top: calc(96px + var(--st)); width: var(--top-width); }
+.touch .chip { max-width: 100%; font-size: 11px; }
+.touch .meter { left: calc(8px + var(--sl)); top: calc(6px + var(--st)); right: auto; bottom: auto; width: auto; padding: 5px 10px; display: flex; align-items: baseline; gap: 8px; pointer-events: auto; }
+.touch .meter-main { margin: 0; gap: 4px; }
+.touch .meter-main b { font-size: 20px; }
+.touch .meter dl { display: block; font-size: 10px; }
+.touch .meter dt, .touch .meter dd, .touch .meter ol, .touch #race { display: none; }
+.touch .meter #meterSim { display: block; color: var(--ink-dim); }
+.touch .meter #meterSim::before { content: 'sim '; }
+.touch .rotation { left: calc(8px + var(--sl)); top: calc(46px + var(--st)); width: 200px; max-height: 44%; }
+.touch .rotation .hint { display: none; }
+.touch label:has(#swRace) { display: none !important; }              /* the race against the sim has no room on a phone */
+#btnMenu { position: absolute; right: calc(8px + var(--sr)); top: calc(6px + var(--st)); padding: 8px 14px; font-size: 13px; font-weight: 600; background: var(--glass); border: 1px solid var(--line); border-radius: 10px; }
+
+/* Bottom: the stick, the cast bar, the spells. */
+#stick { position: absolute; left: calc(18px + var(--sl)); bottom: calc(18px + var(--sb)); width: 118px; height: 118px; border-radius: 50%; background: rgba(20, 11, 30, 0.42); border: 1px solid var(--line-bright); pointer-events: auto; touch-action: none; }
+#stick i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(185, 138, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.55); pointer-events: none; }
+.touch .actionbar { position: absolute; right: calc(8px + var(--sr)); bottom: calc(8px + var(--sb)); display: grid; grid-template-columns: repeat(5, 46px); gap: 4px; padding: 5px; }
+.touch .slot { width: 46px; height: 46px; }
+.touch .slot .secs { font-size: 17px; }
+#touchKeys { position: absolute; right: calc(278px + var(--sr)); bottom: calc(8px + var(--sb)); display: flex; flex-direction: column; gap: 5px; }
+#touchKeys button { width: 46px; height: 46px; padding: 0; border-radius: 50%; font-size: 11px; font-weight: 600; background: var(--glass); border: 1px solid var(--line-bright); }
+#touchKeys button:active, #btnMenu:active { background: rgba(185, 138, 255, 0.3); }
+.touch .castbar { position: absolute; left: var(--mid); bottom: calc(16px + var(--sb)); transform: translateX(-50%); width: min(210px, calc(100% - 500px - var(--sl) - var(--sr))); min-width: 150px; }
+.touch .sim-hint { position: absolute; left: var(--mid); bottom: calc(42px + var(--sb)); transform: translateX(-50%); }
+.touch .error-text { position: absolute; left: var(--mid); bottom: calc(68px + var(--sb)); transform: translateX(-50%); white-space: nowrap; font-size: 13px; }
+
+/* A phone held upright: one more row at the top, the cast bar above the spells. */
+@media (orientation: portrait) {
+  .touch #hud { --mid: 50%; --top-width: calc(100% - 16px - var(--sl) - var(--sr)); }
+  .touch #frames { top: calc(48px + var(--st)); }
+  .touch #auraRow { top: calc(102px + var(--st)); }
+  .touch #topCentre { top: calc(140px + var(--st)); }
+  .touch .rotation { top: calc(140px + var(--st)); }
+  #stick { left: calc(10px + var(--sl)); bottom: calc(14px + var(--sb)); width: 104px; height: 104px; }
+  #stick i { width: 44px; height: 44px; margin: -22px 0 0 -22px; }
+  .touch .actionbar { grid-template-columns: repeat(5, 43px); }
+  .touch .slot { width: 43px; height: 43px; }
+  #touchKeys { left: calc(10px + var(--sl)); right: auto; bottom: calc(128px + var(--sb)); flex-direction: row; gap: 4px; }
+  #touchKeys button { width: 40px; height: 40px; font-size: 10px; }
+  .touch .castbar { bottom: calc(190px + var(--sb)); width: 230px; }
+  .touch .sim-hint { bottom: calc(216px + var(--sb)); }
+  .touch .error-text { bottom: calc(242px + var(--sb)); }
+}
+
+/* The menu: everything you set up before a fight, one under the other. */
+#touchMenu { position: absolute; inset: 0; z-index: 5; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: calc(10px + var(--st)) calc(12px + var(--sr)) calc(24px + var(--sb)) calc(12px + var(--sl)); background: var(--glass-solid); pointer-events: auto; }
+#touchMenu header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+#touchMenu h2 { margin: 0; font-size: 16px; font-weight: 600; }
+#touchMenuBody { display: grid; gap: 10px; }
+.touch #touchMenu #links, .touch #touchMenu #challengeBar, .touch #touchMenu #topBar, .touch #touchMenu #side { position: static; width: auto; max-height: none; overflow: visible; justify-items: stretch; }
+.touch #touchMenu .toolbar { flex-wrap: wrap; row-gap: 6px; padding: 6px 2px; }
+.touch #touchMenu .toolbar .group { flex-wrap: wrap; row-gap: 6px; }
+.touch #touchMenu .toolbar .group + .group { border-left: 0; }
+.touch #touchMenu button { padding: 8px 12px; font-size: 14px; }
+.touch #touchMenu .seg button { min-width: 40px; }
+.touch #touchMenu #btnReview { display: inline-block; width: auto; margin: 0; }
+.touch #touchMenu #buildLabel { max-width: 60vw; font-size: 14px; }
+.touch #touchMenu .picker { width: auto; }
+.touch #touchMenu .options button { padding: 8px 10px; }
+.touch #touchMenu .side summary { font-size: 12px; padding: 4px 0; }
+.touch #touchMenu .side label, .touch #touchMenu .hint { font-size: 13px; }
+.touch #touchMenu .switch { padding: 6px 0; }
+.touch #hud input, .touch #hud textarea, .touch #challenges input { font-size: 16px; }      /* smaller text makes a phone zoom in when you type */
+.touch #hud input[type="number"] { width: 80px; }
+#touchHelp { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 4; width: min(320px, calc(100% - 40px)); display: grid; gap: 6px; padding: 12px 14px; text-align: center; font-size: 13px; border-color: var(--line-bright); pointer-events: auto; }
+#touchHelp b { font-size: 14px; }
+#touchHelp small { color: var(--ink-dim); }
+
+/* The windows (review, Challenges, sheets) on a narrow screen. */
+@media (max-width: 620px) {
+  .cards { grid-template-columns: 1fr 1fr; }
+  .trees { grid-template-columns: 1fr; }
+  .review { padding: 12px; }
+  .challenge-line { flex-wrap: wrap; }
+}
+.touch .review { max-height: calc(100% - 16px); -webkit-overflow-scrolling: touch; }
+.touch .review button { padding: 7px 12px; font-size: 13px; }
+
 /* --- Start-up failure ---------------------------------------------------- */
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }

@@ -1,6 +1,8 @@
 // Walking and the camera, with the game's default keys:
 // W/S forward and back, A/D turn, Q/E step sideways, Space jump, right mouse held = steer,
 // left mouse held = look around, both mouse buttons = walk forward, wheel = zoom.
+// On a touch screen: one finger dragged over the scene turns you (as the right mouse button does), two fingers pinch
+// to zoom, a tap is a click; walking comes from the stick (setStick) and jumping from a button (jump).
 import * as THREE from 'three';
 
 const RUN_SPEED = 7;          // yards per second
@@ -9,6 +11,7 @@ const TURN_SPEED = Math.PI;   // radians per second
 const JUMP_SPEED = 7.96;
 const GRAVITY = 19.29;
 const MOUSE_TURN = 0.005;     // radians per pixel
+const TOUCH_TURN = 0.007;
 const EYE_HEIGHT = 1.7;
 const PLAYER_RADIUS = 0.6;
 
@@ -29,6 +32,9 @@ export function createControls(canvas, camera, world) {
   const view = { offset: 0, pitch: 0.3, distance: 11 };   // offset = camera angle relative to the character's back
   const keys = new Set();
   const mouse = { left: false, right: false };
+  const fingers = new Map();                              // fingers on the scene: pointer id -> { x, y }
+  const stick = { x: 0, y: 0 };                           // the walking stick of a touch screen: x to the right, y forward
+  let pinch = 0, jumpAsked = false;
 
   function reset() {
     player.x = start.x; player.z = start.z; player.yaw = start.yaw; player.height = 0; player.fall = 0;
@@ -59,6 +65,16 @@ export function createControls(canvas, camera, world) {
   canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   let pressed = null;                                     // where and when the left button went down
   canvas.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'touch') {
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (fingers.size === 1) {
+        pressed = { x: e.clientX, y: e.clientY, at: performance.now() };
+        player.yaw = wrapAngle(player.yaw + view.offset); // you turn with the camera
+        view.offset = 0;
+      } else { pressed = null; pinch = 0; }
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* the finger is already gone */ }
+      return;
+    }
     if (e.button === 0) { mouse.left = true; pressed = { x: e.clientX, y: e.clientY, at: performance.now() }; }
     if (e.button === 2) {
       mouse.right = true;
@@ -69,6 +85,13 @@ export function createControls(canvas, camera, world) {
     showCursor();
   });
   function release(e) {
+    if (e.pointerType === 'touch') {
+      fingers.delete(e.pointerId);
+      pinch = 0;
+      if (pressed && !fingers.size && world.onClick && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) < 10 && performance.now() - pressed.at < 400) world.onClick(e.clientX, e.clientY);
+      if (!fingers.size) pressed = null;
+      return;
+    }
     if (e.button === 0) {
       mouse.left = false;
       // A short press without dragging is a click on whatever is under the pointer (a dummy, to target it).
@@ -80,8 +103,23 @@ export function createControls(canvas, camera, world) {
     showCursor();
   }
   canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', function () { mouse.left = mouse.right = false; showCursor(); });
+  canvas.addEventListener('pointercancel', function (e) { fingers.delete(e.pointerId); pinch = 0; mouse.left = mouse.right = false; showCursor(); });
   canvas.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch') {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      const dx = e.clientX - f.x, dy = e.clientY - f.y;   // worked out here: touch screens do not always report the movement
+      f.x = e.clientX; f.y = e.clientY;
+      if (fingers.size === 1) {
+        player.yaw = wrapAngle(player.yaw - dx * TOUCH_TURN);
+        view.pitch = Math.min(1.45, Math.max(-0.12, view.pitch + dy * TOUCH_TURN));
+      } else if (fingers.size === 2) {
+        const both = Array.from(fingers.values()), apart = Math.hypot(both[0].x - both[1].x, both[0].y - both[1].y);
+        if (pinch > 0 && apart > 0) view.distance = Math.min(30, Math.max(3, view.distance * pinch / apart));
+        pinch = apart;
+      }
+      return;
+    }
     if (!mouse.left && !mouse.right) return;
     if (mouse.right) player.yaw = wrapAngle(player.yaw - e.movementX * MOUSE_TURN);
     else view.offset = wrapAngle(view.offset - e.movementX * MOUSE_TURN);
@@ -119,11 +157,13 @@ export function createControls(canvas, camera, world) {
     let sideways = (keys.has(B.strafeRight) ? 1 : 0) - (keys.has(B.strafeLeft) ? 1 : 0);
     if (mouse.right) sideways += right - left;            // while steering, A and D step sideways
     else player.yaw = wrapAngle(player.yaw + (left - right) * TURN_SPEED * dt);
+    forward += stick.y; sideways += stick.x;
+    forward = Math.max(-1, Math.min(1, forward));
     sideways = Math.max(-1, Math.min(1, sideways));
 
     player.moving = forward !== 0 || sideways !== 0;
     if (player.moving) {
-      const length = Math.hypot(forward, sideways), speed = forward < 0 ? BACK_SPEED : RUN_SPEED;
+      const length = Math.hypot(forward, sideways), speed = forward / length < -0.5 ? BACK_SPEED : RUN_SPEED;   // mostly backward is slower
       const f = forward / length * speed * dt, s = sideways / length * speed * dt;
       const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
       player.x += -sin * f + cos * s;                     // forward is (-sin, -cos), right is (cos, -sin)
@@ -132,7 +172,8 @@ export function createControls(canvas, camera, world) {
     }
     collide();
 
-    if (keys.has(B.jump) && player.height === 0) player.fall = JUMP_SPEED;
+    if ((keys.has(B.jump) || jumpAsked) && player.height === 0) player.fall = JUMP_SPEED;
+    jumpAsked = false;
     if (player.height > 0 || player.fall > 0) {
       player.height += player.fall * dt;
       player.fall -= GRAVITY * dt;
@@ -155,5 +196,9 @@ export function createControls(canvas, camera, world) {
     camera.lookAt(target);
   }
 
-  return { player: player, view: view, update: update, reset: reset };
+  return {
+    player: player, view: view, update: update, reset: reset,
+    setStick: function (x, y) { stick.x = x; stick.y = y; },
+    jump: function () { jumpAsked = true; }
+  };
 }

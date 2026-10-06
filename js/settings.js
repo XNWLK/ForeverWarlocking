@@ -11,7 +11,8 @@ const DEFAULTS = {
   latency: 0,                          // milliseconds every key press takes to arrive
   drills: {},                          // your best result per drill or encounter: { id: { grade, pct, dps } }
   bests: {},                           // your best result per fight you set up yourself: { fight: { dps, pct, at } }
-  volume: 0.6                          // how loud the sounds are, 0 to 1
+  volume: 0.6,                         // how loud the sounds are, 0 to 1
+  touchHelp: false                     // the note about touch controls was shown (touch screens only)
 };
 
 let saved = {};

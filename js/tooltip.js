@@ -2,6 +2,8 @@
 // setTip(element, provide) gives an element a tooltip of its own; provide() returns
 //   { title, right, rows: [[left, right], ...], text, notes: [string | { text, yours }] }  or null for none.
 // Anything else with a plain hint (a title attribute) gets the same box with just that text.
+// On a touch screen there is no pointer to rest on something: hold a finger on it instead. The tooltip shows for as
+// long as the finger stays, and that press does nothing else (a spell is not cast by it).
 const providers = new WeakMap();
 let box = null, owner = null, shown = '', stamp = 0;
 
@@ -66,7 +68,29 @@ function update() {
 
 export function initTips() {
   box = document.getElementById('tip');
+  let holdTimer = 0, held = false, downAt = null;
+  function endHold() {
+    window.clearTimeout(holdTimer);
+    downAt = null;
+    if (held) { window.setTimeout(function () { held = false; }, 400); if (owner) hide(); }
+  }
+  document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'touch') return;
+    window.clearTimeout(holdTimer);
+    if (owner) hide();
+    const target = find(e.target);
+    if (!target) return;
+    downAt = { x: e.clientX, y: e.clientY };
+    holdTimer = window.setTimeout(function () { owner = target; shown = ''; held = true; update(); }, 420);
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (e.pointerType === 'touch' && downAt && !held && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 12) { window.clearTimeout(holdTimer); downAt = null; }
+  }, true);
+  document.addEventListener('pointerup', function (e) { if (e.pointerType === 'touch') endHold(); }, true);
+  document.addEventListener('pointercancel', function (e) { if (e.pointerType === 'touch') endHold(); }, true);
+  document.addEventListener('click', function (e) { if (held) { held = false; e.stopPropagation(); e.preventDefault(); } }, true);   // the press that showed a tooltip does nothing else
   document.addEventListener('pointerover', function (e) {
+    if (e.pointerType === 'touch') return;
     const next = e.buttons ? null : find(e.target);       // not while a mouse button is held (steering, dragging)
     if (next === owner) return;
     if (!next) { hide(); return; }

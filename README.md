@@ -3,7 +3,8 @@
 An interactive Warlock practice sim for WoW Forever: stand in front of a training dummy, press your spells in real
 time and see how your rotation does.
 
-**Play it in the browser: https://xnwlk.github.io/ForeverWarlocking/** (desktop, keyboard and mouse)
+**Play it in the browser: https://xnwlk.github.io/ForeverWarlocking/** (desktop with keyboard and mouse, or a phone or
+tablet with touch controls)
 
 **Status: early, playable.** Pick a build and a race, walk around the fel chamber and cast your rotation on the
 dummy with your Imp or Succubus: cast bar, global cooldown, DoTs, procs, execute phase, mana, a combat log and a

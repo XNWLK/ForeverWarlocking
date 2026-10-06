@@ -16,6 +16,7 @@ import { createRecorder } from './record.js';
 import { createEncounter } from './encounter.js';
 import { createAids } from './aids.js';
 import { makeLink, readLink } from './share.js';
+import { createTouch, isTouch } from './touch.js';
 
 const WL = window.WL;
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
@@ -29,7 +30,7 @@ const GAPS = SPOTS.map(function (a) { return SPOTS.map(function (b) { return a &
 const canvas = document.getElementById('scene');
 // 'high-performance' asks a laptop with two graphics chips for the strong one.
 const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
-const FULL_DETAIL = Math.min(window.devicePixelRatio || 1, 2);
+const FULL_DETAIL = Math.min(window.devicePixelRatio || 1, isTouch ? 1.5 : 2);   // phones have very dense screens and small graphics chips
 renderer.setPixelRatio(FULL_DETAIL);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -70,6 +71,16 @@ const controls = createControls(canvas, camera, {
   half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds,
   claimed: function (e) { const combo = keyCombo(e); return combo !== e.code && bound(combo); },   // Shift+W is a spell's key: do not walk
   onWheel: function (e) { const combo = wheelCombo(e); return !!combo && act(combo); }
+});
+// Touch screens: the stick, the round buttons and the menu (nothing happens here on a desktop).
+const touch = createTouch({
+  stick: function (x, y) { controls.setStick(x, y); },
+  jump: function () { controls.jump(); },
+  cancel: function () { combat.cancel(); },
+  nextTarget: function () { nextTarget(); },
+  review: function () { showReview(); },
+  helpSeen: function () { return getSetting('touchHelp') === true; },
+  helpDone: function () { setSetting('touchHelp', true); }
 });
 
 // ---------- the character and the fight ----------
@@ -148,8 +159,8 @@ let fightClock = 0;                                       // seconds since the l
 
 const hud = createHud(WL, {
   onPress: function (key) { press(key); },
-  onBuild: function (key) { setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
-  onRace: function (key) { setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
+  onBuild: function (key) { touch.closeMenu(); setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
+  onRace: function (key) { touch.closeMenu(); setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
   onDummyHealth: function (health) { leaveChallenge(); setSetting('dummyHealth', health); newCharacter(); hud.log((targets > 1 ? 'Each dummy' : 'The dummy') + ' now has ' + health.toLocaleString('en-US') + ' health.'); },
   onDummies: function (count) { leaveChallenge(); setSetting('dummies', count); newCharacter(); hud.log(count === 1 ? 'One dummy.' : count + ' dummies. Tab or a click changes your target.', 'proc'); },
   onTarget: function (ti) { setTarget(ti); },
@@ -202,6 +213,7 @@ const hud = createHud(WL, {
 const extras = createExtras(WL, {
   // A drill, a seeded fight, or null to go back to your own fight settings.
   onChallenge: function (next) {
+    touch.closeMenu();
     challenge = next;
     hud.closePanels();
     newCharacter();
@@ -209,6 +221,7 @@ const extras = createExtras(WL, {
     else hud.log('Back to your own fight settings.');
   },
   onPreset: function (p) {
+    touch.closeMenu();
     challenge = null;
     setSetting('dummies', p.dummies);
     if (p.health) setSetting('dummyHealth', p.health);
@@ -293,6 +306,7 @@ function settleBest() {
 
 const panels = createPanels({
   onFight: function (options) {
+    touch.closeMenu();
     leaveChallenge();
     setSetting('fight', options);
     hud.closePanels();
@@ -526,6 +540,7 @@ function newCharacter() {
   extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
   aids.setCharacter(character);
+  touch.setTargets(targets);
   encounter.start(challenge && challenge.encounter ? challenge : null);
   showBest();
 
@@ -638,6 +653,7 @@ window.addEventListener('mousedown', function (e) {
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   camera.aspect = window.innerWidth / window.innerHeight;
+  camera.fov = camera.aspect < 1 ? 74 : 55;                // a phone held upright: a wider look, or the dummies fall off the sides
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
@@ -668,7 +684,7 @@ panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), [], false)
 hud.setRings(getSetting('rings'));
 hud.log('You enter the fel chamber.', 'proc');
 hud.log('Build: ' + character.build.short + '.');
-hud.log('Cast with the keys on the action bar. Hover a spell or a buff to read it.');
+hud.log(isTouch ? 'Tap a spell to cast it. Hold a finger on a spell or a buff to read it.' : 'Cast with the keys on the action bar. Hover a spell or a buff to read it.');
 if (shared) {
   hud.log('Opened from a link: ' + character.build.short + ', ' + WL.RACES[character.raceKey].name + ', ' + targets + (targets > 1 ? ' dummies.' : ' dummy.'), 'proc');
   if (shared.challenge && !extras.play(shared.challenge)) hud.log('The challenge in the link is not known here.');
@@ -817,7 +833,7 @@ renderer.setAnimationLoop(frame);
 // For checks from the browser console.
 window.FW = {
   extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
-  recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
+  touch: touch, controls: controls, recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
   get keyCodes() { return keyCodes; }, binds: binds,
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,

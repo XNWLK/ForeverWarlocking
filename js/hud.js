@@ -4,6 +4,7 @@ import { getName, setName, maxLength } from './names.js';
 import { parseHealth } from './settings.js';
 import { setTip, initTips, refreshTips } from './tooltip.js';
 import { keyCombo, mouseCombo, wheelCombo, comboLabel, isModifier } from './keys.js';
+import { isTouch } from './touch.js';
 
 export const ACTION_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'KeyR', 'KeyF', 'KeyT', 'KeyG', 'KeyC', 'KeyV', 'KeyB'];
 const LOG_LINES = 9;
@@ -97,7 +98,11 @@ export function createHud(WL, handlers) {
   }
 
   // Desktop only, but keep the frames from overlapping in a small window.
-  function fit() { hud.style.zoom = String(Math.min(1, Math.max(0.5, window.innerWidth / 1280))); }
+  // On a touch screen the layout is made for a phone held either way: it is scaled by the short side.
+  function fit() {
+    hud.style.zoom = String(isTouch ? Math.min(1.5, Math.max(0.8, Math.min(window.innerWidth, window.innerHeight) / 390))
+                                    : Math.min(1, Math.max(0.5, window.innerWidth / 1280)));
+  }
   window.addEventListener('resize', fit);
   fit();
 
