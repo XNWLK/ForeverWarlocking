@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "25869f9",
-    "subject":  "Icons for Blessing of Salvation and Tranquil Air Totem",
+    "commit":  "2498e6d",
+    "subject":  "Demo Pact Shadow Bolt Imp taken off the build list",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 01:51",
+    "synced":  "2026-10-07 02:18",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
