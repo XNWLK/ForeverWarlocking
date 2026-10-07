@@ -137,9 +137,9 @@ export function createPanels(handlers) {
     // The fight from left to right: your casts, the sim's, and when each DoT was up.
     if (d.record && d.record.casts.length) {
       body.appendChild(el('h3', 'Timeline'));
-      body.appendChild(drawTimeline({ record: d.record, seconds: d.seconds, simCasts: sim && sim.casts, spells: d.spells, icon: d.icon,
+      body.appendChild(drawTimeline({ record: d.record, seconds: d.seconds, simCasts: sim && sim.casts, spells: d.spells, icon: d.icon, clips: k.clips,
                                       racialName: d.racialName, targets: d.targets, dummyName: d.dummyName, width: Math.min(640, window.innerWidth * 0.92) - 32 - 112 }));
-      body.appendChild(el('p', 'Red: nothing was cast. Grey: you were made to move. A dim picture: the cast was stopped. "The sim" is one of its own fights' +
+      body.appendChild(el('p', 'Red: nothing was cast. Grey: you were made to move. A dim picture: the cast was stopped. A red notch on a DoT\'s line: it was cast over there. "The sim" is one of its own fights' +
         (d.sameDice ? ', with the same dice as yours.' : ', with other dice than yours: read it for the order of things, not second by second.') + ' Hover anything to read it.', 'graph-key'));
     }
 
@@ -154,14 +154,59 @@ export function createPanels(handlers) {
     if (k.moved > 0) notes.push(['Made to move', k.moved.toFixed(1) + ' s', '']);
     if (k.interrupts) notes.push(['Casts you stopped by moving', String(k.interrupts), '']);
     if (k.pushbacks) notes.push(['Pushed back by hits', k.pushbackTime.toFixed(1) + ' s (' + k.pushbacks + ' times)', sim && sim.pushbackTime != null ? sim.pushbackTime.toFixed(1) + ' s' : '']);
-    notes.push(['Life Taps', String(k.lifeTaps), sim ? sim.lifeTaps.toFixed(1) : '']);
     notes.push(['Threat a second', whole(d.seconds > 0 ? (res.threat || 0) / d.seconds : 0), sim && sim.tps != null ? whole(sim.tps) : '']);
     if (d.health) notes.push(['Lowest health (of ' + whole(d.health.max) + ')', whole(Math.max(0, d.health.min)), sim && sim.health ? whole(Math.max(0, sim.health.min)) + ' at its lowest in any fight' : '']);
-    if (k.spirit >= 1 || (sim && sim.spirit >= 1)) notes.push(['Mana from Spirit (while none was spent for 5 s)', whole(k.spirit || 0), sim && sim.spirit != null ? whole(sim.spirit) : '']);
-    if (k.wasted >= 1) notes.push(['Mana not regained (bar was full)', whole(k.wasted), '']);
     if (d.hasPet) notes.push([d.petName + ' attacking', pct(k.petActive, d.seconds) + ' of the fight', sim ? '100%' : '']);
     body.appendChild(el('h3', 'Time'));
     body.appendChild(table(['', 'You', 'Sim'], notes.map(function (n) { return { cells: n }; })));
+
+    // Mana: how it went over the fight, what Life Tap gave and cost, what was left.
+    if (d.mana) {
+      const m = d.mana, sm = sim && sim.mana, NS = 'http://www.w3.org/2000/svg';
+      body.appendChild(el('h3', 'Mana'));
+      if (m.curve.length > 2) {
+        const W = 600, H = 70, pad = 4, span = Math.max(m.curve.length - 1, 1), svg = document.createElementNS(NS, 'svg');
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'graph mana-graph');
+        const x = function (t) { return pad + (W - 2 * pad) * Math.min(t, span) / span; };
+        // Each Life Tap: a line from the top.
+        ((d.record && d.record.casts) || []).filter(function (c) { return c.key === 'lifeTap' && c.t >= 0; }).forEach(function (c) {
+          const mark = document.createElementNS(NS, 'line');
+          mark.setAttribute('x1', x(c.t).toFixed(1)); mark.setAttribute('x2', x(c.t).toFixed(1)); mark.setAttribute('y1', '0'); mark.setAttribute('y2', String(H));
+          mark.setAttribute('stroke', 'rgba(240,207,122,0.55)'); mark.setAttribute('stroke-width', '1'); mark.setAttribute('vector-effect', 'non-scaling-stroke');
+          svg.appendChild(mark);
+        });
+        const line = document.createElementNS(NS, 'polyline');
+        line.setAttribute('points', m.curve.map(function (v, i) { return x(i).toFixed(1) + ',' + (H - pad - (H - 2 * pad) * Math.max(0, Math.min(v, m.max)) / m.max).toFixed(1); }).join(' '));
+        line.setAttribute('fill', 'none'); line.setAttribute('stroke', '#6f9bff'); line.setAttribute('stroke-width', '2');
+        line.setAttribute('vector-effect', 'non-scaling-stroke'); line.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(line);
+        body.appendChild(svg);
+        const key = el('p', null, 'graph-key');
+        const you = el('span', 'Your mana, 0 to ' + whole(m.max)); you.insertBefore(el('i', null, 'mana'), you.firstChild);
+        key.appendChild(you);
+        if (k.lifeTaps) { const taps = el('span', 'A Life Tap'); taps.insertBefore(el('i', null, 'tap'), taps.firstChild); key.appendChild(taps); }
+        body.appendChild(key);
+      }
+      const rows = [];
+      rows.push(['Life Taps', String(k.lifeTaps), sim ? sim.lifeTaps.toFixed(1) : '']);
+      if (k.lifeTaps || (sm && sm.tapMana >= 1)) rows.push(['Mana from Life Taps', whole(k.tapMana), sm ? whole(sm.tapMana) : '']);
+      if (k.tapLost >= 1) rows.push(['Lost because the bar was too full when you tapped', whole(k.tapLost), '']);
+      if (k.tapsMoving || (sm && sm.movingTaps >= 0.05)) rows.push(['Life Taps while you had to move anyway', String(k.tapsMoving), sm ? sm.movingTaps.toFixed(1) : '']);
+      rows.push(['Mana spent on spells', whole(k.spent), '']);
+      rows.push(['Lowest mana', whole(Math.max(0, k.minMana)), sm ? whole(Math.max(0, sm.min)) : '']);
+      rows.push([d.over ? 'Mana left at the end' : 'Mana right now', whole(Math.max(0, m.end)), sm ? whole(Math.max(0, sm.end)) : '']);
+      if (k.noMana) rows.push(['Presses that failed for lack of mana', String(k.noMana), '']);
+      if (k.spirit >= 1 || (sim && sim.spirit >= 1)) rows.push(['Mana from Spirit (while none was spent for 5 s)', whole(k.spirit || 0), sim && sim.spirit != null ? whole(sim.spirit) : '']);
+      if (k.wasted >= 1) rows.push(['Mana not regained (bar was full)', whole(k.wasted), '']);
+      body.appendChild(table(['', 'You', 'Sim'], rows.map(function (n) { return { cells: n }; })));
+      // What stands out, in a sentence each.
+      const says = [], spare = d.over && m.gain > 0 ? Math.min(k.lifeTaps, Math.floor(m.end / m.gain)) : 0;
+      if (spare >= 1) says.push('You ended with ' + whole(m.end) + ' mana: about ' + (spare === 1 ? 'one Life Tap' : spare + ' Life Taps') + ' more than you needed. Each costs a global cooldown' + (m.tapHealth ? ' and ' + whole(m.tapHealth) + ' health' : '') + '.');
+      if (k.noMana) says.push('You ran dry ' + (k.noMana === 1 ? 'once' : k.noMana + ' times') + ': tap a little earlier, best while you have to move or a DoT is about to run out anyway.');
+      if (k.tapLost >= 1) says.push(whole(k.tapLost) + ' mana from Life Tap was lost to a full bar: one tap gives ' + whole(m.gain) + ', so wait until that much is missing.');
+      if (m.rule) says.push('The sim\'s rule for this build: ' + m.rule.replace(/\s*\[A\d+\]/g, '') + '. It also taps whenever the next spell is not affordable.');
+      if (says.length) body.appendChild(el('p', says.join(' '), 'hint'));
+    }
 
     // Spell by spell, all dummies together.
     const mine = {}, theirs = {};
@@ -213,6 +258,29 @@ export function createPanels(handlers) {
     if (upRows.length) {
       body.appendChild(el('h3', 'How long it was up'));
       body.appendChild(table(['', 'You', 'Sim'], upRows));
+    }
+
+    // DoTs cast over while they still had time left: the ticks that were left are lost.
+    const clipped = {};
+    (k.clips || []).forEach(function (c) {
+      const id = c.target + ':' + c.key + ':' + c.by, g = clipped[id] || (clipped[id] = { key: c.key, by: c.by, target: c.target, times: 0, ticks: 0, left: 0 });
+      g.times++; g.ticks += c.ticks; g.left += c.left;
+    });
+    const clipRows = Object.keys(clipped).map(function (id) {
+      const g = clipped[id], row = res.bySpell[(g.target > 1 ? 'x' + g.target + ':' : '') + g.key];
+      const perTick = row && row.ticks > 0 ? row.dmg / row.ticks : 0;
+      return {
+        cells: [label(g.key) + (d.targets > 1 ? ' on ' + d.dummyName(g.target) : '') + (g.by !== g.key ? ', pushed off by ' + label(g.by) : ', cast again'),
+                String(g.times), (g.left / g.times).toFixed(1) + ' s', String(g.ticks), perTick > 0 && g.ticks ? 'about ' + whole(perTick * g.ticks) : '-'],
+        mark: g.by === g.key && g.ticks > 0 ? 'behind' : ''
+      };
+    });
+    if ((k.clips || []).length || upRows.length) {
+      body.appendChild(el('h3', 'DoTs cast over early'));
+      if (clipRows.length) {
+        body.appendChild(table(['', 'Times', 'Time left (average)', 'Ticks cut off', 'Their damage'], clipRows));
+        body.appendChild(el('p', 'A DoT cast again before it has run out loses the ticks it had left; the new one starts counting afresh. The sim never does it: it starts a cast so that it lands as the old DoT ends, and recasts an instant one when it is gone. "Their damage" is those ticks at this fight\'s average tick - an estimate. Cutting a tick can still be right, before you have to move for example.', 'hint'));
+      } else body.appendChild(el('p', 'None: no DoT was cast again while it still had ticks left.', 'hint'));
     }
     body.appendChild(el('p', d.timed
       ? 'The sim fought for the same length of time with its priority list, many times over; its numbers are averages.'

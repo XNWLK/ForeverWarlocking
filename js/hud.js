@@ -250,7 +250,8 @@ export function createHud(WL, handlers) {
   // Keybinds: every key in one list. Click a key, press the new one.
   const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'],
     ['strafeLeft', 'Step left'], ['strafeRight', 'Step right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
-    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight'], ['pull', 'Pull timer']];
+    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight'], ['pull', 'Pull timer'],
+    ['zoomIn', 'Zoom in'], ['zoomOut', 'Zoom out']];
   let binds = {}, capture = null;                          // capture = the key we are waiting for: { id, button }
   function bindRow(holder, id, text, code) {
     const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');

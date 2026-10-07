@@ -308,12 +308,12 @@ export function createExtras(WL, handlers) {
     calloutUntil = clock + 2.4;
     handlers.log(text, 'miss');
   }
-  let watch = { dots: {}, coe: {}, consumed: {}, idle: 0, idleSaid: false, full: 0, fullSaid: false, last: 0, t: -1 };
+  let watch = { dots: {}, coe: {}, consumed: {}, idle: 0, idleSaid: false, full: 0, fullSaid: false, last: 0, t: -1, clips: 0 };
   function watchFight(combat, now) {
     const S = combat.state, dt = Math.min(0.25, Math.max(0, now - watch.last));
     watch.last = now;
     if (S.t < watch.t || combat.fightSeconds() <= 0 || S.over) {           // a new fight, not started, or over: nothing to say
-      watch.dots = {}; watch.coe = {}; watch.idle = 0; watch.idleSaid = false; watch.full = 0; watch.fullSaid = false;
+      watch.dots = {}; watch.coe = {}; watch.idle = 0; watch.idleSaid = false; watch.full = 0; watch.fullSaid = false; watch.clips = 0;
       watch.t = S.t;
       if (combat.fightSeconds() <= 0 || S.over) return;
     }
@@ -329,6 +329,14 @@ export function createExtras(WL, handlers) {
       const cursed = !!combat.debuff(i, 'coe');
       if (watch.coe[i] && !cursed && alive) callout('Curse of the Elements fell off' + where);
       watch.coe[i] = cursed;
+    }
+    // A DoT cast again while it still had ticks left (one Bane pushing another off is a choice, not a slip).
+    const clips = combat.result.track.clips;
+    for (; watch.clips < clips.length; watch.clips++) {
+      const c = clips[watch.clips];
+      if (c.by === c.key && c.ticks > 0 && character.spells[c.key] && combat.fightSeconds() - c.t < 1) {   // not the old ones when the switch is turned on mid-fight
+        callout(character.spells[c.key].name + ' cast again with ' + c.left.toFixed(1) + ' s left: ' + (c.ticks === 1 ? '1 tick' : c.ticks + ' ticks') + ' cut off' + (character.targets > 1 ? ' on dummy ' + c.target : ''));
+      }
     }
     const phase = combat.movePhase(), busy = !!(S.cast || S.channel) || S.gcdReady > S.t || (phase && phase.moving);
     watch.idle = busy ? 0 : watch.idle + dt;

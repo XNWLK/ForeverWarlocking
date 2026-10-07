@@ -59,12 +59,12 @@ const effects = createEffects(scene);
 
 // Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
 const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
-                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '', pull: '' };
+                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '', pull: '', zoomIn: '', zoomOut: '' };
 const binds = Object.assign({}, DEFAULT_BINDS, getSetting('binds') || {});
 // Walking and jumping are keys you hold: they take a plain key. Everything else also takes a key with Shift, Ctrl or
 // Alt held, a mouse button, or the wheel with a modifier (js/keys.js).
 const MOVE_BINDS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'jump'];
-const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset', 'pull'];
+const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset', 'pull', 'zoomIn', 'zoomOut'];
 
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
 const controls = createControls(canvas, camera, {
@@ -99,6 +99,7 @@ const recorder = createRecorder();                          // what happened whe
 // settings alone. null = your own settings.
 let challenge = null;
 let myCurve = [0];                                         // your damage by the end of each second of this fight (for the review's graph)
+let manaCurve = [], manaEnd = null;                        // your mana at the start of each second, and what was left when the fight ended
 let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
 let prevCast = null, castStopped = false, humming = false, bannerKind = '';
 let keyCodes = ACTION_CODES.slice();
@@ -385,7 +386,10 @@ function showReview() {
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     health: { min: combat.state.minHealth, max: character.stats.maxHealth },
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
-    pull: pullInfo, precast: combat.state.precastKey,
+    pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
+    mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
+            tapHealth: combat.spells.lifeTap.healthCost || 0,
+            rule: character.build.rotation.indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
     timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
 }
@@ -521,6 +525,7 @@ function onCombatEvent(e) {
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
     effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2, controls.player.z) });
   } else if (e.type === 'death') {
+    if (e.last) manaEnd = combat.state.mana;               // what you had left: it keeps regenerating after the fight
     if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
     if (e.last) {
       const fight = combat, mine = settleBest(), drill = challengeResult();
@@ -617,7 +622,7 @@ function resetFight() {
   encounter.reset();
   sound.stopCasting();
   fightBest = null; challengeOut = null; prevCast = null; castStopped = false; humming = false; bannerKind = '';
-  myCurve = [0];
+  myCurve = [0]; manaCurve = []; manaEnd = null;
   fightClock = 0;
   pull = null; pullInfo = null; pullNote = null;
   hud.setPull(false);
@@ -689,6 +694,8 @@ function act(combo) {
   if (combo === binds.petFollow) { combat.update(fightClock, ctx); combat.petCommand('follow'); return true; }
   if (combo === binds.reset) { resetFight(); hud.log('Fight reset.'); return true; }
   if (combo === binds.pull) { togglePull(); return true; }
+  if (combo === binds.zoomIn) { controls.zoom(-1); return true; }
+  if (combo === binds.zoomOut) { controls.zoom(1); return true; }
   const slot = keyCodes.indexOf(combo);
   if (slot < 0) return false;
   press(character.bar[slot]);
@@ -700,7 +707,11 @@ function usesAlt() { return keyCodes.concat(ACTION_BINDS.map(function (k) { retu
 window.addEventListener('keydown', function (e) {
   if (e.metaKey || typing(e)) return;
   const combo = keyCombo(e);
-  if (e.repeat) { if (bound(combo)) e.preventDefault(); return; }
+  if (e.repeat) {                                          // a held key does nothing again - except zooming
+    if (combo && (combo === binds.zoomIn || combo === binds.zoomOut)) act(combo);
+    if (bound(combo)) e.preventDefault();
+    return;
+  }
   if (e.code === 'Escape' && extras.sheetOpen()) { extras.closeSheet(); return; }
   if (e.code === 'Escape' && (panels.reviewOpen() || hud.anyPanelOpen())) { if (panels.reviewOpen()) panels.hideReview(); else hud.closePanels(); return; }
   if (act(combo)) e.preventDefault();                      // also keeps the browser from acting on Ctrl+S, Alt+D and the like
@@ -850,6 +861,10 @@ function frame() {
     else pullNote = null;
   }
 
+  if (combat.state.fightStart !== null && !combat.state.over) {
+    const second = Math.floor(combat.fightSeconds());
+    while (manaCurve.length <= second) manaCurve.push(combat.state.mana);
+  }
   const phase = combat.movePhase(), mustMove = !!(phase && phase.moving);
   if (mustMove && !wasMoving) sound.play('move');
   wasMoving = mustMove;

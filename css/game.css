@@ -137,15 +137,19 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 /* DoT timers: a stack of bars above your target's debuffs, growing upward. */
 #auraRow { position: relative; }
 .dotbars { position: absolute; right: 0; bottom: 36px; width: 186px; display: flex; flex-direction: column-reverse; gap: 2px; pointer-events: none; }
-.dotbar { position: relative; display: flex; align-items: center; gap: 5px; height: 16px; padding-right: 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.6); overflow: hidden; font-size: 11px; line-height: 16px; text-shadow: 0 1px 1px #000; }
+/* The spell's picture stands beside its bar; the bar itself holds the fill, the name and the seconds. */
+.dotbar { display: flex; align-items: center; gap: 3px; height: 16px; font-size: 11px; line-height: 16px; text-shadow: 0 1px 1px #000; }
+.dotbar img { flex: none; width: 16px; height: 16px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7); }
+.dotbar-track { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; height: 100%; padding: 0 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
 .dotbar i { position: absolute; inset: 0 auto 0 0; background: rgba(140, 90, 230, 0.62); }
 .dotbar.fire i { background: rgba(225, 115, 45, 0.62); }
-.dotbar img { position: relative; flex: none; width: 16px; height: 16px; }
-.dotbar span { position: relative; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dotbar span { position: relative; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dotbar b { position: relative; flex: none; font-variant-numeric: tabular-nums; }
 .dotbar.other { opacity: 0.72; }
-.dotbar.soon { box-shadow: 0 0 0 1px var(--gold) inset; }
-.dotbar.soon b { color: var(--gold); }
+/* Gold: cast it again now (it lands as the old one ends). A pale edge: it is due after your next cast. */
+.dotbar.now .dotbar-track { box-shadow: 0 0 0 1px var(--gold) inset; }
+.dotbar.now b { color: var(--gold); }
+.dotbar.next .dotbar-track { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45) inset; }
 
 /* The race against the sim, in the damage meter. */
 .race { margin-top: 8px; display: grid; gap: 3px; }
@@ -394,6 +398,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .tl-casts.sim i { opacity: 0.6; }
 .tl-aura i { top: 3px; height: 7px; border-radius: 3px; background: rgba(160, 110, 240, 0.85); }
 .tl-aura.fire i { background: rgba(230, 120, 50, 0.85); }
+.tl-aura i.clip, .tl-aura.fire i.clip { top: 0; height: 13px; border-radius: 1px; background: #ff5b4f; z-index: 1; }
 .best-line { margin: 4px 0 0; font-size: 12px; color: var(--ink-dim); }
 .best-line.record { color: var(--gold); font-weight: 600; }
 .challenge-line button { flex: none; }
@@ -402,6 +407,9 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .graph-key { display: flex; gap: 14px; margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); }
 .graph-key i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; border-radius: 2px; background: var(--accent); }
 .graph-key i.sim { background: rgba(255, 255, 255, 0.6); }
+.graph-key i.mana { background: #6f9bff; }
+.graph-key i.tap { width: 2px; height: 10px; background: rgba(240, 207, 122, 0.8); }
+.mana-graph { height: 70px; }
 .challenge-line { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: rgba(240, 207, 122, 0.1); font-size: 13px; }
 .challenge-line b { font-size: 26px; line-height: 1; color: var(--gold); }
 .challenge-line span { flex: 1; }

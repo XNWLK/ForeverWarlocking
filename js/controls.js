@@ -1,6 +1,6 @@
 // Walking and the camera, with the game's default keys:
 // W/S forward and back, A/D turn, Q/E step sideways, Space jump, right mouse held = steer,
-// left mouse held = look around, both mouse buttons = walk forward, wheel = zoom.
+// left mouse held = look around, both mouse buttons = walk forward, wheel = zoom (Zoom in / Zoom out can have keys too).
 // On a touch screen: one finger dragged over the scene turns you (as the right mouse button does), two fingers pinch
 // to zoom, a tap is a click; walking comes from the stick (setStick) and jumping from a button (jump).
 import * as THREE from 'three';
@@ -128,8 +128,12 @@ export function createControls(canvas, camera, world) {
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
     if (world.onWheel && world.onWheel(e)) return;        // the wheel with a modifier held may be bound to an action
-    view.distance = Math.min(30, Math.max(3, view.distance * (e.deltaY > 0 ? 1.12 : 0.89)));
+    zoom(e.deltaY > 0 ? 1 : -1);
   }, { passive: false });
+  // One step closer (-1) or further away (1): the wheel, or the Zoom in / Zoom out keys.
+  function zoom(direction) {
+    if (direction) view.distance = Math.min(30, Math.max(3, view.distance * (direction > 0 ? 1.12 : 0.89)));
+  }
 
   // --- Each frame -----------------------------------------------------------
   function down(a, b) { return keys.has(a) || keys.has(b) ? 1 : 0; }
@@ -197,7 +201,7 @@ export function createControls(canvas, camera, world) {
   }
 
   return {
-    player: player, view: view, update: update, reset: reset,
+    player: player, view: view, update: update, reset: reset, zoom: zoom,
     setStick: function (x, y) { stick.x = x; stick.y = y; },
     jump: function () { jumpAsked = true; }
   };

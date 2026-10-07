@@ -1,5 +1,5 @@
 // Two practice aids you can switch on in the bar on the right:
-//   - DoT timers: a bar per DoT of yours that is running, shortest first, on every dummy;
+//   - DoT timers: a bar per DoT of yours that is running, shortest first, on every dummy (its picture beside it);
 //   - the sim's next cast: what the sim's priority list would cast in your place right now.
 // Looks only; the rules are in combat.js (combat.simWould asks the priority list).
 
@@ -39,23 +39,29 @@ export function createAids(WL, handlers) {
     list.slice(0, 12).forEach(function (d, place) {
       let row = rows[d.id];
       if (!row) {
-        const box = document.createElement('div'), fill = document.createElement('i'), img = document.createElement('img');
+        const box = document.createElement('div'), track = document.createElement('div'), fill = document.createElement('i'), img = document.createElement('img');
         const name = document.createElement('span'), secs = document.createElement('b');
         box.className = 'dotbar' + (character.spells[d.key].school === 'fire' ? ' fire' : '');
+        track.className = 'dotbar-track';
         img.src = handlers.icon(d.key) || ''; img.alt = '';
         name.textContent = character.spells[d.key].name + (character.targets > 1 ? ' · ' + d.target : '');
-        box.append(fill, img, name, secs);
+        track.append(fill, name, secs);                    // the picture stands beside the bar, not on it (Xn)
+        box.append(img, track);
         bars.appendChild(box);
-        row = rows[d.id] = { box: box, fill: fill, secs: secs, order: -1, text: '', soon: null, other: null };
+        row = rows[d.id] = { box: box, fill: fill, secs: secs, order: -1, text: '', now: null, next: null, other: null };
       }
       seen[d.id] = true;
       if (row.order !== place) { row.order = place; row.box.style.order = String(place); }
       row.fill.style.width = Math.max(0, Math.min(100, 100 * d.left / d.span)).toFixed(1) + '%';
       const text = d.left >= 9.95 ? String(Math.round(d.left)) : d.left.toFixed(1);
       if (row.text !== text) { row.text = text; row.secs.textContent = text; }
-      // "Soon": the moment the sim would cast it again (it runs out before a new cast could land).
-      const soon = d.key !== 'baneOfHavoc' && d.key !== 'baneOfDoom' && d.left <= combat.castTime(d.key) + combat.gcd();
-      if (row.soon !== soon) { row.soon = soon; row.box.classList.toggle('soon', soon); }
+      // Gold ("now"): a cast started now lands as the old one runs out, so no tick is cut off - the moment the sim
+      // recasts it. A pale edge ("next"): it is due right after your next cast or global cooldown, so do not start
+      // anything long. An instant DoT never turns gold: it is recast when it has run out.
+      const cue = d.key !== 'baneOfHavoc' && d.key !== 'baneOfDoom', castTime = cue ? combat.castTime(d.key) : 0;
+      const now = cue && castTime > 0 && d.left <= castTime, next = cue && !now && d.left <= castTime + combat.gcd();
+      if (row.now !== now) { row.now = now; row.box.classList.toggle('now', now); }
+      if (row.next !== next) { row.next = next; row.box.classList.toggle('next', next); }
       const other = d.target !== S.target;
       if (row.other !== other) { row.other = other; row.box.classList.toggle('other', other); }
     });
