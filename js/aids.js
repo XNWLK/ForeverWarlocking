@@ -126,9 +126,9 @@ export function createAids(WL, handlers) {
       : p.status === 'spend' ? 'Mana estimate: remaining casts are covered'
       : 'Mana estimate: about ' + p.taps + ' more tap' + (p.taps === 1 ? '' : 's');
     manaBudget.textContent = (p.estimatedTime ? '~' : '') + Math.ceil(p.remaining) + 's left · ~' + Math.round(p.needed).toLocaleString('en-US') + ' mana needed · ' + Math.round(p.available).toLocaleString('en-US') + ' available'
-      + (p.timeBasis === 'sim' ? ' · using sim pace' : '')
+      + (p.manaBasis === 'observed' ? ' · using your mana pace' : p.manaBasis === 'blended' ? ' · learning your mana pace' : ' · using sim mana pace')
       + (p.status === 'tap-window' ? ' · tap ' + p.gcd.toFixed(1) + 's fits; filler ' + p.fillerTime.toFixed(1) + 's runs past refresh' : '');
-    manaBox.title = 'Estimate from this build’s simulated spending and regeneration. Health fights use the sim’s damage pace until there is enough sustained player casting; sparse damage and long idle periods do not determine the forecast. Actual casts, misses and fight length change mana needs.';
+    manaBox.title = 'Starts from simulated spending, then learns your actual net mana consumption over 10–30 seconds, accounting for actual Life Tap gains. Health fights use the sim’s damage pace until there is enough sustained player casting; sparse damage and long idle periods do not determine the forecast. Actual casts, misses and fight length change mana needs.';
   }
 
   return {

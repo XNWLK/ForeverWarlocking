@@ -205,6 +205,22 @@ check('brief forecast swings cannot make the displayed count jump', () => {
   assert.equal(planMana(c, sim).taps, 2);
   assert.equal(planMana(c, sim).taps, 2); // repeated render/decision calls
 });
+check('a no-tap fight with mana left learns lower actual spending than the sim', () => {
+  const c = planner();
+  c.state.mana = 3800; c.state.t = 30;
+  c.fightSeconds = () => 30; c.timeLeft = () => 30.6; c.readyAt = () => 30;
+  c.result.track.manaAtStart = 7006; c.result.track.manaFromTaps = 0;
+  const highForecast = { ...forecast, spend: forecast.spend.map(v => v * 1.4) };
+  const p = planMana(c, { manaForecast: highForecast });
+  assert.equal(p.manaBasis, 'observed'); assert.equal(p.taps, 0);
+  close(p.needed, (7006 - 3800) / 30 * 30.6);
+});
+check('measured mana pace adds back actual tap gains and ignores pre-pull taps', () => {
+  const c = planner(); c.result.track.manaAtStart = 7000;
+  c.result.track.manaFromTaps = 1200; c.result.track.tapManaAtStart = 500;
+  const p = planMana(c, { manaForecast: forecast });
+  close(p.needed, 6700); // (7000 + 700 gained during fight - 1000 current) / 50 * 50
+});
 check('pending casts reserve their cost without budgeting extra casts during the same time', () => {
   const c = planner(), sim = { manaForecast: forecast };
   c.state.mana = 1900; c.state.cast = { key: 'shadowBolt', cost: 300, target: 1 };

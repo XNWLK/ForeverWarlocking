@@ -140,7 +140,7 @@ export function createCombat(opts) {
     }
     S.targets = T;
     res = { total: 0, threat: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
-            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
+            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0, manaFromTaps: 0 } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     P = makePet(build.pet);
     S.decideSeq = order++;
@@ -190,6 +190,8 @@ export function createCombat(opts) {
     if (S.fightStart !== null) return;
     const planned = S.pullPlannedAt;
     S.fightStart = S.t;
+    res.track.manaAtStart = S.mana;
+    res.track.tapManaAtStart = res.track.manaFromTaps;
     S.pullAt = null;
     if (planned !== null) {
       emit({ type: 'pull', early: Math.max(0, planned - S.t) });
@@ -627,6 +629,7 @@ export function createCombat(opts) {
       S.mana = Math.min(stats.maxMana, S.mana + gain);
       row('lifeTap').casts++;
       res.track.lifeTaps++;
+      res.track.manaFromTaps += S.mana - before;
       emit({ type: 'mana', source: 'Life Tap', amount: S.mana - before });
       if (P && tv('demonicEnergies')) {     // Demonic Energies: the pet gains a share of the mana you gained
         petRegen();

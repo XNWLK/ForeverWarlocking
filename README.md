@@ -44,8 +44,9 @@ cancelled at a successful replacement. Missed refreshes, expiry on the final tic
 not count as early-refresh clips. Replacing one Bane with another is recorded. Cancelled ticks are observations,
 not a claim about net damage lost.
 
-**Life Tap planner** estimates the mana needed to finish from the build's averaged simulated spell spending,
-mana procs and passive regeneration. It uses the remaining timed duration or, in health fights, an estimated
+**Life Tap planner** starts with simulated spell spending and regeneration, then transitions over 10–30 seconds
+to measured net mana consumption in the current fight. Only actual mana gained from Life Taps is added back
+when measuring consumption; pre-pull taps are excluded. It uses the remaining timed duration or, in health fights, an estimated
 kill time gradually updated from sustained DPS. Forecast revisions settle in direction; increases move one tap at a time and decreases use the settled lower count; a changing positive forecast cannot keep the helper hidden at zero. Zero-tap forecasts hide the helper. It highlights a needed full tap when its GCD fits before a DoT refresh and the
 filler cast does not. The review records those opportunities, flags likely unnecessary late taps, and reports
 mana at the exact finish before later regeneration. Pet-mana requests are treated separately. Aim to end near

@@ -52,7 +52,19 @@ export function planMana(combat, sim) {
   // A full-fight average avoids repeatedly moving across short, bursty sections
   // of the sim's spending curve as cast bars and kill-time estimates change.
   const forecast = sim?.manaForecast;
-  const rate = forecast?.seconds > 0 ? manaBudget(forecast, 0, forecast.seconds) / forecast.seconds : null;
+  let rate = forecast?.seconds > 0 ? manaBudget(forecast, 0, forecast.seconds) / forecast.seconds : null;
+  // Learn net mana drain from the actual fight, including real regeneration and
+  // refunds. Add back only mana actually gained from taps, not their nominal gain.
+  // Gradual trust over 10–30 seconds avoids extrapolating a single opening cast.
+  const track = combat.result.track || {};
+  let manaBasis = 'sim';
+  if (Number.isFinite(track.manaAtStart) && elapsed > 10) {
+    const drain = Math.max(0, track.manaAtStart + (track.manaFromTaps || 0) - (track.tapManaAtStart || 0) - S.mana);
+    const observedRate = drain / elapsed;
+    const trust = Math.min(1, (elapsed - 10) / 20);
+    rate = rate == null ? observedRate : rate * (1 - trust) + observedRate * trust;
+    manaBasis = trust === 1 ? 'observed' : 'blended';
+  }
   // The pending cast is reserved in available below. Do not also budget new
   // casts during its remaining cast/GCD time (channels have already paid).
   const needed = rate == null ? null : rate * Math.max(0, remaining - wait);
@@ -105,7 +117,7 @@ export function planMana(combat, sim) {
   if (petTap) status = 'pet';
   else if (!spendable || estimate.taps === 0) status = 'spend';
   else if (deficit >= 1 && window && fullTap && combat.canTap() && allowed) status = 'tap-window';
-  return { status, remaining, estimatedTime: !combat.timed, timeBasis, available, needed, gain, deficit,
+  return { status, remaining, manaBasis, estimatedTime: !combat.timed, timeBasis, available, needed, gain, deficit,
     taps: estimate.taps, filler, fillerTime, fillerCost: combat.cost(filler), gcd,
     next: next || null, petTap };
 }
