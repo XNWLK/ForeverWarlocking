@@ -36,6 +36,14 @@ check('uptime findings respect spell, target and benchmark thresholds', () => {
   assert.deepEqual(findings.map(f => f.id), ['uptime-2-corruption']);
   assert.equal(findings[0].severity, 'compare');
 });
+check('unused spells do not create uptime penalties; attempted applications still qualify', () => {
+  const d = data({ sim: { uptime: { 'dot:corruption': 90, coe: 95 } } });
+  assert.equal(analyzeFight(d).uptime.length, 0);
+  d.record.casts.push({ key: 'corruption', target: 1, t: 3, len: 0, gcd: 1.5 });
+  assert.deepEqual(analyzeFight(d).uptime.map(u => u.key), ['corruption']);
+  d.targets = 2; d.sim.uptime['dot2:corruption'] = 90;
+  assert.equal(analyzeFight(d).uptime.length, 1);
+});
 check('intentional channel clipping is not called a movement interruption', () => {
   const a = analyzeFight(data({ record: { casts: [{ t: 0, key: 'shadowBolt', len: 2, gcd: 1.5, stopped: 'clipped' }], moves: [] } }));
   assert.equal(a.findings.some(f => f.id === 'interrupts'), false);

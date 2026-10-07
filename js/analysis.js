@@ -1,3 +1,12 @@
+// Only assess uptime for an aura the player actually used on this target.
+export function usedAura(d, key, target) {
+  const spell = key === 'coe' ? 'curseOfElements' : key;
+  const aura = spell === 'curseOfElements' ? 'coe' : key;
+  return (d.result.track.uptime?.[target + ':' + aura] || 0) > 0 ||
+    (d.result.bySpell?.[(target > 1 ? 'x' + target + ':' : '') + spell]?.casts || 0) > 0 ||
+    (d.record?.casts || []).some(c => c.key === spell && (c.target || 1) === target);
+}
+
 // Read-only coaching derived from recorded events, never from a guessed damage penalty.
 const clamp = (n, max) => Math.max(0, Math.min(max, Number(n) || 0));
 export function timestamp(t) {
@@ -86,7 +95,7 @@ export function analyzeFight(d) {
     Object.entries(d.sim.uptime).forEach(([id, expected]) => {
       const m = /^dot(?:(\d+))?:(.+)$/.exec(id);
       const target = m ? Number(m[1] || 1) : 1, key = m ? m[2] : id === 'coe' ? 'curseOfElements' : null;
-      if (!key || target > d.targets || !d.spells[key] || !(expected >= 20)) return;
+      if (!key || target > d.targets || !d.spells[key] || !(expected >= 20) || !usedAura(d, key, target)) return;
       const mine = clamp(100 * (k.uptime[target + ':' + (key === 'curseOfElements' ? 'coe' : key)] || 0) / seconds, 100);
       const delta = expected - mine;
       if (delta < 10) return;

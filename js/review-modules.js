@@ -78,7 +78,7 @@ export function reviewModules(d, { table, inspect, retry }) {
     const help = el('details', null, 'review-help');
     help.appendChild(el('summary', 'How to read this'));
     if (a.clips.length) help.appendChild(el('p', 'Click a clip’s time to locate it in the timeline. Cancelled ticks are not measured net damage loss; Conflagrate consumption is excluded. A needed Life Tap can fill a gap too short for your filler.', 'coach-note'));
-    if (a.uptime.length) help.appendChild(el('p', 'Uptime gaps are percentage points below the sim. Misses, execute priorities, consumed DoTs and target deaths can contribute. Follow the timeline and priority list; avoid refreshing early just to reach 100%.', 'coach-note'));
+    if (a.uptime.length) help.appendChild(el('p', 'Uptime gaps only assess spells you used on that target, in percentage points below the sim. Misses, execute priorities, consumed DoTs and target deaths can contribute. Follow the timeline and priority list; avoid refreshing early just to reach 100%.', 'coach-note'));
     dots.appendChild(help);
   }
   const manaIds = ['taps', 'tap-windows', 'late-taps'];

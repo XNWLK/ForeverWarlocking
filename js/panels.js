@@ -1,3 +1,4 @@
+import { usedAura } from './analysis.js';
 // The three panels that are more than a list: fight options, import from the DPS sim, and the review after a fight.
 import { attachIntervalInspector } from './interval.js';
 import { drawTimeline } from './timeline.js';
@@ -208,10 +209,11 @@ export function createPanels(handlers) {
       });
       Object.keys(names).forEach(function (name) {
         const simKey = i === 1 ? (AURA_NAMES[name] ? name : 'dot:' + name) : (AURA_NAMES[name] ? 'deb' + i + ':' + name : 'dot' + i + ':' + name);
+        const used = usedAura(d, name, i);
         const yours = 100 * (k.uptime[i + ':' + name] || 0) / d.seconds, simPct = sim ? sim.uptime[simKey] : null;
         upRows.push({
-          cells: [(d.spells[name] ? d.spells[name].name : AURA_NAMES[name] || name) + (d.targets > 1 ? ' on ' + d.dummyName(i) : ''), Math.round(yours) + '%', simPct != null ? Math.round(simPct) + '%' : ''],
-          mark: simPct != null && yours < simPct - 10 ? 'behind' : ''
+          cells: [(d.spells[name] ? d.spells[name].name : AURA_NAMES[name] || name) + (d.targets > 1 ? ' on ' + d.dummyName(i) : ''), used ? Math.round(yours) + '%' : 'Not used', simPct != null ? Math.round(simPct) + '%' : ''],
+          mark: used && simPct != null && yours < simPct - 10 ? 'behind' : ''
         });
       });
     }
