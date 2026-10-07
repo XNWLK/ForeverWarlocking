@@ -8,6 +8,10 @@
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
 // two seconds (pushback), movement phases, Windfury Totem (extra pet melee attacks), and both threat buffs at once.
 //
+// Precast scenes: the engine starts the fight with a spell that completes at 0 s (fight.precast). Here the same
+// spell is started before the fight as a player would, in a timed fight of the game itself (not the check's own
+// clock): the fight begins when it lands, so everything is that cast time later than in the engine's log.
+//
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
 import { createCombat } from '../js/combat.js';
@@ -25,7 +29,12 @@ const SCENES = [
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
   { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] },
-  { name: 'Blessing of Salvation and Tranquil Air Totem', targets: 1, seeds: [11], buffs: ['blessingOfSalvation', 'tranquilAir'] }
+  { name: 'Blessing of Salvation and Tranquil Air Totem', targets: 1, seeds: [11], buffs: ['blessingOfSalvation', 'tranquilAir'] },
+  { name: 'precast Shadow Bolt', targets: 1, seeds: [12], precast: 'shadowBolt' },
+  { name: 'precast Immolate', targets: 1, seeds: [13], precast: 'immolate' },
+  { name: 'precast Soul Fire', targets: 1, seeds: [14], precast: 'soulFire' },
+  { name: 'precast Corruption', targets: 1, seeds: [15], precast: 'corruption' },
+  { name: 'precast Searing Pain, hit every 2 s', targets: 1, seeds: [16], precast: 'searingPain', fight: { hitEvery: 2 } }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
@@ -47,29 +56,43 @@ for (const scene of SCENES) {
         cfg.fight.multiDot = scene.targets > 1;
         Object.assign(cfg.fight, scene.fight || {});
         (scene.buffs || []).forEach(k => { cfg.buffs[k].on = true; });
+        if (scene.precast) cfg.fight.precast = scene.precast;
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
+        // The spell this build really precasts (null: it cannot, and the engine starts as usual).
+        const pre = scene.precast ? WL.precastOf(build, cfg, WL.buildSpellTable(build, WL.computeStats(build, raceKey, cfg), cfg)) : null;
 
-        const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });
+        const combat = createCombat(Object.assign({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, targets: scene.targets },
+                                                  pre ? { timedDuration: DURATION } : { linearDuration: DURATION }));
         const problems = [];
         let manaOff = 0;
         let freeSince = 0;                 // when the caster became free after the last cast (the engine waits from there)
-        combat.petCommand('attack', 1);
-        combat.update(0, ctx);
+        let shift = 0;                     // a precast: the fight begins when it lands, that much after the clock here started
+        if (pre) {
+          combat.update(0, ctx);
+          const started = combat.press(pre, ctx);
+          if (!started.ok || !combat.state.cast) problems.push('precast ' + pre + ' refused (' + started.reason + ')');
+          else { shift = combat.state.cast.end; freeSince = combat.readyAt(); }
+        } else {
+          combat.petCommand('attack', 1);
+          combat.update(0, ctx);
+        }
         for (const entry of sim.log) {
           if (entry.type !== 'cast' && entry.type !== 'racial') continue;
+          if (entry.precast != null) continue;             // the engine's own precast: it was started above
           // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when
           // a channel was cut short for this cast) the channel tick it was cut at, or the end of a movement phase, or
           // a tenth of a second later each time the engine found nothing to cast - whichever lies at the logged time.
-          combat.update(entry.t - 0.001, ctx);
-          let at = entry.t, off = 0.00051;
+          const logged = entry.t + shift;
+          combat.update(logged - 0.001, ctx);
+          let at = logged, off = 0.00051;
           const candidates = [combat.readyAt()].concat(combat.eventTimes());
           for (let j = 0; j <= 400; j++) candidates.push(freeSince + j * 0.1);
           if (cfg.fight.moveEvery) {
             const k = Math.floor(entry.t / cfg.fight.moveEvery);
-            candidates.push(k * cfg.fight.moveEvery, k * cfg.fight.moveEvery + cfg.fight.moveDuration);
+            candidates.push(shift + k * cfg.fight.moveEvery, shift + k * cfg.fight.moveEvery + cfg.fight.moveDuration);
           }
           for (const candidate of candidates) {
-            if (Math.abs(candidate - entry.t) < off) { at = candidate; off = Math.abs(candidate - entry.t); }
+            if (Math.abs(candidate - logged) < off) { at = candidate; off = Math.abs(candidate - logged); }
           }
           combat.update(at, ctx);
           // "x2:corruption" = Corruption on the second target; Bane of Havoc always goes on the second target.
@@ -88,7 +111,8 @@ for (const scene of SCENES) {
           if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
           freeSince = Math.max(combat.readyAt(), combat.state.channel ? combat.state.channel.end : 0);
         }
-        combat.update(DURATION, ctx);
+        combat.update(DURATION + shift, ctx);
+        if (pre && Math.abs((combat.state.fightStart === null ? -1 : combat.state.fightStart) - shift) > 1e-9) problems.push('the fight did not begin when the precast landed');
 
         const mine = combat.result;
         const keys = new Set(Object.keys(sim.bySpell).concat(Object.keys(mine.bySpell)));

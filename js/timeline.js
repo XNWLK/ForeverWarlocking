@@ -14,10 +14,13 @@ const AURA_NAMES = { coe: 'Curse of the Elements', baneOfHavoc: 'Bane of Havoc' 
 const ROW = { axis: 16, casts: 34, aura: 13 };
 
 // d: { record: { casts, auras, moves, seconds } (js/record.js), seconds, simCasts: [{ t, k, d }] or null,
-//      spells, icon(key) -> address, racialName, targets, dummyName(i), width (pixels there are for it) }
+//      spells, icon(key) -> address, racialName, targets, dummyName(i), width (pixels there are for it),
+//      clips: [{ t, key, by, target, left, ticks }] DoTs that were cast over while they still had time left }
+// A precast starts before second 0: the picture then begins that much earlier (lead).
 export function drawTimeline(d) {
-  const rec = d.record, seconds = Math.max(d.seconds, 1), px = Math.max(14, Math.min(30, (d.width - 20) / seconds));
-  const width = Math.ceil(seconds * px) + 20, wrap = el('div', null, 'timeline'), names = el('div', null, 'tl-names');
+  const rec = d.record, lead = Math.min(12, Math.max(0, -rec.casts.reduce(function (m, c) { return Math.min(m, c.t); }, 0)));
+  const seconds = Math.max(d.seconds, 1), span = seconds + lead, px = Math.max(14, Math.min(30, (d.width - 20) / span));
+  const width = Math.ceil(span * px) + 20, wrap = el('div', null, 'timeline'), names = el('div', null, 'tl-names');
   const scroll = el('div', null, 'tl-scroll'), inner = el('div', null, 'tl-inner');
   inner.style.width = width + 'px';
   let top = 0;
@@ -33,7 +36,7 @@ export function drawTimeline(d) {
   }
   function block(line, from, to, className, title) {
     const b = el('i', null, className);
-    b.style.left = (from * px).toFixed(1) + 'px';
+    b.style.left = ((from + lead) * px).toFixed(1) + 'px';
     b.style.width = Math.max(1, (to - from) * px).toFixed(1) + 'px';
     if (title) b.title = title;
     line.appendChild(b);
@@ -45,7 +48,7 @@ export function drawTimeline(d) {
   const axis = row('', ROW.axis, 'tl-axis');
   for (let t = 0; t <= seconds + 0.01; t += seconds > 150 ? 30 : 10) {
     const tick = el('span', clock(t));
-    tick.style.left = (t * px).toFixed(1) + 'px';
+    tick.style.left = ((t + lead) * px).toFixed(1) + 'px';
     axis.appendChild(tick);
   }
 
@@ -61,13 +64,13 @@ export function drawTimeline(d) {
       }
       const where = c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
       const what = c.kind === 'channel' ? ', channelled ' + secs(c.len) : c.len > 0.005 ? ', ' + secs(c.len) + ' cast' : '';
-      const title = spellName(c.key) + ' at ' + secs(c.t) + what + where +
+      const title = spellName(c.key) + (c.t < -0.005 ? ' started ' + secs(-c.t) + ' before the fight (precast)' : ' at ' + secs(c.t)) + what + where +
         (c.stopped ? c.stopped === 'clipped' ? ' – cut short by your next cast' : ' – stopped' : '') + (c.pushed ? ' – pushed back ' + secs(c.pushed) : '');
       if (c.len > 0.005) block(line, c.t, c.t + c.len, (c.kind === 'channel' ? 'chan' : 'cast') + (c.stopped && c.stopped !== 'clipped' ? ' stopped' : ''), title);
       const icon = d.icon(c.key), img = icon ? document.createElement('img') : el('b', spellName(c.key).charAt(0));
       if (icon) { img.src = icon; img.alt = ''; }
       img.title = title;
-      img.style.left = (c.t * px).toFixed(1) + 'px';
+      img.style.left = ((c.t + lead) * px).toFixed(1) + 'px';
       if (c.off) img.className = 'off';
       if (c.stopped && c.stopped !== 'clipped') img.classList.add('stopped');
       line.appendChild(img);
@@ -91,6 +94,12 @@ export function drawTimeline(d) {
     const name = (d.spells[key] ? d.spells[key].name : AURA_NAMES[key] || key) + (d.targets > 1 ? ' · ' + target : '');
     const line = row(name, ROW.aura, 'tl-aura' + (d.spells[key] && d.spells[key].school === 'fire' ? ' fire' : ''));
     spans.forEach(function (s) { block(line, s[0], Math.min(s[1], seconds), '', name + ': ' + secs(s[0]) + ' to ' + secs(s[1])); });
+    // Where it was cast over while it still had time left: a notch, and what that cost.
+    (d.clips || []).filter(function (c) { return c.target === target && c.key === key; }).forEach(function (c) {
+      const notch = block(line, c.t, c.t, 'clip', spellName(c.key) + (c.by === c.key ? ' cast again' : ' pushed off by ' + spellName(c.by)) + ' at ' + secs(c.t) + ' with ' + secs(c.left) + ' left: ' +
+        (c.ticks === 1 ? '1 tick' : c.ticks + ' ticks') + ' lost');
+      notch.style.width = '3px';
+    });
   });
 
   inner.style.height = top + 'px';

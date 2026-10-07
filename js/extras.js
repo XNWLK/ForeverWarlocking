@@ -219,6 +219,15 @@ export function createExtras(WL, handlers) {
     handlers.onLatency(ms);
   });
   latency.addEventListener('keydown', function (e) { if (e.key === 'Enter') latency.blur(); e.stopPropagation(); });
+  const pullBox = byId('pullSeconds');
+  pullBox.value = String(getSetting('pullSeconds') || 5);
+  pullBox.addEventListener('change', function () {
+    const s = Math.max(1, Math.min(30, Math.round(Number(pullBox.value) || 5)));
+    pullBox.value = String(s);
+    pullBox.blur();
+    setSetting('pullSeconds', s);
+  });
+  pullBox.addEventListener('keydown', function (e) { if (e.key === 'Enter') pullBox.blur(); e.stopPropagation(); });
   const volume = byId('volume');
   volume.value = String(Math.round(100 * (getSetting('volume') == null ? 0.6 : getSetting('volume'))));
   volume.addEventListener('input', function () { handlers.onVolume(Math.max(0, Math.min(100, Number(volume.value) || 0)) / 100); });
@@ -347,7 +356,7 @@ export function createExtras(WL, handlers) {
     else {
       const end = sim.curve[sim.curve.length - 1] || 1, theirs = simAt(sim.curve, t), gap = mine - theirs;
       you = Math.min(100, 100 * mine / end); them = Math.min(100, 100 * theirs / end);
-      if (t <= 0) text = 'Starts with your first cast';
+      if (t <= 0) text = 'Starts when your first spell takes effect';
       else if (Math.abs(gap) < 0.5) text = 'Level with the sim';
       else text = (gap > 0 ? whole(gap) + ' ahead' : whole(-gap) + ' behind') + (theirs > 0 ? ' · ' + Math.round(100 * mine / theirs) + '% of the sim' : '');
     }

@@ -59,12 +59,12 @@ const effects = createEffects(scene);
 
 // Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
 const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
-                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '' };
+                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '', pull: '' };
 const binds = Object.assign({}, DEFAULT_BINDS, getSetting('binds') || {});
 // Walking and jumping are keys you hold: they take a plain key. Everything else also takes a key with Shift, Ctrl or
 // Alt held, a mouse button, or the wheel with a modifier (js/keys.js).
 const MOVE_BINDS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'jump'];
-const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset'];
+const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset', 'pull'];
 
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
 const controls = createControls(canvas, camera, {
@@ -85,7 +85,14 @@ const touch = createTouch({
 
 // ---------- the character and the fight ----------
 let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
+// The sim's numbers for this fight: without a precast ('') and with each spell you could precast. simResult is the
+// one that fits what you did; until a precast's own numbers are in, the plain ones stay on screen.
+let simResults = {};
 let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
+let codePrecast = '';                                      // the precast an imported settings code names (not taken over)
+// The pull timer: pull = the countdown that is running ({ at: the fight clock at zero, seconds, beep }); pullInfo =
+// how the last countdown ended, for the review; pullNote = what the banner says for a moment afterwards.
+let pull = null, pullInfo = null, pullNote = null;
 const sound = createSound(getSetting('sound') === true, getSetting('volume'));   // off until you switch it on (Xn)
 const recorder = createRecorder();                          // what happened when, for the review's timeline
 // A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
@@ -103,14 +110,15 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 // Infusion, Mana Tide, Innervate) are not playable here, so they are switched off - for you and for the sim average.
 function buildConfig() {
   const cfg = clone(WL.DEFAULT_CONFIG), base = clone(WL.DEFAULT_CONFIG.fight);
-  leftOut = [];
+  leftOut = []; codePrecast = '';
   const code = getSetting('settingsCode');
   if (code) {
     try {
       WL.applySettings(cfg, WL.decodeSettings(code));
-      // A precast set in the sim's settings (a spell that completes as its fight timer starts) is not played here:
-      // your fight starts with your first cast, so the sim average must not get a head start either.
-      if (cfg.fight.precast) { leftOut.push('Precast (' + ((WL.SPELLS[cfg.fight.precast] || {}).name || cfg.fight.precast) + ')'); cfg.fight.precast = base.precast || ''; }
+      // A precast set in the sim's settings is not taken over: here you precast by starting the cast yourself before
+      // the fight, and the sim average then gets the same precast (askSimAverage).
+      codePrecast = cfg.fight.precast ? (WL.SPELLS[cfg.fight.precast] || {}).name || cfg.fight.precast : '';
+      cfg.fight.precast = base.precast || '';
       ['duration', 'durationVarPct', 'iterations', 'weightIterations', 'seed', 'targets', 'multiDot', 'moveEvery', 'moveDuration',
        'hitEvery', 'latencyMs', 'travelMs', 'lifeTapWhileMoving'].forEach(function (k) { cfg.fight[k] = base[k]; });
     } catch (e) { /* a code that no longer decodes is ignored */ }
@@ -172,6 +180,7 @@ const hud = createHud(WL, {
   onTarget: function (ti) { setTarget(ti); },
   onRings: function (on) { setSetting('rings', on); rings.visible = on; },
   onReset: function () { resetFight(); hud.log('Fight reset.'); },
+  onPull: function () { togglePull(); },
   onPet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); },
   onSound: function (on) { setSetting('sound', on); sound.setOn(on); },
   // Edit bar: swap what is in two slots, give a slot another key, or go back to the default.
@@ -223,7 +232,7 @@ const extras = createExtras(WL, {
     challenge = next;
     hud.closePanels();
     newCharacter();
-    if (next) { hud.log((next.encounter ? 'Encounter: ' : next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts with your first cast. "End" at the top goes back to your own fight.'); }
+    if (next) { hud.log((next.encounter ? 'Encounter: ' : next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts when your first spell takes effect. "End" at the top goes back to your own fight.'); }
     else hud.log('Back to your own fight settings.');
   },
   onPreset: function (p) {
@@ -271,7 +280,8 @@ function fightKey() {
   const f = fightOptions(), b = character.build, code = getSetting('settingsCode'), late = Number(getSetting('latency')) || 0;
   return [b.custom ? 'c' + hash(getSetting('buildCode')) : b.key, character.raceKey, targets, f.timed ? 't' + f.seconds : 'h' + character.dummyHealth,
           f.moveEvery > 0 && f.moveDuration > 0 ? 'm' + f.moveEvery + '-' + f.moveDuration : '', f.hitEvery > 0 ? 'x' + f.hitEvery : '',
-          code ? 's' + hash(code) : '', late ? 'l' + late : ''].join('|');
+          code ? 's' + hash(code) : '', late ? 'l' + late : '',
+          combat.state.precastKey ? 'p' + combat.state.precastKey : ''].join('|');   // a fight opened with a precast has its own best
 }
 function showBest() {
   if (challenge) {
@@ -342,6 +352,7 @@ const panels = createPanels({
     setSetting('settingsCode', settingsCode);
     newCharacter();
     if (settingsInfo) lines.push('Settings imported: ' + settingsInfo.replace(/ · \d+ s · \d+ fights$/, '') + '.');
+    if (codePrecast) lines.push('The precast in the code (' + codePrecast + ') is not taken over: here you precast by starting the cast yourself before the fight, and the sim average then does the same.');
     if (leftOut.length) lines.push('Not playable here yet, so switched off (also for the sim average): ' + leftOut.join(', ') + '.');
     if (!buildCode && !settingsCode) lines.push('Nothing imported: the ready builds with the default gear and buffs.');
     panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), lines, bad);
@@ -374,31 +385,46 @@ function showReview() {
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     health: { min: combat.state.minHealth, max: character.stats.maxHealth },
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
+    pull: pullInfo, precast: combat.state.precastKey,
     timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
 }
 
 // The DPS sim's average for this character on these dummies, worked out on another processor core.
 let simWorker = null, simJob = 0;
+// The spells of this character that can be cast before the fight so that they land as it begins.
+function precastChoices() {
+  return (WL.PRECAST_SPELLS || []).filter(function (k) { return character.bar.indexOf(k) >= 0 && combat.table[k] && combat.table[k].cast > 0; });
+}
+// Shows the sim's numbers that fit the fight: with the precast you opened with, or without one.
+function useSimResult() {
+  const next = simResults[(combat && combat.state.precastKey) || ''] || simResults[''] || null;
+  if (next === simResult) return;
+  simResult = next;
+  hud.setSimAverage(next);
+  if (panels.reviewOpen() && combat.fightSeconds() > 0) showReview();   // the review was waiting for these numbers
+}
 function askSimAverage() {
-  simResult = null;
+  simResult = null; simResults = {};
   hud.setSimAverage(null);
   try {
     if (!simWorker) {
       simWorker = new Worker('js/sim-worker.js' + new URL(import.meta.url).search);   // the same version as this file
       simWorker.onmessage = function (e) {
         if (e.data.id !== simJob) return;
-        simResult = e.data;
-        hud.setSimAverage(e.data);
-        if (panels.reviewOpen()) showReview();               // the review was waiting for these numbers
+        simResults[e.data.precast || ''] = e.data;
+        useSimResult();
       };
       simWorker.onerror = function () { simWorker = null; };
     }
     const fight = fightOptions(), simConfig = clone(config);
     if (challenge && challenge.sim) Object.assign(simConfig.fight, challenge.sim);   // an encounter: the even fight the sim plays instead
-    simWorker.postMessage({ id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: targets,
-                            health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
-                            seed: challenge && challenge.seeded ? challenge.seed : null });
+    const job = { id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: targets,
+                  health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
+                  seed: challenge && challenge.seeded ? challenge.seed : null, precast: '' };
+    simWorker.postMessage(job);
+    // Then the same fight opened with each spell you could precast, so the right numbers are ready when you do.
+    precastChoices().forEach(function (k) { simWorker.postMessage(Object.assign({}, job, { precast: k })); });
   } catch (e) {
     simWorker = null;                                     // no workers here: the meter just keeps showing a dash
   }
@@ -421,6 +447,12 @@ function castSound(key) {
   return spell.school === 'fire' ? 'fire' : spell.leech ? 'drain' : 'shadow';
 }
 function onCombatEvent(e) {
+  if (e.type === 'precast') {                              // you opened with a precast (key), or it was stopped after the pull (null)
+    useSimResult();
+    showBest();
+    if (e.key) hud.log('Precast: ' + combat.spells[e.key].name + '. The sim is measured with the same precast.', 'proc');
+    return;
+  }
   if (e.amount > 0 && (e.type === 'hit' || e.type === 'tick' || e.type === 'havoc')) {
     const second = Math.floor(combat.fightSeconds()) + 1;
     while (myCurve.length <= second) myCurve.push(myCurve[myCurve.length - 1]);
@@ -587,9 +619,27 @@ function resetFight() {
   fightBest = null; challengeOut = null; prevCast = null; castStopped = false; humming = false; bannerKind = '';
   myCurve = [0];
   fightClock = 0;
+  pull = null; pullInfo = null; pullNote = null;
+  hud.setPull(false);
+  useSimResult();                                          // back to the numbers without a precast
+  if (character) showBest();
   for (let i = 1; i <= 3; i++) { dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
   pet.sendHome();
   effects.clear();
+}
+
+// The pull timer: a countdown to the pull, so a precast can be timed. The fight begins when it reaches zero - or
+// sooner, when your spell lands (or your pet attacks) before that. Asking again stops it.
+function pullSeconds() { return Math.max(1, Math.min(30, Math.round(Number(getSetting('pullSeconds')) || 5))); }
+function togglePull() {
+  touch.closeMenu();
+  hud.closePanels();
+  if (pull) { pull = null; hud.setPull(false); hud.log('Pull timer stopped.'); return; }
+  resetFight();
+  pull = { at: fightClock + pullSeconds(), seconds: pullSeconds(), beep: 3 };
+  hud.setPull(true);
+  hud.log('Pull in ' + pull.seconds + ' s. The fight begins at zero, or sooner if your spell lands first.', 'proc');
+  sound.play('warn');
 }
 
 function press(key) {
@@ -638,6 +688,7 @@ function act(combo) {
   if (combo === binds.petAttack) { combat.update(fightClock, ctx); combat.petCommand('attack'); return true; }
   if (combo === binds.petFollow) { combat.update(fightClock, ctx); combat.petCommand('follow'); return true; }
   if (combo === binds.reset) { resetFight(); hud.log('Fight reset.'); return true; }
+  if (combo === binds.pull) { togglePull(); return true; }
   const slot = keyCodes.indexOf(combo);
   if (slot < 0) return false;
   press(character.bar[slot]);
@@ -675,6 +726,8 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
+// Results from before a fight could be opened with a precast do not compare with new ones: they start over (Xn).
+if (getSetting('resultsVersion') !== 2) { setSetting('bests', {}); setSetting('drills', {}); setSetting('resultsVersion', 2); }
 const savedKeys = getSetting('keys');
 if (Array.isArray(savedKeys) && savedKeys.length === ACTION_CODES.length) keyCodes = savedKeys.slice();
 // Opened from a share link: its setup replaces the one saved in this browser (keys, names and switches stay yours).
@@ -769,7 +822,33 @@ function frame() {
 
   // The fight's own clock stands still while the page is hidden (a long gap counts as a quarter second at most).
   fightClock += Math.min(0.25, elapsed);
+  if (pull && fightClock >= pull.at) {                     // the countdown ran out: the fight begins at that very moment
+    combat.update(pull.at, ctx);
+    if (combat.state.fightStart === null) {
+      combat.pull();
+      pullInfo = { seconds: pull.seconds, early: 0 };
+      pullNote = { text: 'Pull!', until: pull.at + 1.2 };
+      hud.log('Pull! The fight has begun.', 'proc');
+      sound.play('move');
+      pull = null; hud.setPull(false);
+    }
+  }
   combat.update(fightClock, ctx);
+  if (pull && combat.state.fightStart !== null) {          // your spell or your pet got there before the timer
+    const early = Math.max(0, pull.at - combat.state.fightStart);
+    pullInfo = { seconds: pull.seconds, early: early };
+    pullNote = { text: 'Pulled ' + early.toFixed(1) + ' s early', until: fightClock + 1.8 };
+    hud.log('You pulled ' + early.toFixed(1) + ' s before the timer ran out.', 'miss');
+    pull = null; hud.setPull(false);
+  }
+  if (pull) {
+    const left = Math.max(0, pull.at - fightClock);
+    ctx.banner = { text: 'Pull in ' + left.toFixed(1), soon: left > 3 };
+    if (left <= pull.beep) { pull.beep = Math.ceil(left) - 1; sound.play('warn'); }   // a tick for each of the last three seconds
+  } else if (pullNote) {
+    if (fightClock < pullNote.until) ctx.banner = ctx.banner || { text: pullNote.text, soon: false };
+    else pullNote = null;
+  }
 
   const phase = combat.movePhase(), mustMove = !!(phase && phase.moving);
   if (mustMove && !wasMoving) sound.play('move');
@@ -850,7 +929,8 @@ renderer.setAnimationLoop(frame);
 window.FW = {
   extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
   touch: touch, controls: controls, recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
-  get keyCodes() { return keyCodes; }, binds: binds,
+  get keyCodes() { return keyCodes; }, binds: binds, togglePull: togglePull, get pull() { return pull; }, get pullInfo() { return pullInfo; },
+  get simResults() { return simResults; },
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,

@@ -145,6 +145,11 @@ export function createPanels(handlers) {
 
     // Where the time went.
     const idle = Math.max(0, d.seconds - k.busy), notes = [];
+    // How the fight was opened: a precast, and how close to the pull timer's zero you were.
+    if (d.precast) notes.push(['Precast', (d.spells[d.precast] ? d.spells[d.precast].name : d.precast) + (k.first > 0.005 ? ', landed ' + k.first.toFixed(2) + ' s into the fight' : ', landed as the fight began'),
+                              sim ? (sim.precast === d.precast ? 'the same spell, landing at 0 s' : 'not worked out with it yet') : '']);
+    if (d.pull) notes.push(['Pull timer (' + d.pull.seconds + ' s)', d.pull.early > 0.005 ? 'you pulled ' + d.pull.early.toFixed(2) + ' s early'
+                              : k.first != null ? 'your first spell took effect ' + k.first.toFixed(2) + ' s after the pull' : 'no spell cast yet', '']);
     notes.push(['Not casting', idle.toFixed(1) + ' s (' + pct(idle, d.seconds) + ' of the fight)', sim ? sim.idle.toFixed(1) + ' s' : '']);
     if (k.moved > 0) notes.push(['Made to move', k.moved.toFixed(1) + ' s', '']);
     if (k.interrupts) notes.push(['Casts you stopped by moving', String(k.interrupts), '']);

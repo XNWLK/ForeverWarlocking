@@ -130,7 +130,8 @@ export function createCombat(opts) {
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, petSent: false,
       target: 1, havoc: null,
-      fightStart: null, fightEnd: null, over: false, presses: []
+      fightStart: null, fightEnd: null, over: false, presses: [],
+      precastKey: null                                    // the spell you were already casting when the fight began (the sim average then precasts it too)
     };
     T = [null];
     for (let i = 1; i <= N; i++) {
@@ -139,7 +140,9 @@ export function createCombat(opts) {
     }
     S.targets = T;
     res = { total: 0, threat: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
-            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0 } };
+            track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0,
+                     // for the review: when your first spell took effect (seconds into the fight), your mana, and DoTs cast over
+                     first: null, spent: 0, tapMana: 0, tapLost: 0, tapsMoving: 0, minMana: stats.maxMana, noMana: 0, clips: [] } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     P = makePet(build.pet);
     S.decideSeq = order++;
@@ -166,14 +169,16 @@ export function createCombat(opts) {
     if (S.eurekaCharges > 0 && SPELLS[key].kind !== 'utility') c *= 1 - racialOf('cooldown').costRedPct / 100;
     return c;
   }
-  function manaCap() { return stats.maxMana + (S.cast ? S.cast.cost : 0); }
+  // A precast gets no such room: mana does not regenerate into it before the fight (Xn, 2026-10-07; as in the engine).
+  function manaCap() { return stats.maxMana + (S.cast && !S.cast.precast ? S.cast.cost : 0); }
   function gainHealth(amount) { const before = S.health; S.health = Math.min(stats.maxHealth, S.health + amount); return S.health - before; }
   function loseHealth(amount) { S.health -= amount; if (S.health < S.minHealth) S.minHealth = S.health; }
   function canTap() { return S.health > TAP_HP; }
   // What one tick of a spell that also hits you (Hellfire) does to you: its base damage, no talents, no crit.
   function selfTick(key) { const s = SPELLS[key]; return s.selfDamage ? Math.round(s.tickBase + s.tickCoef * spNow(table[key])) : 0; }
   function executePhase(ti) { return T[ti || S.target].hpPct < cfg.fight.executePct; }
-  // Seconds into the fight (the engine's clock): from the reset in the check, from your first action in play.
+  // Seconds into the fight (the engine's clock): from the reset in the check; in play from the moment the fight begins
+  // (engage: your first spell taking effect, the pull timer running out, or your pet's first attack order).
   function fightTime(t) { return check ? t : S.fightStart === null ? -1 : t - S.fightStart; }
   // When a timed fight is over (Infinity while it has not started, or when it is not timed).
   function endAt() { return check ? linear : timed && S.fightStart !== null ? S.fightStart + linear : Infinity; }
@@ -193,6 +198,33 @@ export function createCombat(opts) {
     if (HEAL) { if (linear) for (let at = HEAL.every; at < linear - EPS; at += HEAL.every) push({ t: S.t + at, o: 0, type: 'heal' }); else push({ t: S.t + HEAL.every, o: 0, type: 'heal', again: true }); }
     if (SAC) { if (linear) for (let at = SAC.every; at < linear - EPS; at += SAC.every) push({ t: S.t + at, o: 0, type: 'sacTick' }); else push({ t: S.t + SAC.every, o: 0, type: 'sacTick', again: true }); }
     if (HIT) push({ t: S.t + R.push() * HIT, o: 1, type: 'dmgTaken' });    // the first hit comes somewhere in the first interval
+  }
+  // The fight begins and your pet joins in by itself. In play this happens when your first spell takes effect: an
+  // instant or a channel when you press it, a spell with a cast bar when it lands - a spell you start before the
+  // fight is a precast, and its cast time is not part of the fight (Xn, 2026-10-07). The pull timer (pull) and a pet
+  // sent in first begin it too. The check script and the engine count from the start of the first cast.
+  function engage(ti) {
+    beginFight();
+    if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', ti); }
+  }
+  // The pull timer ran out: the fight begins now, whether you are casting or not. False when it had already begun.
+  // A cast bar that is running at that moment counts as your precast, however late it lands.
+  function pull() {
+    if (S.over || S.fightStart !== null) return false;
+    if (S.cast && S.cast.precast) { S.precastKey = S.cast.key; emit({ type: 'precast', key: S.cast.key }); }
+    engage(S.target);
+    return true;
+  }
+  // What one Life Tap gives (before the bar's limit).
+  function tapGain() { return (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100); }
+  // A DoT that still had time left is cast over (or pushed off by another Bane): the ticks it had left are lost.
+  // Kept for the review; it changes nothing in the fight.
+  function noteClip(ti, oldKey, by) {
+    const d = T[ti].dots[oldKey], ft = fightTime(S.t);
+    if (!d || !(d.expires > S.t + EPS) || ft < 0) return;
+    const every = SPELLS[oldKey].tickEvery;
+    res.track.clips.push({ t: ft, key: oldKey, by: by, target: ti, left: d.expires - S.t,
+                           ticks: Math.max(0, d.ticks - Math.floor((S.t - d.applied + EPS) / every)), every: every });
   }
   // Distances come from the scene; without them (the check script) everything is in range.
   function distanceTo(ti, ctx) { const c = ctx || lastCtx; return c && c.distances && c.distances[ti] != null ? c.distances[ti] : 0; }
@@ -341,6 +373,7 @@ export function createCombat(opts) {
 
   function applyDot(ti, key, snap) {
     const s = SPELLS[key], e = table[key], id = ++inst, t = T[ti];
+    if (s.bane) { noteClip(ti, 'baneOfAgony', key); noteClip(ti, 'baneOfDoom', key); } else noteClip(ti, key, key);
     if (s.bane) {                                                     // one Bane per target
       delete t.dots.baneOfAgony; delete t.dots.baneOfDoom;
       if (!check && S.havoc && S.havoc.target === ti) S.havoc = null;
@@ -566,6 +599,9 @@ export function createCombat(opts) {
     const s = SPELLS[key], paid = price != null ? price : effectiveCost(key);
     S.mana -= paid;
     if (paid > 0) S.lastSpend = S.t;                       // the 5 seconds start again (a cast bar: at its end, which is now)
+    res.track.spent += paid;
+    if (S.mana < res.track.minMana) res.track.minMana = S.mana;
+    if (res.track.first === null && S.fightStart !== null) res.track.first = S.t - S.fightStart;
     let eurekaUsed = false, baseMult = 1;
     if (S.eurekaCharges > 0 && s.kind !== 'utility') { S.eurekaCharges--; S.eurekaPending++; eurekaUsed = true; }
     // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): +50% to the base value.
@@ -584,21 +620,23 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
-    if (key !== 'lifeTap') {
-      beginFight();
-      if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', ti); }   // the pet joins in by itself
-    }
+    // A cast bar started before the fight is a precast: the fight begins when it lands (handle, 'castEnd').
+    const precast = !check && S.fightStart === null && key !== 'lifeTap' && s.kind !== 'channel' && castT > EPS;
+    if (key !== 'lifeTap' && !precast) engage(ti);
     S.presses.push({ t: S.t, k: key, target: ti });
     S.gcdStart = S.t; S.gcdReady = S.t + gcdT;
     emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? s.duration : 0 });
 
     if (key === 'lifeTap') {
-      const gain = (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100);
+      const gain = tapGain();
       const before = S.mana;
       loseHealth(TAP_HP);
       S.mana = Math.min(stats.maxMana, S.mana + gain);
       row('lifeTap').casts++;
       res.track.lifeTaps++;
+      res.track.tapMana += S.mana - before;
+      res.track.tapLost += Math.max(0, gain - (S.mana - before));
+      if ((lastCtx && lastCtx.moving) || forcedMove()) res.track.tapsMoving++;
       emit({ type: 'mana', source: 'Life Tap', amount: S.mana - before });
       if (P && tv('demonicEnergies')) {     // Demonic Energies: the pet gains a share of the mana you gained
         petRegen();
@@ -632,7 +670,7 @@ export function createCombat(opts) {
       // here for the moment the cast will end; a pushback moves it along (takeHit), and a cast that is stopped never
       // had one (interrupt). Only Soul Fire has both a cast time and a cooldown.
       if (e.cd) S.cds[key] = S.t + castT + e.cd;
-      S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, full: castT, hits: 0, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation') };
+      S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, full: castT, hits: 0, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation'), precast: precast };
       push({ t: S.t + castT, o: 1, type: 'castEnd', inst: id });
     } else {
       if (trance) delete S.buffs.shadowTrance;
@@ -679,6 +717,7 @@ export function createCombat(opts) {
     if (S.cast) {
       const key = S.cast.key;
       if (table[key].cd) delete S.cds[key];              // nothing was cast: no cooldown, no cost
+      if (S.cast.precast && S.precastKey === key) { S.precastKey = null; emit({ type: 'precast', key: null }); }   // it never landed
       S.cast = null;
       S.mana = Math.min(S.mana, stats.maxMana);
       emit({ type: 'interrupt', key: key, reason: reason });
@@ -716,7 +755,9 @@ export function createCombat(opts) {
     if (distanceTo(ti, ctx) > e.range + EPS) return fail('baneOfHavoc', 'range');
     S.mana -= e.cost;
     if (e.cost > 0) S.lastSpend = S.t;
-    if (!check) { delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
+    res.track.spent += e.cost;
+    if (S.mana < res.track.minMana) res.track.minMana = S.mana;
+    if (!check) { noteClip(ti, 'baneOfAgony', 'baneOfHavoc'); noteClip(ti, 'baneOfDoom', 'baneOfHavoc'); delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
     S.havoc = { target: ti, expires: S.t + SPELLS.baneOfHavoc.duration };
     row('baneOfHavoc').casts++;
     S.presses.push({ t: S.t, k: 'baneOfHavoc', target: ti });
@@ -725,6 +766,7 @@ export function createCombat(opts) {
   }
 
   function fail(key, reason) {
+    if (reason === 'mana' && S.fightStart !== null && !S.over) res.track.noMana++;
     emit({ type: 'fail', key: key, reason: reason, text: FAIL_TEXT[reason] });
     return { ok: false, reason: reason };
   }
@@ -837,6 +879,12 @@ export function createCombat(opts) {
       const c = S.cast;
       if (!c || c.inst !== ev.inst) return;
       S.cast = null;
+      if (c.precast && S.fightStart === null) {            // a precast lands: the fight begins now, and the pet starts with it
+        S.precastKey = c.key;
+        emit({ type: 'precast', key: c.key });
+        engage(c.target);
+        syncPet(lastCtx);
+      }
       const spent = commit(c.key, c.decimation, c.cost);
       land(c.key, spent.baseMult, c.target);
       if (spent.eurekaUsed) eurekaRelease();
@@ -1010,7 +1058,7 @@ export function createCombat(opts) {
     get pet() { return P; },
     get current() { return T[S.target]; },
     petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : 0; },
-    petCommand: petCommand, setTarget: setTarget,
+    petCommand: petCommand, setTarget: setTarget, pull: pull, tapGain: tapGain,
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },

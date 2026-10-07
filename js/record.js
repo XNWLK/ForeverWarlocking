@@ -1,29 +1,31 @@
 // Keeps a record of the fight for the review's timeline: what you cast and when, how long each DoT was on each
 // dummy, and when you were made to move. It only listens; the rules are in combat.js.
+// Casts are kept by the casting rules' own clock and turned into seconds of the fight when the review asks: a
+// precast (a cast bar started before the fight, which begins when it lands) so comes out before second 0.
 
 const WATCH_DEBUFFS = ['coe'];
 
 export function createRecorder() {
-  let casts = [], auras = {}, open = {}, moves = [], moveOpen = null, last = 0;
+  let casts = [], auras = {}, open = {}, moves = [], moveOpen = null, last = 0, start = null;
 
-  function reset() { casts = []; auras = {}; open = {}; moves = []; moveOpen = null; last = 0; }
+  function reset() { casts = []; auras = {}; open = {}; moves = []; moveOpen = null; last = 0; start = null; }
 
   // An event from the casting rules.
   function event(e, combat) {
-    const t = combat.fightSeconds(), latest = casts.length ? casts[casts.length - 1] : null;
+    const at = combat.state.t, latest = casts.length ? casts[casts.length - 1] : null;
     if (e.type === 'cast') {
-      casts.push({ t: t, key: e.key, target: e.target || 0, len: e.channel || e.castTime || 0,
+      casts.push({ at: at, key: e.key, target: e.target || 0, len: e.channel || e.castTime || 0,
                    kind: e.channel ? 'channel' : e.castTime > 0 ? 'cast' : 'instant', gcd: combat.gcd() });
-    } else if (e.type === 'interrupt' && latest && latest.key === e.key && latest.kind !== 'instant' && !latest.stopped && t < latest.t + latest.len - 0.02) {
+    } else if (e.type === 'interrupt' && latest && latest.key === e.key && latest.kind !== 'instant' && !latest.stopped && at < latest.at + latest.len - 0.02) {
       latest.stopped = e.reason || 'stopped';
-      latest.len = Math.max(0, t - latest.t);
+      latest.len = Math.max(0, at - latest.at);
     } else if (e.type === 'pushback' && latest && latest.key === e.key) {
       latest.len = Math.max(0, latest.len + (e.channel ? -e.lost : e.lost));
       latest.pushed = (latest.pushed || 0) + e.lost;
     } else if (e.type === 'used' && combat.racial() && e.name === combat.racial().name) {
-      casts.push({ t: t, key: 'racial', name: e.name, target: 0, len: 0, kind: 'instant', off: true });
+      casts.push({ at: at, key: 'racial', name: e.name, target: 0, len: 0, kind: 'instant', off: true });
     } else if (e.type === 'apply' && e.key === 'baneOfHavoc') {
-      casts.push({ t: t, key: 'baneOfHavoc', target: e.target || 0, len: 0, kind: 'instant', off: true });
+      casts.push({ at: at, key: 'baneOfHavoc', target: e.target || 0, len: 0, kind: 'instant', off: true });
     }
   }
 
@@ -36,6 +38,7 @@ export function createRecorder() {
   function sample(combat, targets, forced) {
     const S = combat.state;
     if (S.fightStart === null) return;
+    start = S.fightStart;
     const t = combat.fightSeconds();
     last = t;
     for (let i = 1; i <= targets; i++) {
@@ -49,12 +52,16 @@ export function createRecorder() {
     else if ((!forced || S.over) && moveOpen != null) { moves.push([moveOpen, t]); moveOpen = null; }
   }
 
-  // What the review draws: everything closed off at the moment you ask.
+  // What the review draws: everything closed off at the moment you ask. Casts get `t`, their second of the fight
+  // (below 0 for a precast). What you did before the fight and that did not lead into it is left out: a Life Tap
+  // while waiting, a cast you stopped.
   function data() {
     const out = {};
     Object.keys(auras).forEach(function (id) { out[id] = auras[id].slice(); });
     Object.keys(open).forEach(function (id) { (out[id] || (out[id] = [])).push([open[id], last]); });
-    return { casts: casts.slice(), auras: out, moves: moveOpen != null ? moves.concat([[moveOpen, last]]) : moves.slice(), seconds: last };
+    const shown = start === null ? [] : casts.filter(function (c) { return c.at >= start - 1e-6 || (!c.stopped && c.kind === 'cast' && c.at + c.len >= start - 0.05); })
+      .map(function (c) { return Object.assign({}, c, { t: c.at - start }); });
+    return { casts: shown, auras: out, moves: moveOpen != null ? moves.concat([[moveOpen, last]]) : moves.slice(), seconds: last };
   }
 
   reset();

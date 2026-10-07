@@ -12,7 +12,8 @@ damage meter that also shows what the DPS sim reaches on the same dummy. One, tw
 switching, Bane of Havoc, Rain of Fire and Hellfire. After a fight a review shows where you lost time against the
 sim, with a timeline of what you cast and when. You can import your own build and settings from the DPS sim, change
 the action bar and its keys (also with Shift, Ctrl or Alt, and mouse buttons), and set timed fights, movement phases
-and hits taken. Challenges are graded against the sim: drills, scripted encounters and a seeded fight. Practice aids
+and hits taken. A spell you start casting before the fight is a precast: the fight begins when it lands, and the sim
+is then measured with the same precast; a pull timer counts down to the pull. Challenges are graded against the sim: drills, scripted encounters and a seeded fight. Practice aids
 you can switch on: the sim's rotation, its next cast, DoT timers, mistake callouts. A link shares your setup.
 
 It uses the same spell values, talents and mechanics as Xn's Forever Warlock Sim, the DPS simulator; a copy of that

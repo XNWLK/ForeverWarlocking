@@ -236,6 +236,9 @@ export function createHud(WL, handlers) {
   ringsButton.addEventListener('click', function () { setRings(!ringsButton.classList.contains('on')); handlers.onRings(ringsButton.classList.contains('on')); });
   function setRings(on) { ringsButton.classList.toggle('on', on); ringsButton.setAttribute('aria-pressed', String(on)); }
   byId('btnReset').addEventListener('click', function () { handlers.onReset(); });
+  const pullButton = byId('btnPull');
+  pullButton.addEventListener('click', function () { pullButton.blur(); handlers.onPull(); });
+  function setPull(on) { if (pullButton.classList.contains('on') !== on) pullButton.classList.toggle('on', on); }
   // Top left: each button opens its address in a new tab.
   document.querySelectorAll('#links button[data-link]').forEach(function (button) {
     button.addEventListener('click', function () { button.blur(); window.open(button.dataset.link, '_blank', 'noopener'); });
@@ -247,7 +250,7 @@ export function createHud(WL, handlers) {
   // Keybinds: every key in one list. Click a key, press the new one.
   const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'],
     ['strafeLeft', 'Step left'], ['strafeRight', 'Step right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
-    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight']];
+    ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight'], ['pull', 'Pull timer']];
   let binds = {}, capture = null;                          // capture = the key we are waiting for: { id, button }
   function bindRow(holder, id, text, code) {
     const row = document.createElement('div'), label = document.createElement('span'), button = document.createElement('button');
@@ -804,7 +807,7 @@ export function createHud(WL, handlers) {
 
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
-    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound, setHint: setHint, setBest: setBest,
+    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound, setHint: setHint, setBest: setBest, setPull: setPull,
     labelFor: labelFor,
     fullLog: function () { return everything.join('\n'); },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
