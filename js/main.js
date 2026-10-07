@@ -19,11 +19,8 @@ import { planMana } from './mana.js';
 import { readConfiguration, practiceConfiguration } from './configuration.js';
 import { makeLink, readLink } from './share.js';
 import { createTouch, isTouch } from './touch.js';
-import { simplified } from './layout-mode.js';
-import { prepareSimplified, createSimplified } from './simplified.js';
 
 const WL = window.WL;
-prepareSimplified();
 const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
 
 // Where the dummies stand (yards; the first one in the middle of the summoning circle). Six yards apart: Rain of Fire
@@ -77,7 +74,6 @@ const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset',
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
 const controls = createControls(canvas, camera, {
   half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds,
-  blocked: function () { return simplified && !!document.getElementById('organizer')?.open; },
   claimed: function (e) { const combo = keyCombo(e); return combo !== e.code && bound(combo); },   // Shift+W is a spell's key: do not walk
   onWheel: function (e) {
     const combo = wheelCombo(e);
@@ -103,7 +99,6 @@ const recorder = createRecorder();                          // what happened whe
 // A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
 // settings alone. null = your own settings.
 let challenge = null;
-let simpleUI = null;
 let myCurve = [0];                                         // your damage by the end of each second of this fight (for the review's graph)
 let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
 let prevCast = null, castStopped = false, humming = false, bannerKind = '';
@@ -194,10 +189,9 @@ const anchors = [null, { x: 0, y: 0, visible: false }, { x: 0, y: 0, visible: fa
 let fightClock = 0;                                       // seconds since the last reset
 
 const hud = createHud(WL, {
-  keepPickersOpen: simplified,
   onPress: function (key) { press(key); },
-  onBuild: function (key) { if (!simplified) touch.closeMenu(); setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
-  onRace: function (key) { if (!simplified) touch.closeMenu(); setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
+  onBuild: function (key) { touch.closeMenu(); setSetting('build', key); newCharacter(); hud.log('Build: ' + character.build.short + '.', 'proc'); },
+  onRace: function (key) { touch.closeMenu(); setSetting('race', key); newCharacter(); hud.log('Race: ' + WL.RACES[key].name + '.', 'proc'); },
   onDummyHealth: function (health) { leaveChallenge(); setSetting('dummyHealth', health); newCharacter(); hud.log((targets > 1 ? 'Each dummy' : 'The dummy') + ' now has ' + health.toLocaleString('en-US') + ' health.'); },
   onDummies: function (count) { leaveChallenge(); setSetting('dummies', count); newCharacter(); hud.log(count === 1 ? 'One dummy.' : count + ' dummies. Tab or a click changes your target.', 'proc'); },
   onTarget: function (ti) { setTarget(ti); },
@@ -247,7 +241,6 @@ const hud = createHud(WL, {
 const extras = createExtras(WL, {
   // A drill, a seeded fight, or null to go back to your own fight settings.
   onChallenge: function (next) {
-    simpleUI?.close();
     touch.closeMenu();
     challenge = next;
     hud.closePanels();
@@ -256,7 +249,7 @@ const extras = createExtras(WL, {
     else hud.log('Back to your own fight settings.');
   },
   onPreset: function (p) {
-    if (!simpleUI) touch.closeMenu();
+    touch.closeMenu();
     challenge = null;
     setSetting('dummies', p.dummies);
     if (p.health) setSetting('dummyHealth', p.health);
@@ -341,11 +334,6 @@ function settleBest() {
 
 const panels = createPanels({
   onFight: function (options) {
-    if (simpleUI) {
-      const draft = simpleUI.fightDraft(); if (!draft) return;
-      Object.entries(draft).forEach(([key, value]) => setSetting(key, value));
-      simpleUI.close();
-    }
     touch.closeMenu();
     leaveChallenge();
     setSetting('fight', options);
@@ -383,14 +371,7 @@ const panels = createPanels({
   onReview: function () { showReview(); }
 });
 
-simpleUI = createSimplified({
-  state: function () { return { character, challenge, targets, fight: fightOptions() }; },
-  release: function () { controls.releaseInput(); },
-  closePanels: function () { hud.closePanels(); extras.closeSheet(); },
-  capturingKey: function () { return hud.capturingKey(); },
-  copy: extras.copy,
-  defaultCode: function () { return WL.encodeSettings(WL.DEFAULT_CONFIG); }
-});
+
 
 // What a finished drill or seeded fight comes to: its grade against the sim, and a line to pass on.
 function challengeResult() {
@@ -612,7 +593,6 @@ function newCharacter() {
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
-  simpleUI?.refresh();
   aids.setCharacter(character);
   touch.setTargets(targets);
   encounter.start(challenge && challenge.encounter ? challenge : null);

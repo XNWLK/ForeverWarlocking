@@ -1,99 +1,58 @@
 # Forever Warlocking
 
-## Local training improvements
+## Training and review additions
 
-The runner uses XN's original menus and project links. Challenges stays beneath the links, beside a
-**Pull timer** selector (None, or 1–30 seconds) and **Start pull**. The custom-fight summary button and
-reorganized Settings/Character menus are no longer displayed. The prior UI is preserved on local branch
-`preserved-simplified-ui`.
+The runner retains XN's original menus, project links, character/talent/buff views and fight review.
+Character configuration remains read-only: build and gear/buff settings come from WarlockSIM import codes.
+The bundled WarlockSIM files and its sync process are unchanged.
 
-Existing `?layout=simplified` links display the same original menus while retaining their separate saved
-settings, names and records. The default URL retains its existing saves. Run `node tools/check-layout.mjs`
-to check save isolation. Original Character / Talents / Buffs views and the combat review are retained.
+- Optional 1–30 second pull countdown beside Challenges (default None). Combat starts on hostile
+  impact/application, including a pet attack or hostile miss; starting a cast or reaching zero on the
+  countdown does not itself start combat. Life Tap does not pull. Precast timestamps can be negative.
+  Countdown use does not change challenge grading or record eligibility.
+- Recorded DoT clipping, including remaining cancelled ticks and Bane replacement. Missed refreshes,
+  final-tick expiry and Conflagrate consumption are excluded. Cancelled ticks are not measured damage loss.
+- Optional review modules for DoT uptime/clipping, Life Tap/mana, and casting/movement/pet activity.
+  Unused spells show “Not used” and do not generate uptime warnings. Life Tap information is review-only;
+  it includes ending mana and estimated opportunities, not a live planner.
+- Interval inspection beneath the existing damage graph: drag to select or enter exact times. Shows
+  recorded damage, casts, crits, misses, cast/GCD occupancy, forced movement and aura uptime. Sim interval
+  DPS is interpolated from its averaged one-second curve and is not a causal explanation of lost damage.
+- Player and sim crit percentages per spell, using landed hits and ticks together, excluding misses.
+- A/D strafe defaults, turn keys initially unbound, Shift+wheel zoom, and bindable pet Attack/Follow.
+  Existing custom bindings are preserved; unchanged old defaults migrate without claiming occupied spell keys.
+- DoT icons beside duration bars, stable character window dimensions, and aid descriptions.
+- Procedural race appearances with race-adjusted camera height. Human retains the original hooded model.
+  Movement/collision/jump rules remain shared. No extracted game models or textures are added.
 
-**Keybinds** defaults to A/D for Strafe left/right, with Turn left/right unbound. **Camera** defaults to
-Shift+wheel up/down for zoom; plain scrolling does not zoom. Both layouts support custom keyboard/mouse binds.
-Existing unchanged defaults upgrade once, preserving custom bindings and avoiding spell conflicts. Resetting
-all keys uses the new defaults. Key swaps cannot put a wheel or modifier combination onto movement.
-Run `node tools/check-keys.mjs` to check binding behavior.
+### Local preview and validation
 
-This local edition adds optional rotation coaching. **Review the fight** keeps XN's original review first: DPS, damage graph, timeline, time breakdown, spells
-and uptime tables, all visible in their original order. Additional analysis follows in three optional, initially
-collapsed modules: **DoT clipping & uptime**, **Life Tap & mana**, and **Casting, movement & pet**. Timestamp buttons
-locate recorded moments in the original timeline; **Practice again** restarts the same setup. These additions
-live in `js/review-modules.js` and do not replace the original review.
-The DoT module lists every clip once in a compact table; each timestamp links to the timeline. Target and
-replacement columns appear only when needed. Uptime gaps share a compact comparison table, with explanations
-under **How to read this**.
+Run `node tools/serve.js` and open http://127.0.0.1:8770/.
+After changing loaded files, run `node tools/stamp.js` to refresh asset versions.
 
-Character, Talents and Buffs are read-only. Create your build and gear/buff setup in WarlockSIM, then
-bring its build/settings codes into the runner with Import. The character sheet links directly to WarlockSIM.
-The former in-game editor is preserved on local branch `preserved-in-game-editor`; existing imported codes and
-saved browser data are retained. The shared import configuration continues to exclude unsupported active effects
-from gameplay and the sim comparison. WarlockSIM vendor files and the sync process are unchanged.
-
-Choose a **Pull timer** beside Challenges, then **Start pull** to reset the fight with a 1–30 second countdown.
-Cast during the countdown so your opener lands at zero. Combat time starts on hostile impact/application or a
-pet attack, never merely on starting a cast or reaching zero on the countdown. A hostile miss still engages the
-target; channels engage on application. Life Tap does not pull. Early spells pull early; interrupted precasts do
-not. Precasts appear at negative times in the review. The countdown is only a convenience: challenge grades
-and best records work normally, with no separate countdown category.
-
-**Clipped DoTs** appear in the log, callouts, review and timeline, with the target, time left and pending ticks
-cancelled at a successful replacement. Missed refreshes, expiry on the final tick, and Conflagrate consumption do
-not count as early-refresh clips. Replacing one Bane with another is recorded. Cancelled ticks are observations,
-not a claim about net damage lost.
-
-**Life Tap & mana** remains available in the fight review, including tap counts, ending mana,
-possible refresh-window opportunities and late-tap analysis. These retrospective estimates use simulated
-and observed mana consumption; they do not measure lost DPS. There is no live Life Tap planner or toggle.
-
-**Inspect an interval** below the damage graph accepts a drag selection or exact times. It shows recorded
-damage, casts, crits/misses, cast/GCD occupancy, forced movement, gaps and aura uptime. The sim comparison uses
-its averaged one-second curve. The spell table also compares player and sim crit percentages.
-
-The coach excludes recorded forced movement from idle time. Uptime comparisons appear only after a completed
-fight and are labelled as comparisons, not proven damage losses. Short samples, misses, target deaths and different
-fight lengths can affect them. Spell formulas and the vendored WarlockSIM have not been changed.
-
-This edition keeps the existing WoW icon references and procedural 3D models. It does not bundle new extracted
-game models or textures. The original author and notices below are retained.
-
-The **Race** picker also changes the player model in both layouts: Human, Gnome, Orc, Undead and Troll have
-distinct proportions and faces. Human keeps XN's original hooded model; Undead has a forward hunch, an angular
-hood, hollow cheeks, exposed forearm bones and crooked fingers. The robe and staff design and casting animations
-are retained, with worn cloth and muted colors for Undead. Camera height follows the model; movement, collision size,
-jump height and combat rules remain shared. Appearance geometry lives in `js/warlock-appearance.js`, separate
-from WarlockSIM's racial stats. Replaced models release their geometries/materials without disposing shared textures.
-Open `tools/race-preview.html` on the local server to compare front/back views and animations; its model checks
-cover race switching, resource disposal, spell origins and jump height.
-
-Run with Node.js (no packages to install):
+Checks:
 
 ```bash
-node tools/serve.js
+node tools/check-vendor.js
+node tools/check-combat.mjs
+node tools/check-training.mjs
+node tools/check-analysis.mjs
+node tools/check-setup.mjs
+node tools/check-keys.mjs
+node tools/stamp.js --check
 ```
 
-Open http://127.0.0.1:8770/. Checks: `node tools/check-setup.mjs`, `node tools/check-analysis.mjs`, `node tools/check-training.mjs`, `node tools/check-combat.mjs`,
-`node tools/check-vendor.js`, and `node tools/stamp.js --check`. After edits run `node tools/stamp.js`.
+`check-combat` compares the runner's rules with the bundled engine in its parity-test mode.
+`check-training` separately exercises the interactive impact-based clock and countdown behavior.
+The impact-based opener clock differs from the sim's time origin and can affect DPS comparisons.
+Open `tools/race-preview.html` to inspect race models, animation and resource-disposal checks.
 
-The downloaded baseline is saved on local branch `main`; changes are developed on `training-improvements`. The
-`upstream` remote points to XNWLK/ForeverWarlocking. The review branch is prepared against upstream history for the villms/ForeverWarlocking fork.
-Local preparation does not publish changes or open a pull request.
+### Updating WarlockSIM
 
-### Updating the bundled WarlockSIM
-
-Local and hosted builds load `vendor/warlock-sim`, not the live WarlockSIM website. Updating the upstream repo
-alone does not update this app. Use the existing `tools/sync-sim.ps1 -Sim <path-to-updated-WarlockSIM>` script to
-copy the chosen version; `vendor/warlock-sim/manifest.json` records its commit. Keep that folder unmodified between syncs.
-
-Before publishing a synced version, run `node tools/check-vendor.js`, `node tools/check-combat.mjs`,
-`node tools/check-setup.mjs`, `node tools/check-training.mjs` and `node tools/check-analysis.mjs`, then run
-`node tools/stamp.js` and check the app in the browser. Combat checks compare the 3D implementation with the
-bundled engine. The additional checks cover settings/gear, precasting, DoT clipping and mana guidance.
-Shared value changes flow through the bundled data, but new mechanics, configuration fields or log formats may
-also require changes in the 3D combat layer, import handling or analysis. Passing checks covers existing cases; inspect
-upstream changes for new behavior they do not exercise. Publish the tested app and engine files together.
+Local and hosted versions load `vendor/warlock-sim`, not the live WarlockSIM website. Use the existing
+`tools/sync-sim.ps1 -Sim <path-to-updated-WarlockSIM>` workflow and check the recorded manifest commit.
+Run the checks above and inspect the app before publishing the runner and engine together. New upstream
+mechanics or log formats may require updates to the runner or analysis even when shared data updates cleanly.
 
 ---
 

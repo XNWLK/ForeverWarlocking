@@ -6,7 +6,6 @@
 // button on the left.
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
-import { simplified } from './layout-mode.js';
 import { setTip } from './tooltip.js';
 import { ACTION_SPELLS } from './combat.js';
 import { ENCOUNTERS, simFight } from './encounter.js';
@@ -212,7 +211,6 @@ export function createExtras(WL, handlers) {
   const latency = byId('latency');
   latency.value = String(getSetting('latency') || 0);
   latency.addEventListener('change', function () {
-    if (simplified) return; // applied with the other fight settings
     const ms = Math.max(0, Math.min(1000, Math.round(Number(latency.value) || 0)));
     latency.value = String(ms);
     latency.blur();

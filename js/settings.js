@@ -1,11 +1,9 @@
 // The choices that are kept in this browser between visits: build, race, the dummies' health and number, range rings.
 
-import { storageKey, readStored } from './layout-mode.js';
-const BASE_KEY = 'forever-warlocking.settings', STORE_KEY = storageKey(BASE_KEY);
+const STORE_KEY = 'forever-warlocking.settings';
 const DEFAULTS = {
   pullSeconds: 5,
-  pullEnabled: false,                  // optional countdown in the simplified toolbar; None until selected
-  setupProfiles: [],                   // named gear/buff setups, saved in the sim's settings-code format
+  pullEnabled: false,                  // optional countdown beside Challenges; None until selected
   build: null, race: 'human', dummyHealth: 50000, rings: true, dummies: 1, sound: false,
   fight: { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 },   // how the fight ends, movement, hits taken
   buildCode: '', settingsCode: '',     // imported from the DPS sim
@@ -21,7 +19,7 @@ const DEFAULTS = {
 
 let saved = {};
 try {
-  saved = readStored(window.localStorage, BASE_KEY);
+  saved = JSON.parse(window.localStorage.getItem(STORE_KEY)) || {};
 } catch (e) {
   saved = {};
 }

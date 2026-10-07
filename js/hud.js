@@ -213,9 +213,8 @@ export function createHud(WL, handlers) {
       button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
       button.addEventListener('click', function () {
-        if (!handlers.keepPickersOpen) showPanel(null);
+        showPanel(null);
         handlers.onBuild(b.key);
-        if (handlers.keepPickersOpen) builds.querySelector('.on')?.focus({ preventScroll: true });
       });
       builds.appendChild(button);
     });
@@ -229,9 +228,8 @@ export function createHud(WL, handlers) {
       button.appendChild(racials);
       if (character && key === character.raceKey) button.className = 'on';
       button.addEventListener('click', function () {
-        if (!handlers.keepPickersOpen) showPanel(null);
+        showPanel(null);
         handlers.onRace(key);
-        if (handlers.keepPickersOpen) races.querySelector('.on')?.focus({ preventScroll: true });
       });
       races.appendChild(button);
     });

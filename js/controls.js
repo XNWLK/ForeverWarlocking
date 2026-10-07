@@ -206,7 +206,6 @@ export function createControls(canvas, camera, world) {
   return {
     player: player, view: view, update: update, reset: reset, zoom: zoom,
     setEyeHeight: function (height) { if (Number.isFinite(height)) eyeHeight = Math.max(0.5, Math.min(3, height)); },
-    releaseInput: function () { keys.clear(); mouse.left = mouse.right = false; stick.x = stick.y = 0; jumpAsked = false; showCursor(); },
     setStick: function (x, y) { stick.x = x; stick.y = y; },
     jump: function () { jumpAsked = true; }
   };
