@@ -1,7 +1,8 @@
 // Forever Warlocking - start-up and the frame loop.
 import * as THREE from 'three';
 import { buildChamber, makeRangeRings, HALF } from './chamber.js';
-import { makeWarlock, makeDummy, makeBeam } from './models.js';
+import { makeDummy, makeBeam } from './models.js';
+import { makeWarlock } from './warlock.js';
 import { createControls } from './controls.js';
 import { createHud, ACTION_CODES, RACIAL_ICON } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
@@ -523,7 +524,7 @@ function onCombatEvent(e) {
   } else if (e.type === 'apply') {
     if (fx && fx.apply) effects.play(fx.apply, where);
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
-    effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2, controls.player.z) });
+    effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2 * warlock.size, controls.player.z) });
   } else if (e.type === 'death') {
     if (e.last) manaEnd = combat.state.mana;               // what you had left: it keeps regenerating after the fight
     if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
@@ -571,6 +572,8 @@ function standingBuffs(build, stats) {
 function newCharacter() {
   const build = buildByKey(getSetting('build')) || startingBuild();
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
+  warlock.setRace(raceKey);                                // the model takes the race's shape; the camera looks at its head
+  controls.setEyeHeight(1.7 * warlock.size);
   const dummyHealth = getSetting('dummyHealth');
   targets = Math.max(1, Math.min(3, Number(challenge ? challenge.targets : getSetting('dummies')) || 1));
   config = buildConfig();

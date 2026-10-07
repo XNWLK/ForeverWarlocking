@@ -6,7 +6,7 @@ time and see how your rotation does.
 **Play it in the browser: https://xnwlk.github.io/ForeverWarlocking/** (desktop with keyboard and mouse, or a phone or
 tablet with touch controls)
 
-**Status: early, playable.** Pick a build and a race, walk around the fel chamber and cast your rotation on the
+**Status: early, playable.** Pick a build and a race (your Warlock takes the race's shape), walk around the fel chamber and cast your rotation on the
 dummy with your Imp or Succubus: cast bar, global cooldown, DoTs, procs, execute phase, mana, a combat log and a
 damage meter that also shows what the DPS sim reaches on the same dummy. One, two or three dummies, with target
 switching, Bane of Havoc, Rain of Fire and Hellfire. After a fight a review shows where you lost time against the

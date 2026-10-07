@@ -30,6 +30,7 @@ export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
   const player = { x: start.x, z: start.z, yaw: start.yaw, height: 0, fall: 0, moving: false };
   const view = { offset: 0, pitch: 0.3, distance: 11 };   // offset = camera angle relative to the character's back
+  let eyeHeight = EYE_HEIGHT;                             // what the camera looks at: the head of the race you play
   const keys = new Set();
   const mouse = { left: false, right: false };
   const fingers = new Map();                              // fingers on the scene: pointer id -> { x, y }
@@ -186,7 +187,7 @@ export function createControls(canvas, camera, world) {
 
     // Camera: on a sphere around the character's head, pulled in when a wall, the floor or the ceiling is in the way.
     const yaw = player.yaw + view.offset, flat = Math.cos(view.pitch);
-    target.set(player.x, EYE_HEIGHT + player.height, player.z);
+    target.set(player.x, eyeHeight + player.height, player.z);
     dir.set(Math.sin(yaw) * flat, Math.sin(view.pitch), Math.cos(yaw) * flat);
     let distance = view.distance;
     const edge = world.half - 0.6;
@@ -202,6 +203,7 @@ export function createControls(canvas, camera, world) {
 
   return {
     player: player, view: view, update: update, reset: reset, zoom: zoom,
+    setEyeHeight: function (height) { if (height > 0) eyeHeight = Math.max(0.6, Math.min(2.6, height)); },
     setStick: function (x, y) { stick.x = x; stick.y = y; },
     jump: function () { jumpAsked = true; }
   };
