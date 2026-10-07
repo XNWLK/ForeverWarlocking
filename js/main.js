@@ -402,7 +402,18 @@ function askSimAverage() {
 // wait until the bolt arrives (the damage itself is already counted, exactly as the rules say).
 const boltsAt = [0, 0, 0, 0], deathWaiting = [false, false, false, false];
 const spot = new THREE.Vector3(), staffAt = new THREE.Vector3();
-function hitSound(e) { sound.play(e.school === 'fire' ? 'hitFire' : 'hitShadow'); if (e.crit) sound.play('crit'); }
+// Which sound a spell makes when it takes hold of the target (a DoT, a curse). Damage over time itself is silent.
+const APPLY_SOUND = { corruption: 'rot', siphonLife: 'rot', curseOfElements: 'curse', baneOfAgony: 'curse', baneOfDoom: 'curse', baneOfHavoc: 'curse' };
+function hitSound(e) {
+  if (e.pet) { sound.play('petHit'); return; }
+  sound.play(e.key === 'immolate' ? 'ignite' : e.school === 'fire' ? 'hitFire' : 'hitShadow');
+  if (e.crit) sound.play('big');
+}
+// What a cast or channel sounds like while it lasts.
+function castSound(key) {
+  const spell = combat.spells[key];
+  return spell.school === 'fire' ? 'fire' : spell.leech ? 'drain' : 'shadow';
+}
 function onCombatEvent(e) {
   if (e.amount > 0 && (e.type === 'hit' || e.type === 'tick' || e.type === 'havoc')) {
     const second = Math.floor(combat.fightSeconds()) + 1;
@@ -418,22 +429,20 @@ function onCombatEvent(e) {
   // Sounds.
   if (e.type === 'cast') {
     if (e.key === 'lifeTap') sound.play('lifeTap');
-    else if (e.castTime > 0 || e.channel) {                // a swell as it starts, and a hum for as long as it lasts
-      sound.play(combat.spells[e.key].school === 'fire' ? 'castFire' : 'castShadow');
-      sound.casting(combat.spells[e.key].school, e.channel || e.castTime, !!e.channel);
+    else if (e.castTime > 0 || e.channel) {                // it sounds for as long as it lasts
+      sound.casting(castSound(e.key), e.channel || e.castTime);
       humming = true;
     }
   } else if (e.type === 'fail') sound.play('error');
-  else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled' || e.reason === 'health') sound.play('stopped'); }
-  else if (e.type === 'tick') sound.play('tick');
-  else if (e.type === 'apply') sound.play('apply');
+  else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled' || e.reason === 'health') sound.play('fizzle'); }
+  else if (e.type === 'apply') sound.play(APPLY_SOUND[e.key]);
   else if (e.type === 'proc') sound.play('proc');
   else if (e.type === 'pushback') sound.play('pushback');
   else if (e.type === 'death') sound.play('death');
   else if (e.type === 'miss' && !e.pet) sound.play('miss');
-  else if (e.type === 'hit' && e.pet && !(fx && fx.bolt)) sound.play('pet');
+  else if (e.type === 'hit' && e.pet && !(fx && fx.bolt)) { if (e.key !== 'pet:brand') sound.play('pet'); }   // Demonic Brand's extra damage rides on the pet's own hit
   else if (e.type === 'hit' && !e.pet && !(fx && fx.bolt)) hitSound(e);
-  if (lands && fx && fx.bolt) sound.play('bolt');
+  if (lands && fx && fx.bolt && !e.pet) sound.play(fx.bolt.style === 'fire' ? 'boltFire' : 'boltShadow');
 
   // Where your staff's crystal is right now (life drawn from the target flows back to it).
   warlock.orbPosition(staffAt);
