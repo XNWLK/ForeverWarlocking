@@ -3,23 +3,19 @@
 //   - the sim's next cast: what the sim's priority list would cast in your place right now.
 // Looks only; the rules are in combat.js (combat.simWould asks the priority list).
 
-import { planMana } from './mana.js';
-import { simplified } from './layout-mode.js';
 function byId(id) { return document.getElementById(id); }
 
 // handlers: icon(key) -> picture address, hint(key or null, racial) -> light up that spell on the action bar
 export function createAids(WL, handlers) {
   const bars = byId('dotBars'), hintBox = byId('simHint'), hintIcon = byId('simHintIcon'), hintText = byId('simHintText');
   const rotationList = byId('rotationList');
-  const manaBox = byId('manaCoach'), manaAdvice = byId('manaAdvice'), manaBudget = byId('manaBudget');
-  let character = null, rows = {}, lastBars = -1, lastHint = -1, lastMana = '', shownHint = '';
+  let character = null, rows = {}, lastBars = -1, lastHint = -1, shownHint = '';
 
   function setCharacter(c) {
     character = c;
     bars.textContent = ''; rows = {};
-    lastBars = lastHint = -1; lastMana = ''; shownHint = '';
+    lastBars = lastHint = -1; shownHint = '';
     hintBox.hidden = true;
-    manaBox.hidden = true;
     handlers.hint(null, false);
   }
 
@@ -108,32 +104,9 @@ export function createAids(WL, handlers) {
     Array.prototype.forEach.call(rotationList.children, function (li) { li.classList.toggle('now', !!action && li.dataset.action === action); });
   }
 
-  function showMana(combat, now, on, sim) {
-    const stamp = Math.floor(now * 4) + '|' + on + '|' + combat.state.over;
-    if (stamp === lastMana) return;
-    lastMana = stamp;
-    const p = on && character ? planMana(combat, sim) : null;
-    const show = p && p.status !== 'spend' && (p.taps > 0 || p.petTap);
-    manaBox.hidden = !show;
-    if (!show) return;
-    const next = p.next && character.spells[p.next.key].name + (character.targets > 1 ? ' · target ' + p.next.target : '');
-    manaAdvice.textContent = p.status === 'tap-window' ? 'Life Tap fits before ' + next
-      : p.status === 'pet' ? 'Life Tap: your demon needs mana'
-      : p.status === 'spend' ? 'Spend your mana — no more taps projected'
-      : p.taps ? 'Plan for about ' + p.taps + ' more Life Tap' + (p.taps === 1 ? '' : 's') : 'Mana plan';
-    if (simplified) manaAdvice.textContent = p.status === 'tap-window' ? 'Estimated tap window before ' + next
-      : p.status === 'pet' ? 'Mana estimate: your demon needs mana'
-      : p.status === 'spend' ? 'Mana estimate: remaining casts are covered'
-      : 'Mana estimate: about ' + p.taps + ' more tap' + (p.taps === 1 ? '' : 's');
-    manaBudget.textContent = (p.estimatedTime ? '~' : '') + Math.ceil(p.remaining) + 's left · ~' + Math.round(p.needed).toLocaleString('en-US') + ' mana needed · ' + Math.round(p.available).toLocaleString('en-US') + ' available'
-      + (p.manaBasis === 'observed' ? ' · using your mana pace' : p.manaBasis === 'blended' ? ' · learning your mana pace' : ' · using sim mana pace')
-      + (p.status === 'tap-window' ? ' · tap ' + p.gcd.toFixed(1) + 's fits; filler ' + p.fillerTime.toFixed(1) + 's runs past refresh' : '');
-    manaBox.title = 'Starts from simulated spending, then learns your actual net mana consumption over 10–30 seconds, accounting for actual Life Tap gains. Health fights use the sim’s damage pace until there is enough sustained player casting; sparse damage and long idle periods do not determine the forecast. Actual casts, misses and fight length change mana needs.';
-  }
-
   return {
     setCharacter: setCharacter,
     // show: the switches { dotBars, hint }; sim: the worker's result or null
-    render: function (combat, now, show, sim) { showBars(combat, now, !!show.dotBars); showHint(combat, now, !!show.hint, sim); showMana(combat, now, !!show.mana, sim); }
+    render: function (combat, now, show, sim) { showBars(combat, now, !!show.dotBars); showHint(combat, now, !!show.hint, sim); }
   };
 }

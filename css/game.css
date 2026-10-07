@@ -553,10 +553,6 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 #pullTimer { display: grid; gap: 3px; text-align: center; }
 #pullTimer span { font-size: 11px; color: var(--ink-dim); }
 #btnPull:disabled { opacity: 0.5; cursor: default; }
-.mana-coach { display: grid; gap: 3px; padding: 6px 10px; max-width: 100%; text-align: center; font-size: 12px; pointer-events: auto; }
-.mana-coach small { color: var(--ink-dim); font-size: 11px; }
-.touch .mana-coach { position: absolute; top: calc(180px + var(--st)); left: 50%; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); }
-@media (orientation: portrait) { .touch .mana-coach { top: calc(224px + var(--st)); } }
 
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
 

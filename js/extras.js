@@ -30,7 +30,7 @@ export const PRESETS = [
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
 
-const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, mana: true };
+const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false };
 const TREES = [['affliction', 'Affliction'], ['demonology', 'Demonology'], ['destruction', 'Destruction']];
 const STATS = [
   ['maxHealth', 'Health', 0], ['maxMana', 'Mana', 0], ['int', 'Intellect', 0], ['spi', 'Spirit', 0], ['sta', 'Stamina', 0],
@@ -78,7 +78,7 @@ export function createExtras(WL, handlers) {
 
   // ---------- the switches ----------
   const rotationPanel = byId('rotationPanel'), race = byId('race');
-  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint'), mana: byId('swMana') };
+  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint') };
   function applyShow() {
     const s = show();
     Object.keys(switches).forEach(function (k) { switches[k].checked = !!s[k]; });
