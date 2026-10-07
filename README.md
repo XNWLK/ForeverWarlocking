@@ -46,8 +46,7 @@ not a claim about net damage lost.
 
 **Life Tap planner** estimates the mana needed to finish from the build's averaged simulated spell spending,
 mana procs and passive regeneration. It uses the remaining timed duration or, in health fights, an estimated
-kill time gradually updated from sustained DPS. Forecast revisions settle in direction and change one tap
-at a time; a changing positive forecast cannot keep the helper hidden at zero. Zero-tap forecasts hide the helper. It highlights a needed full tap when its GCD fits before a DoT refresh and the
+kill time gradually updated from sustained DPS. Forecast revisions settle in direction; increases move one tap at a time and decreases use the settled lower count; a changing positive forecast cannot keep the helper hidden at zero. Zero-tap forecasts hide the helper. It highlights a needed full tap when its GCD fits before a DoT refresh and the
 filler cast does not. The review records those opportunities, flags likely unnecessary late taps, and reports
 mana at the exact finish before later regeneration. Pet-mana requests are treated separately. Aim to end near
 zero while retaining enough for the final useful spell. These are estimates: your casts, movement, misses and

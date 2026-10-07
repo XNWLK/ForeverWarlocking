@@ -202,8 +202,16 @@ check('brief forecast swings cannot make the displayed count jump', () => {
   c.timeLeft = () => 20;
   planMana(c, sim);
   c.state.t += 3;
-  assert.equal(planMana(c, sim).taps, 5);
-  assert.equal(planMana(c, sim).taps, 5); // repeated render/decision calls
+  assert.equal(planMana(c, sim).taps, 2);
+  assert.equal(planMana(c, sim).taps, 2); // repeated render/decision calls
+});
+check('pending casts reserve their cost without budgeting extra casts during the same time', () => {
+  const c = planner(), sim = { manaForecast: forecast };
+  c.state.mana = 1900; c.state.cast = { key: 'shadowBolt', cost: 300, target: 1 };
+  c.readyAt = () => c.state.t + 2.5;
+  const p = planMana(c, sim);
+  assert.equal(p.available, 1600); assert.equal(p.needed, 4750);
+  assert.equal(p.taps, 5); // previous overlap predicted six
 });
 check('a changing positive forecast cannot leave the planner hidden at zero', () => {
   const c = planner(), sim = { manaForecast: forecast };

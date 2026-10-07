@@ -53,7 +53,9 @@ export function planMana(combat, sim) {
   // of the sim's spending curve as cast bars and kill-time estimates change.
   const forecast = sim?.manaForecast;
   const rate = forecast?.seconds > 0 ? manaBudget(forecast, 0, forecast.seconds) / forecast.seconds : null;
-  const needed = rate == null ? null : rate * remaining;
+  // The pending cast is reserved in available below. Do not also budget new
+  // casts during its remaining cast/GCD time (channels have already paid).
+  const needed = rate == null ? null : rate * Math.max(0, remaining - wait);
   if (needed == null) return null;
   const available = Math.max(0, S.mana - (S.cast?.cost || 0)), gain = combat.tapGain(), gcd = combat.gcd();
   const list = combat.build.rotation.flatMap(a => ACTION_SPELLS[a] || []);
@@ -87,9 +89,11 @@ export function planMana(combat, sim) {
   if (direction !== estimate.candidate) { estimate.candidate = direction; estimate.candidateAt = S.t; }
   // Settle the direction, not an exact count: a changing positive forecast must
   // still become visible when the previous estimate was zero.
-  // Move one tap at a time; actual taps count immediately.
+  // Increase one tap at a time; actual taps count immediately.
   if (S.t - estimate.candidateAt >= 3) {
-    estimate.taps += direction;
+    // Drop to the settled lower forecast instead of retaining excess taps
+    // for several more updates. Increases still move one tap at a time.
+    estimate.taps = direction < 0 ? rawTaps : estimate.taps + direction;
     estimate.candidateAt = S.t;
   }
   const petTap = wanted?.action === 'lifeTapPet';
