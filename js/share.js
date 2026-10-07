@@ -2,6 +2,7 @@
 // codes imported from the Warlock SIM, and the drill, encounter or seeded fight that was running.
 // Everything sits after the # of the address, so nothing is sent anywhere: the page reads it and removes it.
 
+import { simplified } from './layout-mode.js';
 const NUMBER = /^\d+(\.\d+)?$/;
 
 // state: { build, race, dummies, health, fight: { timed, seconds, moveEvery, moveDuration, hitEvery }, latency,
@@ -19,7 +20,7 @@ export function makeLink(state) {
   if (state.buildCode) p.set('bc', state.buildCode);
   if (state.settingsCode) p.set('sc', state.settingsCode);
   if (state.challenge) p.set('play', state.challenge);
-  return window.location.origin + window.location.pathname + '#' + p.toString();
+  return window.location.origin + window.location.pathname + (simplified ? '?layout=simplified' : '') + '#' + p.toString();
 }
 
 // Reads a share link from the address and takes it out of the address bar (so a reload does not apply it again).

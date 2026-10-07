@@ -13,15 +13,60 @@ export function mouseCombo(e) {
   const name = e.button === 1 ? 'Mouse3' : e.button === 3 ? 'Mouse4' : e.button === 4 ? 'Mouse5' : null;
   return name ? held(e) + name : null;
 }
-// The wheel counts only with a modifier held; by itself it zooms. (With Shift some browsers report it sideways.)
+// With Shift some browsers report wheel movement sideways.
 export function wheelCombo(e) {
   const mods = held(e), turn = e.deltaY || e.deltaX;
-  return mods && turn ? mods + (turn < 0 ? 'WheelUp' : 'WheelDown') : null;
+  return turn ? mods + (turn < 0 ? 'WheelUp' : 'WheelDown') : null;
 }
 
 export function hasModifier(combo) { return !!combo && combo.indexOf('+') > 0; }
 export function plainKey(combo) { return combo ? combo.slice(combo.lastIndexOf('+') + 1) : ''; }
 export function isMouse(combo) { return /^(Mouse\d|Wheel(Up|Down))$/.test(plainKey(combo)); }
+
+export const MOVE_BINDS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'jump'];
+export const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: '', turnRight: '', strafeLeft: 'KeyA', strafeRight: 'KeyD',
+  jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '',
+  zoomIn: 'Shift+WheelUp', zoomOut: 'Shift+WheelDown' };
+
+// Upgrade old defaults once, preserving custom bindings and any spell already using a new default.
+export function migrateControlBinds(saved, codes) {
+  const legacy = { turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE', zoomIn: 'WheelUp', zoomOut: 'WheelDown' };
+  const binds = { ...DEFAULT_BINDS, ...legacy, ...saved };
+  for (const [id, old] of Object.entries(legacy)) {
+    const next = DEFAULT_BINDS[id];
+    if (binds[id] !== old) continue;
+    if (next && (codes.includes(next) || Object.keys(binds).some(k => k !== id && binds[k] === next))) continue;
+    binds[id] = next;
+  }
+  return binds;
+}
+
+// A modified wheel turn still zooms when its plain wheel direction is assigned to the camera.
+// The caller must try exact action bindings first, so a spell on Shift+wheel always wins.
+export function zoomDirection(combo, binds, wheelFallback = false) {
+  if (!combo) return 0;
+  if (combo === binds.zoomIn) return -1;
+  if (combo === binds.zoomOut) return 1;
+  const plain = plainKey(combo);
+  return wheelFallback && hasModifier(combo) && /^Wheel(Up|Down)$/.test(plain) ? zoomDirection(plain, binds) : 0;
+}
+
+// Share the existing swap behavior with camera keys, without moving a wheel/modifier binding onto walking.
+export function assignBinding(codes, binds, id, code) {
+  if (MOVE_BINDS.includes(id)) {
+    if (isMouse(code)) return 'Walking and jumping take a plain key';
+    code = plainKey(code);
+  }
+  if (/^Arrow/.test(plainKey(code))) return 'The arrow keys always move you';
+  const old = typeof id === 'number' ? codes[id] : binds[id];
+  if ((isMouse(old) || hasModifier(old)) && MOVE_BINDS.some(k => k !== id && binds[k] === code)) {
+    return 'That key is used for movement. Change its movement binding first.';
+  }
+  codes.forEach((c, i) => { if (c === code && i !== id) codes[i] = old; });
+  Object.keys(binds).forEach(k => { if (binds[k] === code && k !== id) binds[k] = old; });
+  if (typeof id === 'number') codes[id] = code; else binds[id] = code;
+  return null;
+}
 
 const NAMED = { Space: 'Space', Escape: 'Esc', Tab: 'Tab', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
                 AltLeft: 'Alt', AltRight: 'Alt', CapsLock: 'Caps', Backspace: 'Back' };

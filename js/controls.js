@@ -1,6 +1,6 @@
 // Walking and the camera, with the game's default keys:
-// W/S forward and back, A/D turn, Q/E step sideways, Space jump, right mouse held = steer,
-// left mouse held = look around, both mouse buttons = walk forward, wheel = zoom.
+// W/S forward and back, A/D strafe, Space jump, right mouse held = steer,
+// left mouse held = look around, both mouse buttons = walk forward, Shift+wheel = zoom.
 // On a touch screen: one finger dragged over the scene turns you (as the right mouse button does), two fingers pinch
 // to zoom, a tap is a click; walking comes from the stick (setStick) and jumping from a button (jump).
 import * as THREE from 'three';
@@ -24,12 +24,13 @@ function wrapAngle(a) {
 // world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional),
 //          binds: { forward, back, turnLeft, turnRight, strafeLeft, strafeRight, jump } - key codes, may change any time,
 //          claimed(keyEvent) -> true when that key with its modifiers is bound to an action (optional),
-//          onWheel(wheelEvent) -> true when the wheel was used for an action instead of zooming (optional) }
+//          onWheel(wheelEvent) handles wheel bindings, including zoom (optional) }
 // The arrow keys always move you as well.
 export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
   const player = { x: start.x, z: start.z, yaw: start.yaw, height: 0, fall: 0, moving: false };
   const view = { offset: 0, pitch: 0.3, distance: 11 };   // offset = camera angle relative to the character's back
+  let eyeHeight = EYE_HEIGHT;
   const keys = new Set();
   const mouse = { left: false, right: false };
   const fingers = new Map();                              // fingers on the scene: pointer id -> { x, y }
@@ -50,6 +51,7 @@ export function createControls(canvas, camera, world) {
   window.addEventListener('keydown', function (e) {
     if (e.metaKey) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;   // typing must not walk the character
+    if (world.blocked && world.blocked()) return;
     if (world.claimed && world.claimed(e)) return;        // this key with the modifier held is bound to something else
     if (e.target instanceof HTMLButtonElement && e.code === 'Space') e.target.blur();
     if (isMoveKey(e.code)) { keys.add(e.code); e.preventDefault(); }
@@ -127,9 +129,14 @@ export function createControls(canvas, camera, world) {
   });
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
-    if (world.onWheel && world.onWheel(e)) return;        // the wheel with a modifier held may be bound to an action
-    view.distance = Math.min(30, Math.max(3, view.distance * (e.deltaY > 0 ? 1.12 : 0.89)));
+    if (world.blocked && world.blocked()) return;
+    if (world.onWheel) world.onWheel(e);
+    else zoom(Math.sign(e.deltaY || e.deltaX));
   }, { passive: false });
+
+  function zoom(direction) {
+    if (direction) view.distance = Math.min(30, Math.max(3, view.distance * (direction > 0 ? 1.12 : 0.89)));
+  }
 
   // --- Each frame -----------------------------------------------------------
   function down(a, b) { return keys.has(a) || keys.has(b) ? 1 : 0; }
@@ -182,7 +189,7 @@ export function createControls(canvas, camera, world) {
 
     // Camera: on a sphere around the character's head, pulled in when a wall, the floor or the ceiling is in the way.
     const yaw = player.yaw + view.offset, flat = Math.cos(view.pitch);
-    target.set(player.x, EYE_HEIGHT + player.height, player.z);
+    target.set(player.x, eyeHeight + player.height, player.z);
     dir.set(Math.sin(yaw) * flat, Math.sin(view.pitch), Math.cos(yaw) * flat);
     let distance = view.distance;
     const edge = world.half - 0.6;
@@ -197,7 +204,9 @@ export function createControls(canvas, camera, world) {
   }
 
   return {
-    player: player, view: view, update: update, reset: reset,
+    player: player, view: view, update: update, reset: reset, zoom: zoom,
+    setEyeHeight: function (height) { if (Number.isFinite(height)) eyeHeight = Math.max(0.5, Math.min(3, height)); },
+    releaseInput: function () { keys.clear(); mouse.left = mouse.right = false; stick.x = stick.y = 0; jumpAsked = false; showCursor(); },
     setStick: function (x, y) { stick.x = x; stick.y = y; },
     jump: function () { jumpAsked = true; }
   };

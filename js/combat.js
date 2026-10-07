@@ -130,7 +130,8 @@ export function createCombat(opts) {
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, petSent: false,
       target: 1, havoc: null,
-      fightStart: null, fightEnd: null, over: false, presses: []
+      fightStart: null, fightEnd: null, over: false, presses: [],
+      pullAt: null, pullPlannedAt: null
     };
     T = [null];
     for (let i = 1; i <= N; i++) {
@@ -173,7 +174,7 @@ export function createCombat(opts) {
   // What one tick of a spell that also hits you (Hellfire) does to you: its base damage, no talents, no crit.
   function selfTick(key) { const s = SPELLS[key]; return s.selfDamage ? Math.round(s.tickBase + s.tickCoef * spNow(table[key])) : 0; }
   function executePhase(ti) { return T[ti || S.target].hpPct < cfg.fight.executePct; }
-  // Seconds into the fight (the engine's clock): from the reset in the check, from your first action in play.
+  // Seconds in combat: from the reset in parity checks, otherwise from the first hostile impact/application.
   function fightTime(t) { return check ? t : S.fightStart === null ? -1 : t - S.fightStart; }
   // When a timed fight is over (Infinity while it has not started, or when it is not timed).
   function endAt() { return check ? linear : timed && S.fightStart !== null ? S.fightStart + linear : Infinity; }
@@ -187,12 +188,26 @@ export function createCombat(opts) {
   }
   function beginFight() {
     if (S.fightStart !== null) return;
+    const planned = S.pullPlannedAt;
     S.fightStart = S.t;
+    S.pullAt = null;
+    if (planned !== null) {
+      emit({ type: 'pull', early: Math.max(0, planned - S.t) });
+      S.pullPlannedAt = null;
+      if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', S.target); }
+    }
     // The healing you are given, and the sacrifice's ticks: all planned now when the fight has a set length (as the
     // engine does), otherwise one at a time.
     if (HEAL) { if (linear) for (let at = HEAL.every; at < linear - EPS; at += HEAL.every) push({ t: S.t + at, o: 0, type: 'heal' }); else push({ t: S.t + HEAL.every, o: 0, type: 'heal', again: true }); }
     if (SAC) { if (linear) for (let at = SAC.every; at < linear - EPS; at += SAC.every) push({ t: S.t + at, o: 0, type: 'sacTick' }); else push({ t: S.t + SAC.every, o: 0, type: 'sacTick', again: true }); }
     if (HIT) push({ t: S.t + R.push() * HIT, o: 1, type: 'dmgTaken' });    // the first hit comes somewhere in the first interval
+  }
+  function startPull(seconds) {
+    if (check || S.fightStart !== null || S.over || S.pullAt !== null || S.cast || S.channel || !Number.isFinite(seconds) || seconds < 1 || seconds > 30) return false;
+    S.pullAt = S.t + seconds;
+    S.pullPlannedAt = S.pullAt;
+    push({ t: S.pullAt, o: -1, type: 'pull' });
+    return true;
   }
   // Distances come from the scene; without them (the check script) everything is in range.
   function distanceTo(ti, ctx) { const c = ctx || lastCtx; return c && c.distances && c.distances[ti] != null ? c.distances[ti] : 0; }
@@ -339,8 +354,16 @@ export function createCombat(opts) {
     }
   }
 
+  function reportDotClip(ti, key, replacement) {
+    const old = T[ti].dots[key];
+    if (!old || old.expires <= S.t + EPS) return;
+    const ticks = events.filter(function (ev) { return ev.type === 'dotTick' && ev.inst === old.inst && ev.t > S.t + EPS; }).length;
+    if (ticks) emit({ type: 'dotClip', key: key, replacement: replacement, target: ti, left: old.expires - S.t, ticks: ticks });
+  }
   function applyDot(ti, key, snap) {
     const s = SPELLS[key], e = table[key], id = ++inst, t = T[ti];
+    if (s.bane) { reportDotClip(ti, 'baneOfAgony', key); reportDotClip(ti, 'baneOfDoom', key); }
+    else reportDotClip(ti, key, key);
     if (s.bane) {                                                     // one Bane per target
       delete t.dots.baneOfAgony; delete t.dots.baneOfDoom;
       if (!check && S.havoc && S.havoc.target === ti) S.havoc = null;
@@ -385,6 +408,8 @@ export function createCombat(opts) {
 
   // A finished or instant cast arrives at its target. Returns true when it hit.
   function land(key, baseMult, ti) {
+    beginFight(); // a hostile impact engages the target even when the spell misses
+    if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', ti); }
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
     r.landed++;
@@ -454,6 +479,7 @@ export function createCombat(opts) {
   function petSp() { return warlockSpNow() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
 
   function petSpellHit(sp) {
+    beginFight();
     const key = 'pet:' + sp.key, ti = P.target, r = row(rowKey(ti, key));
     P.casting = null;
     r.casts++;
@@ -513,6 +539,7 @@ export function createCombat(opts) {
     if (!S.over && P.gen === gen) petEvent(S.t + m.swing, 0, 'petSwing');
   }
   function petMeleeAttack(key, roll, extraAp, ti) {   // one roll decides miss, dodge, glancing, crit or hit; true if it landed
+    beginFight();
     const m = P.c.melee, r = row(rowKey(ti, key)), tb = cb.petMelee;
     r.casts++;
     const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
@@ -546,7 +573,7 @@ export function createCombat(opts) {
     P.gen++;                                // whatever it had planned is dropped
     P.casting = null;
     if (!wanted) return;
-    beginFight();
+    if (check) beginFight(); // in play, a travelling pet or a pet cast bar has not yet engaged the target
     if (P.c.melee) petEvent(Math.max(S.t, P.swingReady), 0, 'petSwing');
     if (P.c.spell) petEvent(S.t, 2, 'petAct');
   }
@@ -584,10 +611,11 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
-    if (key !== 'lifeTap') {
+    if (key !== 'lifeTap' && (castT <= EPS || s.kind === 'channel')) {
       beginFight();
       if (!S.petSent) { S.petSent = true; if (P && P.mode !== 'attack') petCommand('attack', ti); }   // the pet joins in by itself
     }
+    emit({ type: 'decision', key: key, target: ti });
     S.presses.push({ t: S.t, k: key, target: ti });
     S.gcdStart = S.t; S.gcdReady = S.t + gcdT;
     emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? s.duration : 0 });
@@ -714,9 +742,13 @@ export function createCombat(opts) {
     if (!alive(ti)) return fail('baneOfHavoc', 'dead');
     if (S.mana < e.cost - 1e-6) return fail('baneOfHavoc', 'mana');
     if (distanceTo(ti, ctx) > e.range + EPS) return fail('baneOfHavoc', 'range');
+    beginFight();
     S.mana -= e.cost;
     if (e.cost > 0) S.lastSpend = S.t;
-    if (!check) { delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
+    if (!check) {
+      reportDotClip(ti, 'baneOfAgony', 'baneOfHavoc'); reportDotClip(ti, 'baneOfDoom', 'baneOfHavoc');
+      delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom;
+    }
     S.havoc = { target: ti, expires: S.t + SPELLS.baneOfHavoc.duration };
     row('baneOfHavoc').casts++;
     S.presses.push({ t: S.t, k: 'baneOfHavoc', target: ti });
@@ -833,7 +865,12 @@ export function createCombat(opts) {
   }
 
   function handle(ev) {
-    if (ev.type === 'castEnd') {
+    if (ev.type === 'pull') {
+      if (S.pullAt !== null && Math.abs(S.pullAt - ev.t) < EPS) {
+        S.pullAt = null;
+        emit({ type: 'pullReady' }); // the countdown is a cue, not a hostile action
+      }
+    } else if (ev.type === 'castEnd') {
       const c = S.cast;
       if (!c || c.inst !== ev.inst) return;
       S.cast = null;
@@ -1011,7 +1048,10 @@ export function createCombat(opts) {
     get current() { return T[S.target]; },
     petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : 0; },
     petCommand: petCommand, setTarget: setTarget,
-    press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
+    press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt, startPull: startPull,
+    pullLeft: function () { return S.pullAt === null ? null : Math.max(0, S.pullAt - S.t); },
+    tapGain: function () { return (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100); },
+    canTap: canTap,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },
     castTime: castTime, gcd: gcd, cost: effectiveCost, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warlock race model preview</title>
+<style>
+  * { box-sizing: border-box; } body { margin: 0; background: #111018; color: #e7e1f1; font: 14px/1.5 system-ui,sans-serif; }
+  header { padding: 20px 28px 10px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0; } header p { margin: 3px 0 0; color: #aba0ba; font-size: 12px; }
+  nav { display: flex; flex-wrap: wrap; gap: 12px; } select,button { font: inherit; padding: 5px 8px; background: #282033; color: #e7e1f1; border: 1px solid #645074; border-radius: 5px; }
+  canvas { display: block; width: 100%; height: calc(100vh - 208px); min-height: 350px; }
+  .labels { display: grid; grid-template-columns: repeat(5,1fr); padding: 0 5%; text-align: center; }
+  h2 { font-size: 16px; margin: 0; } .labels p { color: #aba0ba; font-size: 12px; margin: 3px 4px; }
+  #checks { margin: 20px 28px; color: #a8d9b2; font-size: 12px; } #checks.bad { color: #ffb5a6; }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js"}}</script>
+<header><div><h1>Warlock race appearances</h1><p>The same robes and staff, with distinct silhouettes and facial features.</p></div>
+  <nav><label>View <select id="view"><option value="front">Front</option><option value="quarter">Three-quarter</option><option value="back">Back</option></select></label>
+  <label>Pose <select id="pose"><option value="idle">Idle</option><option value="walk">Walking</option><option value="cast">Casting</option><option value="jump">Jumping</option></select></label>
+  <button id="release">Release spell</button><button id="test">Run model checks</button></nav>
+</header>
+<canvas id="preview" aria-label="Five race models side by side"></canvas>
+<div class="labels"><section><h2>Human</h2><p>XN's original hooded model</p></section><section><h2>Gnome</h2><p>Short · white beard</p></section><section><h2>Orc</h2><p>Broad · green skin</p></section><section><h2>Undead</h2><p>Hooded · gaunt · hunched</p></section><section><h2>Troll</h2><p>Tall · tusks and crest</p></section></div>
+<p id="checks" role="status">Checking models…</p>
+<script type="module">
+import * as THREE from 'three';
+import { makeWarlock } from '../js/models.js';
+import { RACE_APPEARANCES } from '../js/warlock-appearance.js';
+const canvas = document.getElementById('preview'), scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111018);
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.1;
+scene.add(new THREE.HemisphereLight(0xe0e6ff,0x70606a,2));
+const key = new THREE.DirectionalLight(0xffe4c8,2.7); key.position.set(-4,7,-7); scene.add(key);
+const rim = new THREE.DirectionalLight(0xa78bf3,1.8); rim.position.set(4,5,5); scene.add(rim);
+const camera = new THREE.OrthographicCamera(-7,7,3,-3,0.1,100); camera.position.set(0,3,-16); camera.lookAt(0,1.6,0);
+const races = Object.keys(RACE_APPEARANCES), models = races.map((race,i) => {
+  const model = makeWarlock(race); model.root.position.x=(2-i)*2.65; scene.add(model.root); return model;
+});
+const orb = new THREE.Vector3(), markers = models.map(() => {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.04,6,4),new THREE.MeshBasicMaterial({color:0xffffff})); scene.add(dot); return dot;
+});
+const view = document.getElementById('view'), pose = document.getElementById('pose');
+document.getElementById('release').onclick = () => models.forEach(m=>m.release());
+function checkModels() {
+  let count = 0; const assert = (ok,message) => { if (!ok) throw Error(message); count++; };
+  const probe = makeWarlock(), originalRoot = probe.root;
+  probe.root.position.set(5,0,-2); probe.root.rotation.y=0.4;
+  try {
+    assert(probe.race === 'human','Default race');
+    for (const race of races) {
+      const old = probe.root.children[0], geometries = new Set(), materials = new Set(); let gd=0,md=0;
+      old.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(o.material)[].concat(o.material).forEach(m=>materials.add(m));});
+      geometries.forEach(g=>g.addEventListener('dispose',()=>gd++)); materials.forEach(m=>m.addEventListener('dispose',()=>md++));
+      const changed = race !== probe.race; probe.setRace(race);
+      assert(probe.race === race,'Selected race '+race);
+      assert(probe.root === originalRoot && probe.root.children.length===1 && probe.root.position.x===5 && probe.root.rotation.y===0.4,'Stable scene root '+race);
+      assert(gd===(changed?geometries.size:0) && md===(changed?materials.size:0),'Dispose only replaced resources '+race);
+      const same = probe.root.children[0]; probe.setRace(race); assert(probe.root.children[0]===same,'Same race is not rebuilt '+race);
+      for (const school of [null,'shadow','fire']) {
+        probe.release(); probe.update(0.1,1.3,true,0.7,school); probe.root.updateMatrixWorld(true); probe.orbPosition(orb);
+        assert([orb.x,orb.y,orb.z].every(Number.isFinite) && orb.y>0.7,'Animated spell origin '+race+' '+school);
+      }
+      probe.update(1,0,false,0,null); probe.root.updateMatrixWorld(true); const before=probe.orbPosition(new THREE.Vector3());
+      probe.update(1,0,false,1,null); probe.root.updateMatrixWorld(true); const after=probe.orbPosition(new THREE.Vector3());
+      assert(Math.abs(after.y-before.y-1)<1e-6,'Race size does not scale jump height '+race);
+    }
+    probe.setRace('unknown'); assert(probe.race==='human','Unknown race fallback');
+    assert(RACE_APPEARANCES.gnome.height<RACE_APPEARANCES.human.height && RACE_APPEARANCES.troll.height>RACE_APPEARANCES.human.height,'Distinct heights');
+    document.getElementById('checks').textContent=count+' model checks passed · race switching, resource disposal, casting attachments and jump height.';
+  } catch(e) { document.getElementById('checks').className='bad';document.getElementById('checks').textContent=e.message; throw e; }
+  finally { const gs=new Set(),ms=new Set();probe.root.traverse(o=>{if(o.geometry)gs.add(o.geometry);if(o.material)[].concat(o.material).forEach(m=>ms.add(m));});gs.forEach(g=>g.dispose());ms.forEach(m=>m.dispose()); }
+}
+document.getElementById('test').onclick=checkModels; checkModels();
+let last=performance.now();
+function frame(now) {
+  const dt=Math.min(0.05,(now-last)/1000), time=now/1000; last=now;
+  const width=canvas.clientWidth,height=canvas.clientHeight;
+  if(canvas.width!==Math.round(width*renderer.getPixelRatio())||canvas.height!==Math.round(height*renderer.getPixelRatio())) renderer.setSize(width,height,false);
+  const halfHeight=Math.max(1.9,7*height/width);camera.left=-halfHeight*width/height;camera.right=-camera.left;camera.top=halfHeight;camera.bottom=-halfHeight;camera.updateProjectionMatrix();
+  models.forEach((m,i)=>{
+    m.root.rotation.y=view.value==='back'?Math.PI:view.value==='quarter'?0.6:0;
+    m.update(dt,time,pose.value==='walk',pose.value==='jump'?Math.max(0,Math.sin(time*3))*0.8:0,pose.value==='cast'?'shadow':null);
+    m.root.updateMatrixWorld(true); markers[i].visible=pose.value==='cast';markers[i].position.copy(m.orbPosition(orb));
+  });
+  renderer.render(scene,camera);requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</html>

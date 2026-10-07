@@ -1,11 +1,12 @@
 // The bar on the right and what it switches on or opens:
 //   - the rotation panel (what the sim plays), the race against the sim, mistake callouts;
-//   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM;
+//   - character, talents and buffs sheets, with a link to WarlockSIM;
 //   - latency, fight presets, the volume, a link to share, and copying the combat log.
 // Challenges (drills, scripted encounters and the seeded fight) have a window of their own, opened by the gold
 // button on the left.
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
+import { simplified } from './layout-mode.js';
 import { setTip } from './tooltip.js';
 import { ACTION_SPELLS } from './combat.js';
 import { ENCOUNTERS, simFight } from './encounter.js';
@@ -29,8 +30,7 @@ export const PRESETS = [
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
 
-const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false };
-const FROM_SIM = 'Read-only: this comes from the Warlock SIM. To change it, change it there and bring the codes over with Import.';
+const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, mana: true };
 const TREES = [['affliction', 'Affliction'], ['demonology', 'Demonology'], ['destruction', 'Destruction']];
 const STATS = [
   ['maxHealth', 'Health', 0], ['maxMana', 'Mana', 0], ['int', 'Intellect', 0], ['spi', 'Spirit', 0], ['sta', 'Stamina', 0],
@@ -78,7 +78,7 @@ export function createExtras(WL, handlers) {
 
   // ---------- the switches ----------
   const rotationPanel = byId('rotationPanel'), race = byId('race');
-  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint') };
+  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint'), mana: byId('swMana') };
   function applyShow() {
     const s = show();
     Object.keys(switches).forEach(function (k) { switches[k].checked = !!s[k]; });
@@ -95,7 +95,6 @@ export function createExtras(WL, handlers) {
     });
   });
   applyShow();
-
   // ---------- rotation panel ----------
   function fillRotation() {
     const list = byId('rotationList'), build = character.build;
@@ -200,6 +199,7 @@ export function createExtras(WL, handlers) {
     Object.keys(tabs).forEach(function (k) { tabs[k].classList.toggle('on', k === which); });
     byId('sheetTitle').textContent = which === 'character' ? 'Character' : which === 'talents' ? 'Talents' : 'Buffs and consumables';
     if (which === 'character') characterSheet(); else if (which === 'talents') talentSheet(); else buffSheet();
+    byId('sheetNote').textContent = 'Read-only: this comes from WarlockSIM. Make your build and setup there, then bring the codes over with Import.';
     sheet.hidden = false;
   }
   Object.keys(tabs).forEach(function (k) { tabs[k].addEventListener('click', function () { tabs[k].blur(); showSheet(k); }); });
@@ -207,12 +207,12 @@ export function createExtras(WL, handlers) {
   byId('btnTalents').addEventListener('click', function () { showSheet('talents'); });
   byId('btnBuffs').addEventListener('click', function () { showSheet('buffs'); });
   byId('sheetClose').addEventListener('click', function () { sheet.hidden = true; });
-  byId('sheetNote').textContent = FROM_SIM;
 
   // ---------- latency, presets ----------
   const latency = byId('latency');
   latency.value = String(getSetting('latency') || 0);
   latency.addEventListener('change', function () {
+    if (simplified) return; // applied with the other fight settings
     const ms = Math.max(0, Math.min(1000, Math.round(Number(latency.value) || 0)));
     latency.value = String(ms);
     latency.blur();
@@ -347,7 +347,7 @@ export function createExtras(WL, handlers) {
     else {
       const end = sim.curve[sim.curve.length - 1] || 1, theirs = simAt(sim.curve, t), gap = mine - theirs;
       you = Math.min(100, 100 * mine / end); them = Math.min(100, 100 * theirs / end);
-      if (t <= 0) text = 'Starts with your first cast';
+      if (t <= 0) text = combat.pullLeft() !== null ? 'Waiting for the pull' : 'Starts when combat is initiated';
       else if (Math.abs(gap) < 0.5) text = 'Level with the sim';
       else text = (gap > 0 ? whole(gap) + ' ahead' : whole(-gap) + ' behind') + (theirs > 0 ? ' · ' + Math.round(100 * mine / theirs) + '% of the sim' : '');
     }
@@ -381,7 +381,13 @@ export function createExtras(WL, handlers) {
       if (s.race) showRace(combat, sim);
     },
     // An event from the casting rules (only what the callouts need to know).
-    event: function (e, combat) { if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t; },
+    event: function (e, combat) {
+      if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t;
+      if (e.type === 'dotClip') {
+        const text = combat.spells[e.key].name + ' clipped on target ' + e.target + ': ' + e.left.toFixed(1) + ' s / ' + e.ticks + ' ticks left.';
+        if (show().callouts) callout(text); else handlers.log(text, 'miss');
+      }
+    },
     refreshDrills: fillDrills,
     show: show,
     // A challenge named in a share link ('drill:opener', 'encounter:fireDance', 'seed:word'): start it. False when

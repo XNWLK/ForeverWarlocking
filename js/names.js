@@ -2,11 +2,12 @@
 
 const DEFAULTS = { warlock: 'Xn', imp: 'Yazpad', succubus: 'Rob', dummy: 'Mage dummy', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
 const MAX_LENGTH = { warlock: 12, imp: 12, succubus: 12, dummy: 20, felhunter: 12, voidwalker: 12 };
-const STORE_KEY = 'forever-warlocking.names';
+import { storageKey, readStored } from './layout-mode.js';
+const BASE_KEY = 'forever-warlocking.names', STORE_KEY = storageKey(BASE_KEY);
 
 let saved = {};
 try {
-  saved = JSON.parse(window.localStorage.getItem(STORE_KEY)) || {};
+  saved = readStored(window.localStorage, BASE_KEY);
 } catch (e) {
   saved = {};
 }

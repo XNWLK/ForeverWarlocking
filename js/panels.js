@@ -1,7 +1,13 @@
 // The three panels that are more than a list: fight options, import from the DPS sim, and the review after a fight.
+import { attachIntervalInspector } from './interval.js';
 import { drawTimeline } from './timeline.js';
+import { reviewModules } from './review-modules.js';
 
 function byId(id) { return document.getElementById(id); }
+export function spellCritPercent(row) {
+  const hits = (row?.hits || 0) + (row?.ticks || 0);
+  return hits > 0 ? (100 * ((row.crits || 0) + (row.tickCrits || 0)) / hits).toFixed(1) + '%' : '—';
+}
 function whole(n) { return Math.round(n).toLocaleString('en-US'); }
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -68,7 +74,7 @@ export function createPanels(handlers) {
   // d: { seconds, result (from the casting rules), sim (from the worker, or null), spells, petName, dummyName(i),
   //      targets, timed, hasPet }
   function showReview(d) {
-    const res = d.result, k = res.track, sim = d.sim, dps = d.seconds > 0 ? res.total / d.seconds : 0;
+    const res = d.result, k = res.track, sim = d.complete ? d.sim : null, dps = d.seconds > 0 ? res.total / d.seconds : 0;
     body.textContent = '';
 
     // A drill or seeded fight: its grade, and a line to pass on.
@@ -97,7 +103,7 @@ export function createPanels(handlers) {
     head.appendChild(el('b', whole(dps) + ' DPS'));
     head.appendChild(document.createTextNode(' in ' + d.seconds.toFixed(1) + ' s'));
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
-    else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
+    else head.appendChild(document.createTextNode(d.complete ? '  ·  the sim\'s numbers are still being worked out' : '  ·  live snapshot; sim comparison available after the fight'));
     body.appendChild(head);
     // Your best in this very fight (same build, race, dummies and fight options), outside challenges.
     if (d.best) {
@@ -132,14 +138,15 @@ export function createPanels(handlers) {
       if (simCurve) { const s = el('span', 'The sim (average of its fights)'); s.insertBefore(el('i', null, 'sim'), s.firstChild); key.appendChild(s); }
       key.appendChild(el('span', '0 s to ' + span + ' s, up to ' + whole(top) + ' damage'));
       body.appendChild(key);
+      attachIntervalInspector(body, svg, { ...d, sim }, span, W, pad);
     }
 
     // The fight from left to right: your casts, the sim's, and when each DoT was up.
-    if (d.record && d.record.casts.length) {
+    if (d.record && d.seconds > 0) {
       body.appendChild(el('h3', 'Timeline'));
       body.appendChild(drawTimeline({ record: d.record, seconds: d.seconds, simCasts: sim && sim.casts, spells: d.spells, icon: d.icon,
                                       racialName: d.racialName, targets: d.targets, dummyName: d.dummyName, width: Math.min(640, window.innerWidth * 0.92) - 32 - 112 }));
-      body.appendChild(el('p', 'Red: nothing was cast. Grey: you were made to move. A dim picture: the cast was stopped. "The sim" is one of its own fights' +
+      body.appendChild(el('p', 'Red: nothing was cast. Grey: you were made to move. ×: a DoT was clipped. A dim picture: the cast was stopped. "The sim" is one of its own fights' +
         (d.sameDice ? ', with the same dice as yours.' : ', with other dice than yours: read it for the order of things, not second by second.') + ' Hover anything to read it.', 'graph-key'));
     }
 
@@ -164,6 +171,7 @@ export function createPanels(handlers) {
       Object.keys(rows || {}).forEach(function (key) {
         const base = key.replace(/^x\d:/, ''), r = into[base] || (into[base] = { casts: 0, dmg: 0 });
         r.casts += rows[key].casts || 0; r.dmg += rows[key].dmg || 0;
+        ['hits', 'crits', 'ticks', 'tickCrits'].forEach(function (field) { r[field] = (r[field] || 0) + (rows[key][field] || 0); });
       });
     }
     add(mine, res.bySpell);
@@ -180,12 +188,14 @@ export function createPanels(handlers) {
       const m = mine[key] || { casts: 0, dmg: 0 }, s = theirs[key];
       const diff = s ? m.dmg - s.dmg : 0;
       return {
-        cells: [label(key), String(Math.round(m.casts)), s ? s.casts.toFixed(1) : '', whole(m.dmg), s ? whole(s.dmg) : '', s ? (diff >= 0 ? '+' : '') + whole(diff) : ''],
+        cells: [label(key), String(Math.round(m.casts)), s ? s.casts.toFixed(1) : '', whole(m.dmg), s ? whole(s.dmg) : '', s ? (diff >= 0 ? '+' : '') + whole(diff) : '', spellCritPercent(m), spellCritPercent(s)],
         mark: s && s.dmg > 0 && diff < -0.02 * (sim.dps * sim.seconds) ? 'behind' : ''
       };
     });
     body.appendChild(el('h3', 'Spells'));
-    body.appendChild(table(['', 'Your casts', 'Sim', 'Your damage', 'Sim', 'Difference'], spellRows));
+    body.appendChild(table(['', 'Your casts', 'Sim', 'Your damage', 'Sim', 'Difference', 'Your crit %', 'Sim crit %'], spellRows));
+
+    body.appendChild(el('p', 'Crit % is critical damage events divided by landed hits and ticks, excluding misses. Spells with no damage events show —.', 'muted'));
 
     // How long each DoT and debuff was on each dummy.
     const upRows = [];
@@ -209,10 +219,27 @@ export function createPanels(handlers) {
       body.appendChild(el('h3', 'How long it was up'));
       body.appendChild(table(['', 'You', 'Sim'], upRows));
     }
-    body.appendChild(el('p', d.timed
+    body.appendChild(el('p', !d.complete ? 'Live snapshot. Sim totals and uptime comparisons are available after the fight ends.' : d.timed
       ? 'The sim fought for the same length of time with its priority list, many times over; its numbers are averages.'
       : 'The sim fought until it had dealt the same total health with its priority list, many times over; its numbers are averages. Its pet attacks from the first second.', 'hint'));
+    // Keep the additional analysis after the original review, with each module closed by default.
+    body.appendChild(reviewModules(d, {
+      table,
+      inspect: function (time) {
+        const scroll = body.querySelector('.tl-scroll'), inner = body.querySelector('.tl-inner');
+        if (!scroll || !inner) return;
+        const x = (time - Number(inner.dataset.startTime || 0)) * Number(inner.dataset.pixelsPerSecond);
+        let mark = inner.querySelector('.tl-inspect');
+        if (!mark) { mark = el('div', null, 'tl-inspect'); inner.appendChild(mark); }
+        mark.style.left = x + 'px';
+        scroll.scrollLeft = Math.max(0, x - scroll.clientWidth / 3);
+        scroll.scrollIntoView({ block: 'center', behavior: 'auto' });
+        scroll.tabIndex = -1; scroll.focus({ preventScroll: true });
+      },
+      retry: function () { review.hidden = true; if (d.retry) d.retry(); }
+    }));
     review.hidden = false;
+    review.scrollTop = 0;
   }
 
   return {

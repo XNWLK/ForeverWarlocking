@@ -84,6 +84,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 
 .keys { width: 470px; display: grid; gap: 8px; }
 .binds { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.binds h3 { margin: 10px 0 4px; font-size: 12px; color: var(--ink-dim); }
+#bindsError:empty { display: none; }
 .bind { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 1px 0; font-size: 12px; }
 .bind span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bind button { flex: none; min-width: 58px; padding: 1px 6px; font-weight: 600; color: var(--gold); }
@@ -137,14 +139,15 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 /* DoT timers: a stack of bars above your target's debuffs, growing upward. */
 #auraRow { position: relative; }
 .dotbars { position: absolute; right: 0; bottom: 36px; width: 186px; display: flex; flex-direction: column-reverse; gap: 2px; pointer-events: none; }
-.dotbar { position: relative; display: flex; align-items: center; gap: 5px; height: 16px; padding-right: 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.6); overflow: hidden; font-size: 11px; line-height: 16px; text-shadow: 0 1px 1px #000; }
+.dotbar { display: flex; align-items: center; gap: 3px; height: 16px; font-size: 11px; line-height: 16px; text-shadow: 0 1px 1px #000; }
+.dotbar-track { position: relative; display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; height: 100%; padding: 0 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
 .dotbar i { position: absolute; inset: 0 auto 0 0; background: rgba(140, 90, 230, 0.62); }
 .dotbar.fire i { background: rgba(225, 115, 45, 0.62); }
-.dotbar img { position: relative; flex: none; width: 16px; height: 16px; }
-.dotbar span { position: relative; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dotbar img { flex: none; width: 16px; height: 16px; border-radius: 2px; }
+.dotbar span { position: relative; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dotbar b { position: relative; flex: none; font-variant-numeric: tabular-nums; }
 .dotbar.other { opacity: 0.72; }
-.dotbar.soon { box-shadow: 0 0 0 1px var(--gold) inset; }
+.dotbar.soon .dotbar-track { box-shadow: 0 0 0 1px var(--gold) inset; }
 .dotbar.soon b { color: var(--gold); }
 
 /* The race against the sim, in the damage meter. */
@@ -520,5 +523,48 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .touch .review { max-height: calc(100% - 16px); -webkit-overflow-scrolling: touch; }
 .touch .review button { padding: 7px 12px; font-size: 13px; }
 
-/* --- Start-up failure ---------------------------------------------------- */
+/* --- Optional fight-review modules -------------------------------------- */
+.coach-note { font-size: 11px; color: var(--ink-dim); }
+.coach-finding { border-top: 1px solid var(--line); padding: 12px 0; }
+.finding-heading { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; font-size: 11px; color: var(--ink-dim); }
+.finding-heading b { color: var(--gold); }
+.coach-finding h4 { margin: 4px 0; font-size: 13px; }
+.coach-finding p { margin: 4px 0; font-size: 12px; }
+.coach-finding p:first-of-type { color: var(--ink-dim); }
+.coach-events, .coach-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.coach-events button { border: 1px solid var(--line); font-size: 11px; }
+.coach-note { line-height: 1.5; }
+.review-modules { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+.review-module { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.review-module summary { cursor: pointer; color: var(--accent); }
+.review-module-table { overflow-x: auto; }
+.review-module > h4 { margin: 10px 0 4px; font-size: 12px; }
+.review-module > .coach-note { margin: 6px 0; }
+.review-module-table .clip-table th:nth-child(2), .review-module-table .clip-table td:nth-child(2) { text-align: left; white-space: normal; }
+.review .review-time { padding: 2px 0; background: none; border: 0; border-radius: 0; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.review .review-time:hover { color: var(--ink); }
+.review-help { margin-top: 6px; }
+.review-help summary { font-size: 11px; color: var(--ink-dim); }
+.tl-inspect { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 3; }
+.tl-scroll:focus-visible { outline: 1px solid var(--gold); }
+.sim-link { display: inline-block; color: var(--accent); padding: 6px 10px; pointer-events: auto; }
+.tl-pull { position: absolute; top: 16px; bottom: 0; border-left: 1px dashed var(--ink-dim); pointer-events: none; }
+.tl-clips button { position: absolute; top: 0; width: 18px; height: 20px; padding: 0; color: var(--gold); font-size: 18px; }
+#pullTimer { display: grid; gap: 3px; text-align: center; }
+#pullTimer span { font-size: 11px; color: var(--ink-dim); }
+#btnPull:disabled { opacity: 0.5; cursor: default; }
+.mana-coach { display: grid; gap: 3px; padding: 6px 10px; max-width: 100%; text-align: center; font-size: 12px; pointer-events: auto; }
+.mana-coach small { color: var(--ink-dim); font-size: 11px; }
+.touch .mana-coach { position: absolute; top: calc(180px + var(--st)); left: 50%; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); }
+@media (orientation: portrait) { .touch .mana-coach { top: calc(224px + var(--st)); } }
+
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }
+
+.pull-choice { display: flex; align-items: center; gap: 6px; margin: 0 6px; color: var(--ink-dim); font-size: 12px; }
+.pull-choice select { font: inherit; color: var(--ink); background: #1b1226; border: 1px solid var(--line-bright); border-radius: 5px; padding: 4px; }
+
+.interval-inspector { margin: 8px 0 16px; font-size: 12px; }
+.interval-inspector summary { cursor: pointer; color: var(--accent); }
+.interval-controls { display: flex; gap: 16px; flex-wrap: wrap; }
+.interval-controls input { width: 80px; padding: 3px 6px; color: var(--ink); background: var(--glass); border: 1px solid var(--line); border-radius: 4px; }
+.interval-inspector p, .interval-inspector ul { margin: 8px 0; }

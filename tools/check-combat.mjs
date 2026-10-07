@@ -25,6 +25,7 @@ const SCENES = [
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
   { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] },
+  { name: 'custom gear and consumables', targets: 1, seeds: [12], gear: { sp: 825, hitPct: 12.5, critPct: 14.2, hastePct: 4.5, int: 230, spi: 85, sta: 190, mp5: 20 }, consumables: ['greaterArcaneElixir', 'brilliantWizardOil'] },
   { name: 'Blessing of Salvation and Tranquil Air Totem', targets: 1, seeds: [11], buffs: ['blessingOfSalvation', 'tranquilAir'] }
 ];
 const ctx = { moving: false, petDistance: 0 };
@@ -46,7 +47,9 @@ for (const scene of SCENES) {
         cfg.fight.targets = scene.targets;
         cfg.fight.multiDot = scene.targets > 1;
         Object.assign(cfg.fight, scene.fight || {});
+        Object.assign(cfg.gear, scene.gear || {});
         (scene.buffs || []).forEach(k => { cfg.buffs[k].on = true; });
+        (scene.consumables || []).forEach(k => { cfg.consumables[k].on = true; });
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
 
         const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });

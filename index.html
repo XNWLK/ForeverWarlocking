@@ -4,33 +4,41 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Forever Warlocking</title>
-<link rel="stylesheet" href="css/game.css?v=88818783a1">
+<link rel="stylesheet" href="css/game.css?v=72c07f5e2f">
 <script type="importmap">
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js",
-    "./js/aids.js": "./js/aids.js?v=88818783a1",
-    "./js/chamber.js": "./js/chamber.js?v=88818783a1",
-    "./js/combat.js": "./js/combat.js?v=88818783a1",
-    "./js/controls.js": "./js/controls.js?v=88818783a1",
-    "./js/effects.js": "./js/effects.js?v=88818783a1",
-    "./js/encounter.js": "./js/encounter.js?v=88818783a1",
-    "./js/extras.js": "./js/extras.js?v=88818783a1",
-    "./js/hud.js": "./js/hud.js?v=88818783a1",
-    "./js/keys.js": "./js/keys.js?v=88818783a1",
-    "./js/kit.js": "./js/kit.js?v=88818783a1",
-    "./js/main.js": "./js/main.js?v=88818783a1",
-    "./js/models.js": "./js/models.js?v=88818783a1",
-    "./js/names.js": "./js/names.js?v=88818783a1",
-    "./js/panels.js": "./js/panels.js?v=88818783a1",
-    "./js/pets.js": "./js/pets.js?v=88818783a1",
-    "./js/record.js": "./js/record.js?v=88818783a1",
-    "./js/settings.js": "./js/settings.js?v=88818783a1",
-    "./js/share.js": "./js/share.js?v=88818783a1",
-    "./js/sound.js": "./js/sound.js?v=88818783a1",
-    "./js/timeline.js": "./js/timeline.js?v=88818783a1",
-    "./js/tooltip.js": "./js/tooltip.js?v=88818783a1",
-    "./js/touch.js": "./js/touch.js?v=88818783a1"
+    "./js/aids.js": "./js/aids.js?v=72c07f5e2f",
+    "./js/analysis.js": "./js/analysis.js?v=72c07f5e2f",
+    "./js/chamber.js": "./js/chamber.js?v=72c07f5e2f",
+    "./js/combat.js": "./js/combat.js?v=72c07f5e2f",
+    "./js/configuration.js": "./js/configuration.js?v=72c07f5e2f",
+    "./js/controls.js": "./js/controls.js?v=72c07f5e2f",
+    "./js/effects.js": "./js/effects.js?v=72c07f5e2f",
+    "./js/encounter.js": "./js/encounter.js?v=72c07f5e2f",
+    "./js/extras.js": "./js/extras.js?v=72c07f5e2f",
+    "./js/hud.js": "./js/hud.js?v=72c07f5e2f",
+    "./js/interval.js": "./js/interval.js?v=72c07f5e2f",
+    "./js/keys.js": "./js/keys.js?v=72c07f5e2f",
+    "./js/kit.js": "./js/kit.js?v=72c07f5e2f",
+    "./js/layout-mode.js": "./js/layout-mode.js?v=72c07f5e2f",
+    "./js/main.js": "./js/main.js?v=72c07f5e2f",
+    "./js/mana.js": "./js/mana.js?v=72c07f5e2f",
+    "./js/models.js": "./js/models.js?v=72c07f5e2f",
+    "./js/names.js": "./js/names.js?v=72c07f5e2f",
+    "./js/panels.js": "./js/panels.js?v=72c07f5e2f",
+    "./js/pets.js": "./js/pets.js?v=72c07f5e2f",
+    "./js/record.js": "./js/record.js?v=72c07f5e2f",
+    "./js/review-modules.js": "./js/review-modules.js?v=72c07f5e2f",
+    "./js/settings.js": "./js/settings.js?v=72c07f5e2f",
+    "./js/share.js": "./js/share.js?v=72c07f5e2f",
+    "./js/simplified.js": "./js/simplified.js?v=72c07f5e2f",
+    "./js/sound.js": "./js/sound.js?v=72c07f5e2f",
+    "./js/timeline.js": "./js/timeline.js?v=72c07f5e2f",
+    "./js/tooltip.js": "./js/tooltip.js?v=72c07f5e2f",
+    "./js/touch.js": "./js/touch.js?v=72c07f5e2f",
+    "./js/warlock-appearance.js": "./js/warlock-appearance.js?v=72c07f5e2f"
   }
 }
 </script>
@@ -38,28 +46,31 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js">
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.min.js">
-<link rel="modulepreload" href="js/main.js?v=88818783a1">
-<link rel="modulepreload" href="js/chamber.js?v=88818783a1">
-<link rel="modulepreload" href="js/models.js?v=88818783a1">
-<link rel="modulepreload" href="js/controls.js?v=88818783a1">
-<link rel="modulepreload" href="js/hud.js?v=88818783a1">
-<link rel="modulepreload" href="js/names.js?v=88818783a1">
-<link rel="modulepreload" href="js/combat.js?v=88818783a1">
-<link rel="modulepreload" href="js/settings.js?v=88818783a1">
-<link rel="modulepreload" href="js/pets.js?v=88818783a1">
-<link rel="modulepreload" href="js/effects.js?v=88818783a1">
-<link rel="modulepreload" href="js/panels.js?v=88818783a1">
-<link rel="modulepreload" href="js/sound.js?v=88818783a1">
-<link rel="modulepreload" href="js/kit.js?v=88818783a1">
-<link rel="modulepreload" href="js/tooltip.js?v=88818783a1">
-<link rel="modulepreload" href="js/extras.js?v=88818783a1">
-<link rel="modulepreload" href="js/keys.js?v=88818783a1">
-<link rel="modulepreload" href="js/record.js?v=88818783a1">
-<link rel="modulepreload" href="js/timeline.js?v=88818783a1">
-<link rel="modulepreload" href="js/encounter.js?v=88818783a1">
-<link rel="modulepreload" href="js/share.js?v=88818783a1">
-<link rel="modulepreload" href="js/touch.js?v=88818783a1">
-<link rel="modulepreload" href="js/aids.js?v=88818783a1">
+<link rel="modulepreload" href="js/main.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/chamber.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/models.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/controls.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/hud.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/names.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/combat.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/settings.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/pets.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/effects.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/panels.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/sound.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/kit.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/tooltip.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/extras.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/keys.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/record.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/timeline.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/encounter.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/share.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/touch.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/aids.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/analysis.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/mana.js?v=72c07f5e2f">
+<link rel="modulepreload" href="js/configuration.js?v=72c07f5e2f">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -80,7 +91,7 @@
 
   <!-- Left, under the links: the Challenges button, a thing of its own -->
   <div id="challengeBar" class="toolbar">
-    <div class="group"><button type="button" id="btnChallenges" class="gold" title="Drills and scripted encounters graded against the sim, and the seeded fight">Challenges</button></div>
+    <div class="group"><button type="button" id="btnChallenges" class="gold" title="Drills and scripted encounters graded against the sim, and the seeded fight">Challenges</button><label class="pull-choice">Pull timer <select id="pullDuration" aria-label="Pull timer"></select></label><button type="button" id="btnPull" title="Choose a countdown, then start the pull to precast.">Start pull</button></div>
   </div>
 
   <!-- Top right: one slim bar with everything you set up before a fight; its panels open under it -->
@@ -115,6 +126,7 @@
     </div>
     <div class="panel picker" id="fightPanel" hidden>
       <h2>Fight</h2>
+      <label hidden>Pull countdown <input type="number" id="pullSeconds" min="1" max="30" step="1" value="5" aria-label="Pull countdown seconds"> seconds (1–30)</label>
       <form id="fightForm" class="form" novalidate>
         <label><input type="radio" name="mode" value="health" checked> Ends when the dummies are dead</label>
         <label><input type="radio" name="mode" value="timed"> Ends after <input type="number" id="fightSeconds" min="10" max="1800" step="1" value="120"> seconds</label>
@@ -137,9 +149,10 @@
     </div>
     <div class="panel keys" id="keysPanel" hidden>
       <h2>Keybinds</h2>
-      <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places. Spells, targeting, the pet and Reset also take a key with Shift, Ctrl or Alt held, the middle mouse button, the thumb buttons, and the wheel with a modifier.</p>
+      <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places. Spells, targeting, the pet, Reset and camera zoom also take Shift, Ctrl or Alt combinations, middle or thumb mouse buttons, and the wheel. Walking and jumping require plain keys.</p>
       <div class="binds"><div id="bindsLeft"></div><div id="bindsRight"></div></div>
-      <p class="hint">Mouse: hold right to steer, hold left to look around, both buttons walk forward, the wheel zooms. Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots. A few combinations belong to the browser and never reach the game (Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Tab, and Ctrl+1 to 9 in some browsers).</p>
+      <p id="bindsError" class="hint bad" role="status"></p>
+      <p class="hint">Defaults: A/D strafe, turning is unbound, and Shift+wheel up/down zooms in/out. Hold right mouse to steer, left to look around, or both to walk forward. Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots. Some browser shortcuts never reach the game (Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Tab, and sometimes Ctrl+1 to 9).</p>
       <button type="button" id="bindsReset" class="wide">All keys back to default</button>
     </div>
   </section>
@@ -148,15 +161,16 @@
   <aside id="side" class="panel side">
     <details open>
       <summary>Show</summary>
-      <label class="switch"><input type="checkbox" id="swRotation"><span>Rotation panel</span></label>
-      <label class="switch"><input type="checkbox" id="swRace"><span>Race the sim live</span></label>
-      <label class="switch"><input type="checkbox" id="swCallouts"><span>Mistake callouts</span></label>
-      <label class="switch" title="A bar for each of your DoTs that is running, shortest first. Gold means: the sim would cast it again now."><input type="checkbox" id="swDotBars"><span>DoT timers</span></label>
-      <label class="switch" title="Shows what the sim's priority list would cast in your place right now, and lights it up on your bar. For learning a rotation; switch it off to test yourself."><input type="checkbox" id="swHint"><span>The sim's next cast</span></label>
+      <label class="switch" title="Shows your build's full spell priority list on the left. Enable The sim's next cast to highlight the rule that applies right now."><input type="checkbox" id="swRotation"><span>Rotation panel</span></label>
+      <label class="switch" title="Compares your total damage so far with the sim's average damage curve for this setup. Shows how far ahead or behind you are during the fight."><input type="checkbox" id="swRace"><span>Race the sim live</span></label>
+      <label class="switch" title="Shows brief alerts for idle time, early DoT refreshes, expired DoTs and wasted mana regeneration during the fight."><input type="checkbox" id="swCallouts"><span>Mistake callouts</span></label>
+      <label class="switch" title="Shows remaining durations for your active DoTs on each dummy, with your current target first. Gold highlights a DoT nearing its refresh window."><input type="checkbox" id="swDotBars"><span>DoT timers</span></label>
+      <label class="switch" title="Shows the spell XN's priority list would choose now and highlights it on your action bar. Also marks the matching rule in the rotation panel."><input type="checkbox" id="swHint"><span>The sim's next cast</span></label>
+      <label class="switch" title="Estimates the mana and Life Taps needed to finish, and highlights useful tapping windows before DoT refreshes. Accounts for remaining fight time, mana spending and regeneration."><input type="checkbox" id="swMana"><span>Life Tap planner</span></label>
     </details>
     <details>
       <summary>Your character</summary>
-      <p class="hint">From the Warlock SIM, to look at only.</p>
+      <p class="hint">Inspect your imported stats and build. Make changes in WarlockSIM, then bring the codes over with Import.</p>
       <div class="stack">
         <button type="button" id="btnSheet">Character sheet</button>
         <button type="button" id="btnTalents">Talents</button>
@@ -188,6 +202,7 @@
 
   <!-- Top centre: the drill or seeded fight that is running, and quiet notes about mistakes -->
   <div id="topCentre">
+    <div id="pullTimer" class="panel chip" hidden><b id="pullCount" role="status" aria-live="polite"></b><span>Time your precast to land at 0.</span></div>
     <div id="challengeTag" class="panel chip" hidden><span id="challengeText"></span><button type="button" id="challengeEnd">End</button></div>
     <div id="callout" class="callout" aria-live="polite"></div>
   </div>
@@ -199,6 +214,7 @@
       <button type="button" id="editReset">Back to default</button>
       <button type="button" id="editDone">Done</button>
     </div>
+    <div id="manaCoach" class="panel mana-coach" hidden><b id="manaAdvice"></b><small id="manaBudget"></small></div>
     <div id="simHint" class="sim-hint" hidden><span>The sim would cast</span><img id="simHintIcon" alt=""><b id="simHintText"></b></div>
     <div id="errorText" class="error-text" aria-live="polite"></div>
     <div id="castBar" class="castbar idle"><i id="castFill"></i><b id="castText"></b></div>
@@ -320,6 +336,7 @@
     <button type="button" id="sheetClose">Close</button>
   </header>
   <p class="hint from-sim" id="sheetNote"></p>
+  <a id="sheetSim" class="sim-link" href="https://xnwlk.github.io/WarlockSIM/" target="_blank" rel="noopener noreferrer">Open WarlockSIM</a>
   <div id="sheetBody"></div>
 </section>
 <div id="plates"></div>
@@ -328,24 +345,24 @@
 <div id="fatal" hidden></div>
 
 <!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->
-<script src="vendor/warlock-sim/data/consumables.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/config.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/talents.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/spells.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/races.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/builds.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/stats.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/spelltable.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/rng.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/resist.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/rotation.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/sim.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/custom-builds.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/engine/settings-code.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/icons.js?v=88818783a1"></script>
-<script src="vendor/warlock-sim/data/tooltips.js?v=88818783a1"></script>
+<script src="vendor/warlock-sim/data/consumables.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/config.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/talents.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/spells.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/races.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/builds.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/stats.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/spelltable.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/rng.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/resist.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/rotation.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/sim.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/custom-builds.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/engine/settings-code.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/icons.js?v=72c07f5e2f"></script>
+<script src="vendor/warlock-sim/data/tooltips.js?v=72c07f5e2f"></script>
 <!-- The ready builds ranked by their DPS in the DPS sim (tools/gen-build-order.js) -->
-<script src="data/build-order.js?v=88818783a1"></script>
+<script src="data/build-order.js?v=72c07f5e2f"></script>
 
 <script>
 // Shown when the 3D library or the game code cannot start (module errors do not reach the page otherwise).
@@ -356,6 +373,6 @@ window.addEventListener('error', function (e) {
   box.textContent = 'Forever Warlocking could not start: ' + (e.message || 'a file did not load') + '. Check your connection and reload.';
 }, true);
 </script>
-<script type="module" src="js/main.js?v=88818783a1"></script>
+<script type="module" src="js/main.js?v=72c07f5e2f"></script>
 </body>
 </html>

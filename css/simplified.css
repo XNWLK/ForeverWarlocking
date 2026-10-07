@@ -1,0 +1,76 @@
+/* Only loaded by ?layout=simplified. Reuses XN's colors, controls and combat layout. */
+.simplified #challengeBar { max-width: calc(100% - 28px); flex-wrap: wrap; }
+.simple-status { color: var(--ink-dim); font-size: 11px; text-align: left; }
+.simplified #side { top: 98px; }
+.simplified #topCentre { top: 98px; }
+.simple-pull-label { display: flex; gap: 6px; align-items: center; padding-right: 6px; color: var(--ink-dim); }
+.simple-pull-label select { font: inherit; color: var(--ink); background: #1b1226; border: 1px solid var(--line-bright); border-radius: 5px; padding: 4px; }
+.quick-picker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.quick-picker-header h2 { margin: 0; }
+.simplified #topBar > .picker { width: min(400px, calc(100vw - 28px)); }
+.simplified #topBar > .picker .hint { font-size: 11px; margin: 10px 0 0; }
+.simplified #fightPanel { max-height: calc(100dvh - 70px); overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+.simplified #keysPanel { max-width: calc(100vw - 28px); max-height: calc(100dvh - 112px); overflow-y: auto; overscroll-behavior: contain; }
+.simple-settings { gap: 4px; }
+.simple-settings-more #links { position: static; flex-wrap: wrap; margin: 8px 0; }
+.simple-settings-more .range { display: flex; align-items: center; gap: 10px; margin: 10px 0 14px; }
+.simple-settings-more .range input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.organizer { width: min(920px, calc(100vw - 32px)); max-width: calc(100vw - 32px); height: min(760px, calc(100dvh - 32px)); max-height: calc(100dvh - 32px); inset: 0; transform: none; margin: auto; padding: 0; overflow: hidden; }
+.organizer[open] { display: flex; flex-direction: column; }
+.organizer::backdrop { background: rgba(0, 0, 0, .25); }
+.organizer > header { flex: none; min-height: 78px; margin: 0; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.organizer-heading { min-width: 0; }
+.organizer .organizer-heading .hint { margin: 4px 0 0; }
+.organizer-page { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.organizer-content { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 16px 18px; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.organizer[data-pane="sheet"] .organizer-content { padding: 0; overflow: hidden; }
+.organizer #sheet { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.organizer #sheet > header { flex: none; min-height: 64px; padding: 14px 18px; margin: 0; }
+.organizer .sheet-scroll { flex: 1; min-height: 0; padding: 0 18px 16px; overflow: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.organizer .sheet-actions { margin: 0 0 10px; }
+.organizer #sheetNote { margin: 0 0 10px !important; }
+.organizer #sheetBody td:first-child { white-space: nowrap; }
+.simplified #simpleFightError:empty { display: none; }
+.organizer #challenges > header { display: none; }
+.organizer .review, .organizer .picker, .organizer .keys { position: static; transform: none; width: auto; max-height: none; overflow: visible; padding: 0; border: 0; border-radius: 0; background: none; }
+.organizer .hint { margin: 8px 0; }
+.organizer input, .organizer textarea, .organizer select { font: inherit; color: var(--ink); background: #1b1226; border: 1px solid var(--line-bright); border-radius: 5px; padding: 5px 7px; }
+.organizer input[type="number"] { width: 78px; }
+.organizer input[type="text"] { width: 160px; }
+.organizer input[type="checkbox"], .organizer input[type="radio"] { accent-color: var(--accent); }
+.organizer textarea { width: 100%; display: block; resize: vertical; margin: 4px 0; }
+.organizer .buttons { flex-wrap: wrap; }
+.organizer-fight-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.organizer-fight-fields:disabled { opacity: .55; }
+.organizer-fight-fields > label { display: block; margin: 10px 0; }
+.organizer-presets { margin-bottom: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.organizer-presets h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.organizer-presets #presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.organizer-presets button { padding: 7px 8px; text-align: left; }
+.organizer-presets button span, .organizer-presets button small { display: block; }
+.organizer-presets button span { font-weight: 600; }
+.organizer-presets button small { margin-top: 3px; color: var(--ink-dim); font-size: 11px; }
+.organizer-advanced { margin: 8px 0; }
+.organizer-advanced > summary { cursor: pointer; color: var(--accent); margin-bottom: 6px; }
+.organizer-advanced > label { margin: 8px 0; }
+.organizer-notice { border: 1px solid var(--line); padding: 8px; border-radius: 6px; margin: 8px 0; }
+.organizer-notice p { margin: 0 0 8px; }
+.organizer #buildLabel { max-width: none; white-space: normal; }
+.touch.simplified #topCentre { top: calc(90px + var(--st)); }
+.touch.simplified #touchMenu #side { max-height: none; }
+.touch.simplified #touchMenu .simple-status { width: 100%; padding: 8px; }
+.touch.simplified #touchMenu #fightPanel { width: auto; max-height: none; overflow: visible; }
+.touch.simplified #touchMenu #keysPanel { width: auto; max-height: none; }
+@media (max-width: 620px) {
+  .organizer { width: calc(100vw - 16px); max-width: calc(100vw - 16px); height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
+  .organizer > header { min-height: 78px; padding: 10px 12px; }
+  .organizer #sheet > header { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .organizer #sheet > header .tabs { order: 1; flex-basis: 100%; }
+  .organizer .sheet-scroll { padding: 0 12px 12px; }
+  .organizer-content { padding: 12px; }
+  .organizer input, .organizer select, .organizer textarea { font-size: 16px; }
+  .simplified #keysPanel .binds { grid-template-columns: 1fr; }
+  .organizer .tabs { flex-wrap: wrap; }
+}
+
+.layout-return { color: var(--accent); pointer-events: auto; }

@@ -8,7 +8,7 @@ function el(tag, text, className) {
   return node;
 }
 function secs(t) { return (Math.round(t * 10) / 10).toFixed(1) + ' s'; }
-function clock(t) { return Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0'); }
+function clock(t) { return (t < 0 ? '−' : '') + Math.floor(Math.abs(t) / 60) + ':' + String(Math.floor(Math.abs(t) % 60)).padStart(2, '0'); }
 
 const AURA_NAMES = { coe: 'Curse of the Elements', baneOfHavoc: 'Bane of Havoc' };
 const ROW = { axis: 16, casts: 34, aura: 13 };
@@ -16,10 +16,13 @@ const ROW = { axis: 16, casts: 34, aura: 13 };
 // d: { record: { casts, auras, moves, seconds } (js/record.js), seconds, simCasts: [{ t, k, d }] or null,
 //      spells, icon(key) -> address, racialName, targets, dummyName(i), width (pixels there are for it) }
 export function drawTimeline(d) {
-  const rec = d.record, seconds = Math.max(d.seconds, 1), px = Math.max(14, Math.min(30, (d.width - 20) / seconds));
-  const width = Math.ceil(seconds * px) + 20, wrap = el('div', null, 'timeline'), names = el('div', null, 'tl-names');
+  const rec = d.record, seconds = Math.max(d.seconds, 1), start = Math.floor(Math.min(0, ...rec.casts.map(c => c.t)));
+  const px = Math.max(14, Math.min(30, (d.width - 20) / (seconds - start))), x = t => (t - start) * px;
+  const width = Math.ceil((seconds - start) * px) + 20, wrap = el('div', null, 'timeline'), names = el('div', null, 'tl-names');
   const scroll = el('div', null, 'tl-scroll'), inner = el('div', null, 'tl-inner');
   inner.style.width = width + 'px';
+  inner.dataset.pixelsPerSecond = String(px);
+  inner.dataset.startTime = String(start);
   let top = 0;
   function row(label, height, className) {
     const name = el('div', label, 'tl-name');
@@ -33,7 +36,7 @@ export function drawTimeline(d) {
   }
   function block(line, from, to, className, title) {
     const b = el('i', null, className);
-    b.style.left = (from * px).toFixed(1) + 'px';
+    b.style.left = x(from).toFixed(1) + 'px';
     b.style.width = Math.max(1, (to - from) * px).toFixed(1) + 'px';
     if (title) b.title = title;
     line.appendChild(b);
@@ -43,21 +46,25 @@ export function drawTimeline(d) {
 
   // The clock along the top.
   const axis = row('', ROW.axis, 'tl-axis');
-  for (let t = 0; t <= seconds + 0.01; t += seconds > 150 ? 30 : 10) {
+  const step = seconds > 150 ? 30 : 10, times = start < 0 ? [start] : [];
+  for (let t = 0; t <= seconds + 0.01; t += step) times.push(t);
+  times.forEach(function (t) {
     const tick = el('span', clock(t));
-    tick.style.left = (t * px).toFixed(1) + 'px';
+    tick.style.left = x(t).toFixed(1) + 'px';
     axis.appendChild(tick);
+  });
+  if (start < 0) {
+    const pull = el('div', null, 'tl-pull'); pull.style.left = x(0) + 'px'; pull.title = 'Pull · 0:00'; inner.appendChild(pull);
   }
 
   // One line of casts: a bar as long as the cast (or the global cooldown), with the spell's picture at its start.
   function castRow(label, casts, sim) {
     const line = row(label, ROW.casts, sim ? 'tl-casts sim' : 'tl-casts');
-    let free = 0, started = false;
+    let free = 0;
     casts.forEach(function (c) {
       if (!sim && !c.off) {
-        if (started && c.t - free > 0.3) block(line, free, c.t, 'idle', 'Nothing cast for ' + secs(c.t - free) + ' (from ' + secs(free) + ')');
-        free = c.t + Math.max(c.len, c.gcd || 0);        // busy until the cast and the global cooldown are both over
-        started = true;
+        if (c.t - free > 0.3) block(line, free, c.t, 'idle', 'Nothing cast for ' + secs(c.t - free) + ' (from ' + secs(free) + ')');
+        free = Math.max(free, c.t + Math.max(c.len, c.gcd || 0)); // precasts never create pre-pull idle time
       }
       const where = c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
       const what = c.kind === 'channel' ? ', channelled ' + secs(c.len) : c.len > 0.005 ? ', ' + secs(c.len) + ' cast' : '';
@@ -67,12 +74,12 @@ export function drawTimeline(d) {
       const icon = d.icon(c.key), img = icon ? document.createElement('img') : el('b', spellName(c.key).charAt(0));
       if (icon) { img.src = icon; img.alt = ''; }
       img.title = title;
-      img.style.left = (c.t * px).toFixed(1) + 'px';
+      img.style.left = x(c.t).toFixed(1) + 'px';
       if (c.off) img.className = 'off';
       if (c.stopped && c.stopped !== 'clipped') img.classList.add('stopped');
       line.appendChild(img);
     });
-    if (!sim && started && seconds - free > 0.3) block(line, free, seconds, 'idle', 'Nothing cast for ' + secs(seconds - free) + ' (from ' + secs(free) + ')');
+    if (!sim && seconds - free > 0.3) block(line, free, seconds, 'idle', 'Nothing cast for ' + secs(seconds - free) + ' (from ' + secs(free) + ')');
     return line;
   }
   const mine = castRow('You', rec.casts, false);
@@ -82,6 +89,15 @@ export function drawTimeline(d) {
       const m = /^x(\d):(.+)$/.exec(c.k);
       return { t: c.t, key: m ? m[2] : c.k, target: m ? Number(m[1]) : 1, len: c.d || 0, kind: c.ch ? 'channel' : c.d > 0 ? 'cast' : 'instant', off: c.k === 'baneOfHavoc' };
     }), true);
+  }
+  if (rec.clips?.length) {
+    const line = row('Clipped DoTs', 22, 'tl-clips');
+    rec.clips.forEach(function (c) {
+      const mark = el('button', '×'); mark.type = 'button';
+      mark.style.left = x(c.t).toFixed(1) + 'px';
+      mark.title = spellName(c.key) + ' · target ' + c.target + ' at ' + secs(c.t) + ': ' + secs(c.left) + ' / ' + c.ticks + ' ticks left; replaced by ' + spellName(c.replacement);
+      mark.setAttribute('aria-label', mark.title); line.appendChild(mark);
+    });
   }
 
   // When each DoT was on each dummy.

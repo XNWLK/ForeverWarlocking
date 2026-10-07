@@ -186,6 +186,7 @@ export function createHud(WL, handlers) {
       const open = k === which && panels[k].hidden;
       panels[k].hidden = !open;
       panelButtons[k].classList.toggle('on', open);
+      panelButtons[k].setAttribute('aria-expanded', String(open));
     });
   }
   Object.keys(panelButtons).forEach(function (k) { panelButtons[k].addEventListener('click', function () { showPanel(k); }); });
@@ -211,7 +212,11 @@ export function createHud(WL, handlers) {
         (notes ? (r ? '\n\n' : '') + 'Its notes on this build: ' + notes : '');
       button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
-      button.addEventListener('click', function () { showPanel(null); handlers.onBuild(b.key); });
+      button.addEventListener('click', function () {
+        if (!handlers.keepPickersOpen) showPanel(null);
+        handlers.onBuild(b.key);
+        if (handlers.keepPickersOpen) builds.querySelector('.on')?.focus({ preventScroll: true });
+      });
       builds.appendChild(button);
     });
     WL.RACE_KEYS.forEach(function (key) {
@@ -223,7 +228,11 @@ export function createHud(WL, handlers) {
       racials.textContent = WL.RACES[key].racials.map(function (r) { return r.name; }).join(', ');
       button.appendChild(racials);
       if (character && key === character.raceKey) button.className = 'on';
-      button.addEventListener('click', function () { showPanel(null); handlers.onRace(key); });
+      button.addEventListener('click', function () {
+        if (!handlers.keepPickersOpen) showPanel(null);
+        handlers.onRace(key);
+        if (handlers.keepPickersOpen) races.querySelector('.on')?.focus({ preventScroll: true });
+      });
       races.appendChild(button);
     });
   }
@@ -245,8 +254,8 @@ export function createHud(WL, handlers) {
   soundButton.addEventListener('click', function () { soundButton.blur(); const on = !soundButton.classList.contains('on'); setSound(on); handlers.onSound(on); });
 
   // Keybinds: every key in one list. Click a key, press the new one.
-  const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'],
-    ['strafeLeft', 'Step left'], ['strafeRight', 'Step right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
+  const BIND_ROWS = [['forward', 'Walk forward'], ['back', 'Walk back'], ['strafeLeft', 'Strafe left'], ['strafeRight', 'Strafe right'],
+    ['turnLeft', 'Turn left'], ['turnRight', 'Turn right'], ['jump', 'Jump'], ['nextTarget', 'Next dummy'],
     ['cancel', 'Stop casting'], ['petAttack', 'Pet: attack'], ['petFollow', 'Pet: follow'], ['reset', 'Reset the fight']];
   let binds = {}, capture = null;                          // capture = the key we are waiting for: { id, button }
   function bindRow(holder, id, text, code) {
@@ -254,12 +263,14 @@ export function createHud(WL, handlers) {
     row.className = 'bind';
     label.textContent = text;
     button.type = 'button';
+    button.setAttribute('aria-label', text + ' keybind: ' + (code ? labelFor(code) : 'none'));
     button.textContent = code ? labelFor(code) : 'none';
     if (!code) button.className = 'unset';
     button.addEventListener('click', function () {
       if (capture) showBinds();
       capture = { id: id, button: button };
       button.textContent = 'press it';
+      button.setAttribute('aria-label', text + ' keybind: press a key');
       button.className = 'waiting';
       button.blur();
     });
@@ -268,9 +279,14 @@ export function createHud(WL, handlers) {
   }
   function showBinds() {
     capture = null;
+    byId('bindsError').textContent = '';
     const left = byId('bindsLeft'), right = byId('bindsRight');
     left.textContent = ''; right.textContent = '';
     BIND_ROWS.forEach(function (r) { bindRow(left, r[0], r[1], binds[r[0]]); });
+    const cameraTitle = document.createElement('h3');
+    cameraTitle.textContent = 'Camera'; left.appendChild(cameraTitle);
+    bindRow(left, 'zoomIn', 'Zoom in', binds.zoomIn);
+    bindRow(left, 'zoomOut', 'Zoom out', binds.zoomOut);
     slots.forEach(function (slot, i) {
       if (!slot.key) return;
       const name = slot.key === 'racial' ? character.racial.name : character.spells[slot.key].name;
@@ -320,7 +336,7 @@ export function createHud(WL, handlers) {
     picked = -1;
     handlers.onRebind(slot, keyCombo(e));
   }, true);
-  // The same for a mouse button (middle, or a thumb button) and for the wheel with a modifier held.
+  // The same for a mouse button (middle, or a thumb button) and for the wheel, with optional modifiers.
   function waiting() { return capture ? capture.id : editing && picked >= 0 ? picked : null; }
   function take(e, combo) {
     const id = waiting();
@@ -757,7 +773,7 @@ export function createHud(WL, handlers) {
     } else if (e.type === 'target') {
       if (c.targets > 1) log((e.auto ? 'New target: ' : 'Target: ') + dummy + '.');
     } else if (e.type === 'petCast') {
-      // shown by the Imp itself
+      // The model animates the cast; the pet frame reads its authoritative casting state each frame.
     } else if (e.type === 'hit') {
       log(name + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.crit ? '!' : '.'), e.crit ? 'crit' : '');
       if (!quiet) floatFor(e, anchor);
@@ -798,7 +814,7 @@ export function createHud(WL, handlers) {
       if (!e.last) { log(dummy + ' dies.', 'crit'); return; }
       log((e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
       if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
-      log('Reset starts a new fight. "Review the fight" shows where the time went.');
+      log('Reset starts a new fight. "Review the fight" shows the breakdown and optional analysis.');
     }
   }
 
@@ -809,6 +825,8 @@ export function createHud(WL, handlers) {
     fullLog: function () { return everything.join('\n'); },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
     setBinds: function (map) { binds = map; if (character) showBinds(); },
+    bindingError: function (text) { byId('bindsError').textContent = text; },
+    capturingKey: function () { return waiting() != null; },
     anyPanelOpen: function () { return Object.keys(panels).some(function (k) { return !panels[k].hidden; }); },
     closePanels: function () { let any = false; Object.keys(panels).forEach(function (k) { if (!panels[k].hidden) any = true; }); showPanel(null); return any; },
     simAverage: function () { return simAverage; }, dummyName: dummyName,
