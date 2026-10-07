@@ -6,7 +6,7 @@
 //
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
-// two seconds (pushback), movement phases, and Windfury Totem (extra pet melee attacks).
+// two seconds (pushback), movement phases, Windfury Totem (extra pet melee attacks), and both threat buffs at once.
 //
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
@@ -24,7 +24,8 @@ const SCENES = [
   { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' },
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
-  { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] }
+  { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] },
+  { name: 'Blessing of Salvation and Tranquil Air Totem', targets: 1, seeds: [11], buffs: ['blessingOfSalvation', 'tranquilAir'] }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;

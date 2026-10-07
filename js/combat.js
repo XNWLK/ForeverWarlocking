@@ -96,7 +96,18 @@ export function createCombat(opts) {
   // Threat (Xn, 2026-10-07; as in the engine): 1 damage = 1 threat, Searing Pain twice that (less with Demonic Brand),
   // all of it reduced by Suppression and by Blessing of Salvation / Tranquil Air Totem. Your pet's damage is the pet's
   // threat, not yours. It changes nothing in the fight; it is counted so you can see it.
-  const THREAT_ALL = (1 - tv('suppression', 'threatPct') / 100) * WL.activeBuffs(cfg).reduce(function (m, b) { return m * (1 - (b.threatPct || 0) / 100); }, 1);
+  // Threat buffs of one group do not stack (Blessing of Salvation and Tranquil Air Totem; Xn, 2026-10-07): the biggest counts.
+  const THREAT_BUFFS = (function () {
+    let m = 1;
+    const best = {};
+    WL.activeBuffs(cfg).forEach(function (b) {
+      if (!b.threatPct) return;
+      if (b.group) best[b.group] = Math.max(best[b.group] || 0, b.threatPct); else m *= 1 - b.threatPct / 100;
+    });
+    Object.keys(best).forEach(function (g) { m *= 1 - best[g] / 100; });
+    return m;
+  })();
+  const THREAT_ALL = (1 - tv('suppression', 'threatPct') / 100) * THREAT_BUFFS;
   function threatMult(key) {
     const s = SPELLS[key];
     let m = THREAT_ALL * ((s && s.threatMult) || 1);

@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "f22072f",
-    "subject":  "Windfury Totem for pets with a melee attack",
+    "commit":  "4d21e63",
+    "subject":  "One air totem at a time; Tranquil Air and Salvation do not stack; Grace of Air 89",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 15:04",
+    "synced":  "2026-10-07 15:21",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
