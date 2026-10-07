@@ -2,7 +2,7 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-10-07",
-  "simCommit": "4d21e63",
+  "simCommit": "7e7cef0",
   "order": [
     {
       "key": "demo_pact_fire",

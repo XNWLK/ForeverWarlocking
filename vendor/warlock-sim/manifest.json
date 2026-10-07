@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "4d21e63",
-    "subject":  "One air totem at a time; Tranquil Air and Salvation do not stack; Grace of Air 89",
+    "commit":  "7e7cef0",
+    "subject":  "Precast: start the fight with a spell that finishes as the timer starts",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 15:21",
+    "synced":  "2026-10-07 23:16",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

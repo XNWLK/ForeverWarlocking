@@ -108,6 +108,9 @@ function buildConfig() {
   if (code) {
     try {
       WL.applySettings(cfg, WL.decodeSettings(code));
+      // A precast set in the sim's settings (a spell that completes as its fight timer starts) is not played here:
+      // your fight starts with your first cast, so the sim average must not get a head start either.
+      if (cfg.fight.precast) { leftOut.push('Precast (' + ((WL.SPELLS[cfg.fight.precast] || {}).name || cfg.fight.precast) + ')'); cfg.fight.precast = base.precast || ''; }
       ['duration', 'durationVarPct', 'iterations', 'weightIterations', 'seed', 'targets', 'multiDot', 'moveEvery', 'moveDuration',
        'hitEvery', 'latencyMs', 'travelMs', 'lifeTapWhileMoving'].forEach(function (k) { cfg.fight[k] = base[k]; });
     } catch (e) { /* a code that no longer decodes is ignored */ }
