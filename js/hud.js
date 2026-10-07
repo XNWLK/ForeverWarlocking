@@ -54,7 +54,7 @@ function span(seconds) {
   return s >= 60 ? (Math.round(s / 6) / 10) + ' min' : s + ' sec';
 }
 const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
-const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:windfury': 'Windfury attack', 'pet:brand': 'Demonic Brand' };
 export const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
 export function createHud(WL, handlers) {

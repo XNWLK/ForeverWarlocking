@@ -116,9 +116,12 @@ function buildConfig() {
     const c = cfg.consumables[k];
     if (c.on && (c.spPotion || c.manaRestore || c.explosive)) { c.on = false; leftOut.push(c.name); }
   });
+  const exclusive = {};
   Object.keys(cfg.buffs).forEach(function (k) {
     const b = cfg.buffs[k];
     if (b.on && (b.tide || b.innervate || b.spellDmgPct)) { b.on = false; leftOut.push(b.name); }
+    // Buffs that cannot be up together (Windfury Totem and Grace of Air Totem): the first listed one counts, as in the sim.
+    if (b.on && b.excl) { if (exclusive[b.excl]) b.on = false; else exclusive[b.excl] = true; }
   });
   const fight = fightOptions();
   cfg.fight.latencyMs = Math.max(0, Number(getSetting('latency')) || 0);      // the sim average waits this long after each cast

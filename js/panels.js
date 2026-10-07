@@ -11,7 +11,7 @@ function el(tag, text, className) {
 }
 
 const AURA_NAMES = { coe: 'Curse of the Elements', isb: 'Improved Shadow Bolt', brand: 'Demonic Brand' };
-const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Melee', 'pet:brand': 'Demonic Brand' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Melee', 'pet:windfury': 'Windfury attack', 'pet:brand': 'Demonic Brand' };
 
 export function createPanels(handlers) {
   // ---------- fight options ----------

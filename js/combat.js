@@ -68,6 +68,7 @@ export function createCombat(opts) {
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
   const armorRed = WL.armorReduction(cfg);
+  const WF = (WL.activeBuffs(cfg).filter(function (b) { return b.windfury; })[0] || {}).windfury || null;   // Windfury Totem, for pet melee
   const petMeleeRange = opts.petMeleeRange || 5;
   const havocPct = table.baneOfHavoc ? SPELLS.baneOfHavoc.havocPct / 100 : 0;
   // The 5-second rule (Xn, 2026-10-06; as in the engine): Spirit gives mana back only while you have spent none for
@@ -109,7 +110,7 @@ export function createCombat(opts) {
     const seed0 = seed != null ? seed : (opts.seed != null ? opts.seed : Math.floor(Math.random() * 4294967296));
     // One random stream per kind of roll, with the engine's own constants.
     R = { hit: WL.makeRng(seed0 ^ 0x1B873593), crit: WL.makeRng(seed0 ^ 0x85EBCA6B), proc: WL.makeRng(seed0 ^ 0xC2B2AE35),
-          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), isb: WL.makeRng(seed0 ^ 0x9E3779B9),
+          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), wf: WL.makeRng(seed0 ^ 0x9E3779B9),
           pet: WL.makeRng(seed0 ^ 0x165667B1), push: WL.makeRng(seed0 ^ 0x61C88647) };
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
@@ -399,10 +400,8 @@ export function createCombat(opts) {
     const crit = R.crit() * 100 < e.critPct;
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, false, ti);
-    // The rolls below are made even when this hit killed the target, so the random streams stay in step with the engine.
-    if (isSB(key) && crit && tv('improvedShadowBolt')) {
-      if (R.isb() * 100 < stats.hitPct && !t.dead) { t.deb.isb = S.t + 12; emit({ type: 'apply', key: 'isb', target: ti }); }
-    }
+    // Improved Shadow Bolt: every Shadow Bolt crit applies it (Xn, 2026-10-07; there is no second hit roll for it).
+    if (isSB(key) && crit && tv('improvedShadowBolt') && !t.dead) { t.deb.isb = S.t + 12; emit({ type: 'apply', key: 'isb', target: ti }); }
     if (key === 'searingPain' && tv('demonicBrand') && P && !t.dead) {  // Demonic Brand: the pet's attacks on it add damage
       if (!(debuff(ti, 'brand') && t.brandCharges > 0)) emit({ type: 'apply', key: 'brand', target: ti });
       t.deb.brand = S.t + cfg.demonicBrand.duration;
@@ -488,30 +487,42 @@ export function createCombat(opts) {
       if (!S.over && P.gen === gen) petEvent(P.lashReady || S.t + 1.5, 2, 'petAct');
     }
   }
-  function petSwing() {                     // the Succubus's melee: one roll decides miss, dodge, glancing, crit or hit
+  // The pet's melee. Windfury Totem (Xn, 2026-10-07): a swing that lands has a chance of one extra attack at once, with
+  // extra attack power, on the same attack table. The extra attack counts as a pet attack (it uses a Demonic Brand
+  // charge) and cannot cause another one. Its dice are rolled even when the swing ended the fight, to stay in step
+  // with the engine.
+  function petSwing() {
     if (S.t >= endAt() - EPS) return;
-    const m = P.c.melee, ti = P.target, r = row(rowKey(ti, 'pet:melee')), tb = cb.petMelee, gen = P.gen;
+    const m = P.c.melee, ti = P.target, gen = P.gen;
+    P.swingReady = S.t + m.swing;
+    if (petMeleeAttack('pet:melee', R.pet() * 100, 0, ti) && WF && R.wf() * 100 < WF.procPct) {
+      const roll = R.wf() * 100;
+      if (!S.over && P.gen === gen && alive(ti)) petMeleeAttack('pet:windfury', roll, WF.ap, ti);
+    }
+    if (!S.over && P.gen === gen) petEvent(S.t + m.swing, 0, 'petSwing');
+  }
+  function petMeleeAttack(key, roll, extraAp, ti) {   // one roll decides miss, dodge, glancing, crit or hit; true if it landed
+    const m = P.c.melee, r = row(rowKey(ti, key)), tb = cb.petMelee;
     r.casts++;
     const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
-    const miss = Math.max(0, tb.missPct - hitBonus), roll = R.pet() * 100;
+    const miss = Math.max(0, tb.missPct - hitBonus);
     const critChance = Math.max(0, m.critPct + (m.inheritMeleeCrit ? stats.meleeCritPct : 0) - tb.critSuppressionPct);
-    P.swingReady = S.t + m.swing;
     if (roll >= miss + tb.dodgePct) {
       r.landed++;
       if (ti === 1) jowProc(true);
-      const dps = m.baseDps + m.apPerSp * warlockSpNow() / m.apPerDps;
+      const dps = m.baseDps + (m.apPerSp * warlockSpNow() + extraAp) / m.apPerDps;
       let amount = dps * m.swing * (1 - armorRed) * petMult('physical');
       const glance = roll < miss + tb.dodgePct + tb.glancePct;
       const crit = !glance && roll < miss + tb.dodgePct + tb.glancePct + critChance;
       if (glance) amount *= tb.glanceDmgPct / 100;
       if (crit) amount *= 2;
-      deal('pet:melee', amount, crit, false, ti, { pet: true, school: 'physical', glance: glance });
+      deal(key, amount, crit, false, ti, { pet: true, school: 'physical', glance: glance });
       if (!S.over && alive(ti)) brandProc(ti);
-    } else {
-      r.misses++;
-      emit({ type: 'miss', key: 'pet:melee', target: ti, pet: true, dodge: roll >= miss });
+      return true;
     }
-    if (!S.over && P.gen === gen) petEvent(S.t + m.swing, 0, 'petSwing');
+    r.misses++;
+    emit({ type: 'miss', key: key, target: ti, pet: true, dodge: roll >= miss });
+    return false;
   }
   // The pet attacks while it is told to and stands in range of its target. ctx.petDistance = that distance in yards.
   function syncPet(ctx) {

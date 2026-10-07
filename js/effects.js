@@ -38,6 +38,7 @@ export const SPELL_FX = {
   'pet:firebolt':  { bolt: { style: 'fire', color: 0xff8a2a, core: 0xfff0b0, size: 0.2, speed: 40 }, land: 'emberHit' },
   'pet:lashOfPain': { land: 'lash' },
   'pet:melee':     { land: 'slash' },
+  'pet:windfury':  { land: 'slash' },
   'pet:brand':     { land: 'brand' }
 };
 

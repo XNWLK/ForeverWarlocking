@@ -6,7 +6,7 @@
 //
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
-// two seconds (pushback), and movement phases.
+// two seconds (pushback), movement phases, and Windfury Totem (extra pet melee attacks).
 //
 // Run: node tools/check-combat.mjs
 import { createRequire } from 'node:module';
@@ -23,7 +23,8 @@ const SCENES = [
   { name: '3 targets, Rain of Fire', targets: 3, seeds: [6], filler: 'rainOfFire' },
   { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' },
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
-  { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } }
+  { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
+  { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
@@ -44,6 +45,7 @@ for (const scene of SCENES) {
         cfg.fight.targets = scene.targets;
         cfg.fight.multiDot = scene.targets > 1;
         Object.assign(cfg.fight, scene.fight || {});
+        (scene.buffs || []).forEach(k => { cfg.buffs[k].on = true; });
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
 
         const combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: cfg, seed: seed, linearDuration: DURATION, targets: scene.targets });

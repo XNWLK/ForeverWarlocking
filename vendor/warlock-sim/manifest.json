@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "2498e6d",
-    "subject":  "Demo Pact Shadow Bolt Imp taken off the build list",
+    "commit":  "f22072f",
+    "subject":  "Windfury Totem for pets with a melee attack",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-07 02:18",
+    "synced":  "2026-10-07 15:04",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
