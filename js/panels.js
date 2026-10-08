@@ -99,6 +99,12 @@ export function createPanels(handlers) {
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
     else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
     body.appendChild(head);
+    // The top of the sim's spread: its average is what you are measured against, this is how far the dice can carry it.
+    if (sim && sim.max > 0) {
+      const most = el('p', 'The sim\'s highest of its ' + sim.fights + ' fights: ' + whole(sim.max) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.max) + '% of that', 'sim-max');
+      most.title = 'The sim plays this fight ' + sim.fights + ' times, each with other dice. Its average is what you are measured against; this is the one where the dice fell best.';
+      body.appendChild(most);
+    }
     // Your best in this very fight (same build, race, dummies and fight options), outside challenges.
     if (d.best) {
       const b = d.best;

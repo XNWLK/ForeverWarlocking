@@ -63,6 +63,6 @@ self.onmessage = function (e) {
   } catch (err) { curve = null; }
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
-  self.postMessage({ id: job.id, precast: job.precast || '', dps: result.dps, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
+  self.postMessage({ id: job.id, precast: job.precast || '', dps: result.dps, max: result.dpsMax, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
                      idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, casts: casts, mana: mana });
 };

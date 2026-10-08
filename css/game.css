@@ -399,6 +399,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .tl-aura i { top: 3px; height: 7px; border-radius: 3px; background: rgba(160, 110, 240, 0.85); }
 .tl-aura.fire i { background: rgba(230, 120, 50, 0.85); }
 .tl-aura i.clip, .tl-aura.fire i.clip { top: 0; height: 13px; border-radius: 1px; background: #ff5b4f; z-index: 1; }
+.sim-max { margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); opacity: 0.7; }
 .best-line { margin: 4px 0 0; font-size: 12px; color: var(--ink-dim); }
 .best-line.record { color: var(--gold); font-weight: 600; }
 .challenge-line button { flex: none; }
