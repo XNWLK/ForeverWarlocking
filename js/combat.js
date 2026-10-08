@@ -69,6 +69,7 @@ export function createCombat(opts) {
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
   const armorRed = WL.armorReduction(cfg);
   const WF = (WL.activeBuffs(cfg).filter(function (b) { return b.windfury; })[0] || {}).windfury || null;   // Windfury Totem, for pet melee
+  const FT = (WL.activeBuffs(cfg).filter(function (b) { return b.flametongue; })[0] || {}).flametongue || null;   // Flametongue Totem, for pet melee
   const petMeleeRange = opts.petMeleeRange || 5;
   const havocPct = table.baneOfHavoc ? SPELLS.baneOfHavoc.havocPct / 100 : 0;
   // The 5-second rule (Xn, 2026-10-06; as in the engine): Spirit gives mana back only while you have spent none for
@@ -122,6 +123,7 @@ export function createCombat(opts) {
     // One random stream per kind of roll, with the engine's own constants.
     R = { hit: WL.makeRng(seed0 ^ 0x1B873593), crit: WL.makeRng(seed0 ^ 0x85EBCA6B), proc: WL.makeRng(seed0 ^ 0xC2B2AE35),
           vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), wf: WL.makeRng(seed0 ^ 0x9E3779B9),
+          ft: WL.makeRng(seed0 ^ 0x7F4A7C15),
           pet: WL.makeRng(seed0 ^ 0x165667B1), push: WL.makeRng(seed0 ^ 0x61C88647) };
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
@@ -562,11 +564,27 @@ export function createCombat(opts) {
       if (crit) amount *= 2;
       deal(key, amount, crit, false, ti, { pet: true, school: 'physical', glance: glance });
       if (!S.over && alive(ti)) brandProc(ti);
+      if (FT && !S.over && alive(ti)) flametongueHit(ti);
       return true;
     }
     r.misses++;
     emit({ type: 'miss', key: key, target: ti, pet: true, dodge: roll >= miss });
     return false;
+  }
+  // Flametongue Totem (Xn in the sim's chat, 2026-10-08; as in the engine): every pet swing that lands - a glancing
+  // blow and Windfury's extra attack too - adds a Fire hit of per100 x swing time / 100 (27 for a 2 s swing), without
+  // spell power. It stacks with Windfury Totem. The engine treats it as a spell of the pet: it can miss (your hit
+  // chance) and crit (your crit), and takes the pet's damage bonuses and Curse of the Elements. It is not an attack:
+  // no Demonic Brand charge, no Judgement of Wisdom. Its own dice (R.ft): first whether it lands, then whether it crits.
+  function flametongueHit(ti) {
+    const key = 'pet:flametongue', r = row(rowKey(ti, key));
+    r.casts++;
+    if (R.ft() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, pet: true }); return; }
+    r.landed++;
+    let amount = FT.per100 * P.c.melee.swing / 100 * petMult('fire');
+    const crit = R.ft() * 100 < stats.critPct;
+    if (crit) amount *= cb.critMultiplier;
+    deal(key, amount, crit, false, ti, { pet: true, school: 'fire' });
   }
   // The pet attacks while it is told to and stands in range of its target. ctx.petDistance = that distance in yards.
   function syncPet(ctx) {

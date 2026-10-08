@@ -467,7 +467,8 @@ function onCombatEvent(e) {
   recorder.event(e, combat);
   const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
-  if (e.pet && lands && e.key !== 'pet:brand') pet.strike();
+  const rides = e.key === 'pet:brand' || e.key === 'pet:flametongue';   // extra damage that comes with the pet's own hit: no second strike, no second sound
+  if (e.pet && lands && !rides) pet.strike();
 
   // Sounds.
   if (e.type === 'cast') {
@@ -483,7 +484,7 @@ function onCombatEvent(e) {
   else if (e.type === 'pushback') sound.play('pushback');
   else if (e.type === 'death') sound.play('death');
   else if (e.type === 'miss' && !e.pet) sound.play('miss');
-  else if (e.type === 'hit' && e.pet && !(fx && fx.bolt)) { if (e.key !== 'pet:brand') sound.play('pet'); }   // Demonic Brand's extra damage rides on the pet's own hit
+  else if (e.type === 'hit' && e.pet && !(fx && fx.bolt)) { if (!rides) sound.play('pet'); }
   else if (e.type === 'hit' && !e.pet && !(fx && fx.bolt)) hitSound(e);
   if (lands && fx && fx.bolt && !e.pet) sound.play(fx.bolt.style === 'fire' ? 'boltFire' : 'boltShadow');
 

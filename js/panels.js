@@ -11,7 +11,7 @@ function el(tag, text, className) {
 }
 
 const AURA_NAMES = { coe: 'Curse of the Elements', isb: 'Improved Shadow Bolt', brand: 'Demonic Brand' };
-const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Melee', 'pet:windfury': 'Windfury attack', 'pet:brand': 'Demonic Brand' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem', 'pet:brand': 'Demonic Brand' };
 
 export function createPanels(handlers) {
   // ---------- fight options ----------
@@ -221,7 +221,7 @@ export function createPanels(handlers) {
     function label(key) {
       if (d.spells[key]) return d.spells[key].name;
       if (key === 'touchOfTheGrave') return 'Touch of the Grave';
-      if (PET_ATTACK[key]) return key === 'pet:brand' ? 'Demonic Brand' : d.petName + ': ' + PET_ATTACK[key];
+      if (PET_ATTACK[key]) return key === 'pet:brand' || key === 'pet:flametongue' ? PET_ATTACK[key] : d.petName + ': ' + PET_ATTACK[key];
       return key;
     }
     const keys = Object.keys(Object.assign({}, mine, theirs)).filter(function (key) { return (mine[key] && (mine[key].dmg > 0 || mine[key].casts > 0)) || (theirs[key] && theirs[key].dmg > 0.5); })

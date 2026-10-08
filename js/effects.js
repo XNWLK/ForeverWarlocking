@@ -39,6 +39,7 @@ export const SPELL_FX = {
   'pet:lashOfPain': { land: 'lash' },
   'pet:melee':     { land: 'slash' },
   'pet:windfury':  { land: 'slash' },
+  'pet:flametongue': { land: 'emberHit' },
   'pet:brand':     { land: 'brand' }
 };
 

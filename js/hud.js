@@ -54,7 +54,7 @@ function span(seconds) {
   return s >= 60 ? (Math.round(s / 6) / 10) + ' min' : s + ' sec';
 }
 const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
-const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:windfury': 'Windfury attack', 'pet:brand': 'Demonic Brand' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem', 'pet:brand': 'Demonic Brand' };
 export const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
 export function createHud(WL, handlers) {
@@ -674,6 +674,7 @@ export function createHud(WL, handlers) {
   function label(key) {
     if (key === 'touchOfTheGrave') return 'Touch of the Grave';
     if (key === 'pet:brand') return 'Demonic Brand';
+    if (key === 'pet:flametongue') return 'Flametongue Totem';
     if (PET_ATTACK[key]) return getName(character.build.pet) + ': ' + PET_ATTACK[key].charAt(0).toUpperCase() + PET_ATTACK[key].slice(1);
     return key;
   }
@@ -747,7 +748,7 @@ export function createHud(WL, handlers) {
     const name = e.key && c.spells[e.key] ? c.spells[e.key].name : e.key === 'touchOfTheGrave' ? 'Touch of the Grave' : e.key === 'isb' ? 'Improved Shadow Bolt' : e.name || '';
     if (e.pet && (e.type === 'hit' || e.type === 'miss')) {
       const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
-      const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
+      const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:flametongue' ? 'Flametongue Totem' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
       if (e.type === 'miss') {
         log(e.dodge ? dummy + ' dodges ' + petName + '.' : who + ' misses ' + dummy + '.', 'miss');
       } else {
