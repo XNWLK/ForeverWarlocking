@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "2da83da",
-    "subject":  "Flametongue Totem has its icon",
+    "commit":  "ad5ec62",
+    "subject":  "Destro Incinerate Imp casts Curse of the Elements right after Immolate",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-08 01:57",
+    "synced":  "2026-10-08 02:50",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
