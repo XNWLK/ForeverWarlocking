@@ -133,8 +133,12 @@ function buildConfig() {
   Object.keys(cfg.buffs).forEach(function (k) {
     const b = cfg.buffs[k];
     if (b.on && (b.tide || b.innervate || b.spellDmgPct)) { b.on = false; leftOut.push(b.name); }
-    // Buffs that cannot be up together (Windfury Totem and Grace of Air Totem): the first listed one counts, as in the sim.
-    if (b.on && b.excl) { if (exclusive[b.excl]) b.on = false; else exclusive[b.excl] = true; }
+    // Buffs that cannot be up together share a tag (Windfury, Flametongue and Grace of Air Totem; the air totems): the
+    // first listed one counts, as in the sim. One switched off here blocks nothing.
+    if (b.on) {
+      const tags = WL.buffExcl(b);
+      if (tags.some(function (t) { return exclusive[t]; })) b.on = false; else tags.forEach(function (t) { exclusive[t] = true; });
+    }
   });
   const fight = fightOptions();
   cfg.fight.latencyMs = Math.max(0, Number(getSetting('latency')) || 0);      // the sim average waits this long after each cast

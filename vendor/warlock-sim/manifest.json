@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "ad5ec62",
-    "subject":  "Destro Incinerate Imp casts Curse of the Elements right after Immolate",
+    "commit":  "0b5a990",
+    "subject":  "Windfury, Flametongue and Grace of Air Totem do not stack",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-08 02:50",
+    "synced":  "2026-10-08 15:40",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
