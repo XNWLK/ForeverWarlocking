@@ -99,12 +99,6 @@ export function createPanels(handlers) {
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
     else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
     body.appendChild(head);
-    // The top of the sim's spread: its average is what you are measured against, this is how far the dice can carry it.
-    if (sim && sim.max > 0) {
-      const most = el('p', 'The sim\'s highest of its ' + sim.fights + ' fights: ' + whole(sim.max) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.max) + '% of that', 'sim-max');
-      most.title = 'The sim plays this fight ' + sim.fights + ' times, each with other dice. Its average is what you are measured against; this is the one where the dice fell best.';
-      body.appendChild(most);
-    }
     // Your best in this very fight (same build, race, dummies and fight options), outside challenges.
     if (d.best) {
       const b = d.best;
@@ -112,22 +106,24 @@ export function createPanels(handlers) {
         : 'Your best in this fight: ' + whole(b.best.dps) + ' DPS' + (b.best.pct ? ' (' + b.best.pct + '% of the sim).' : '.'), 'best-line' + (b.record ? ' record' : '')));
     }
 
-    // Damage over time: you against the sim's average fight.
-    const yourCurve = d.curve || [], simCurve = sim && sim.curve ? sim.curve : null;
+    // Damage over time: you against the sim's average fight, and faintly the sim's highest fight (the top of its spread).
+    const yourCurve = d.curve || [], simCurve = sim && sim.curve ? sim.curve : null, topCurve = sim && sim.top && sim.top.length > 2 ? sim.top : null;
     if (yourCurve.length > 2) {
       const span = Math.max(yourCurve.length - 1, simCurve ? simCurve.length - 1 : 0, 1);
-      const top = Math.max(yourCurve[yourCurve.length - 1], simCurve ? simCurve[simCurve.length - 1] : 0, 1), W = 600, H = 150, pad = 4;
+      const top = Math.max(yourCurve[yourCurve.length - 1], simCurve ? simCurve[simCurve.length - 1] : 0, topCurve ? topCurve[topCurve.length - 1] : 0, 1), W = 600, H = 150, pad = 4;
       const points = function (curve) {
         return curve.map(function (v, i) { return (pad + (W - 2 * pad) * i / span).toFixed(1) + ',' + (H - pad - (H - 2 * pad) * v / top).toFixed(1); }).join(' ');
       };
       const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
       svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'graph');
-      const line = function (curve, color, width) {
+      const line = function (curve, color, width, dash) {
         const p = document.createElementNS(NS, 'polyline');
         p.setAttribute('points', points(curve)); p.setAttribute('fill', 'none'); p.setAttribute('stroke', color);
         p.setAttribute('stroke-width', width); p.setAttribute('vector-effect', 'non-scaling-stroke'); p.setAttribute('stroke-linejoin', 'round');
+        if (dash) p.setAttribute('stroke-dasharray', dash);
         svg.appendChild(p);
       };
+      if (topCurve) line(topCurve, 'rgba(255,255,255,0.28)', '1', '4 3');
       if (simCurve) line(simCurve, 'rgba(255,255,255,0.6)', '1.5');
       line(yourCurve, '#b98aff', '2');
       body.appendChild(el('h3', 'Damage over time'));
@@ -136,6 +132,12 @@ export function createPanels(handlers) {
       const you = el('span', 'You'); you.insertBefore(el('i'), you.firstChild);
       key.appendChild(you);
       if (simCurve) { const s = el('span', 'The sim (average of its fights)'); s.insertBefore(el('i', null, 'sim'), s.firstChild); key.appendChild(s); }
+      if (topCurve) {
+        const s = el('span', 'The sim\'s highest of ' + sim.fights + ' fights: ' + whole(sim.max) + ' DPS'); s.insertBefore(el('i', null, 'top'), s.firstChild);
+        s.title = 'The sim plays this fight ' + sim.fights + ' times, each with other dice. This is the one where the dice fell best' + (d.timed ? '' : ', drawn over the time the sim needs on average') +
+          '. You reached ' + Math.round(100 * dps / sim.max) + '% of it. The average is still what you are measured against.';
+        key.appendChild(s);
+      }
       key.appendChild(el('span', '0 s to ' + span + ' s, up to ' + whole(top) + ' damage'));
       body.appendChild(key);
     }

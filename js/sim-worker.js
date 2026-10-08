@@ -61,8 +61,26 @@ self.onmessage = function (e) {
     curve = curve.map(function (v) { return v * scale; });
     mana = { taps: taps / RUNS, tapMana: tapMana / RUNS, end: endMana / RUNS, min: lowMana / RUNS, movingTaps: movingTaps / RUNS };
   } catch (err) { curve = null; }
+  // The sim's highest fight, for the faint line in the review's graph: the same fights again to find which one it
+  // was, then that one with its log. It runs the sim's full time also when the fight ends on health, so that the line
+  // ends at the sim's highest DPS (cut off at the dummies' health it would hide what made that fight the highest).
+  var top = null;
+  try {
+    var best = -1, bestDps = -1;
+    for (var f = 0; f < result.iterations; f++) {
+      var fp = WL.fightParams(cfg, f);
+      var dps = WL.simulateOnce(job.build, job.race, cfg, { stats: result.stats, table: result.table, seed: fp.seed, duration: fp.duration, log: false }).dps;
+      if (dps > bestDps) { bestDps = dps; best = f; }
+    }
+    var bp = WL.fightParams(cfg, best), size = Math.max(1, Math.ceil(seconds)), per = new Array(size + 1).fill(0);
+    var high = WL.simulateOnce(job.build, job.race, cfg, { stats: result.stats, table: result.table, seed: bp.seed, duration: bp.duration, log: true });
+    (high.log || []).forEach(function (line) { if (line.dmg > 0) per[Math.min(size, Math.floor(line.t) + 1)] += line.dmg; });
+    var logged = per.reduce(function (a, b) { return a + b; }, 0), fit = logged > 0 ? result.dpsMax * seconds / logged : 1;   // ends exactly at the highest DPS
+    top = [0];
+    for (var s = 1; s <= size; s++) top.push(top[s - 1] + per[s] * fit);
+  } catch (err) { top = null; }
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
   self.postMessage({ id: job.id, precast: job.precast || '', dps: result.dps, max: result.dpsMax, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, casts: casts, mana: mana });
+                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, top: top, casts: casts, mana: mana });
 };

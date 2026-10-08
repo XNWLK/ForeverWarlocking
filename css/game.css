@@ -399,15 +399,15 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .tl-aura i { top: 3px; height: 7px; border-radius: 3px; background: rgba(160, 110, 240, 0.85); }
 .tl-aura.fire i { background: rgba(230, 120, 50, 0.85); }
 .tl-aura i.clip, .tl-aura.fire i.clip { top: 0; height: 13px; border-radius: 1px; background: #ff5b4f; z-index: 1; }
-.sim-max { margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); opacity: 0.7; }
 .best-line { margin: 4px 0 0; font-size: 12px; color: var(--ink-dim); }
 .best-line.record { color: var(--gold); font-weight: 600; }
 .challenge-line button { flex: none; }
 /* The graph and the challenge line in the review. */
 .graph { display: block; width: 100%; height: 150px; margin-top: 4px; border-radius: 6px; background: rgba(0, 0, 0, 0.3); }
-.graph-key { display: flex; gap: 14px; margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); }
+.graph-key { display: flex; flex-wrap: wrap; gap: 0 14px; margin: 3px 0 0; font-size: 11px; color: var(--ink-dim); }
 .graph-key i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; border-radius: 2px; background: var(--accent); }
 .graph-key i.sim { background: rgba(255, 255, 255, 0.6); }
+.graph-key i.top { height: 0; border-radius: 0; background: none; border-top: 1px dashed rgba(255, 255, 255, 0.45); }
 .graph-key i.mana { background: #6f9bff; }
 .graph-key i.tap { width: 2px; height: 10px; background: rgba(240, 207, 122, 0.8); }
 .mana-graph { height: 70px; }
