@@ -449,7 +449,7 @@ export function createHud(WL, handlers) {
       });
       notes.push('The sim also taps whenever mana is too low for the next spell.');
     }
-    if (s.selfDamage && lastCombat) notes.push('Every tick also burns you for ' + whole(Math.round(s.tickBase + s.tickCoef * e.sp)) + '. It stops by itself before a tick would kill you.');
+    if (s.selfDamage && lastCombat) notes.push('Every tick also burns you for ' + whole(lastCombat.selfTick(key)) + '. It stops by itself before a tick would kill you.');
     if (s.leech) notes.push('What it deals comes back to you as health.');
     if (s.threatMult && lastCombat) notes.push('Causes ' + (Math.round(lastCombat.threatMult(key) * 100) / 100) + ' times its damage as threat.');
     if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));

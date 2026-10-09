@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "0b5a990",
-    "subject":  "Windfury, Flametongue and Grace of Air Totem do not stack",
+    "commit":  "4598b8a",
+    "subject":  "Molten Skin and Soul Link also reduce the Demonic Rune and the Goblin Sapper",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-08 15:40",
+    "synced":  "2026-10-09 03:44",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

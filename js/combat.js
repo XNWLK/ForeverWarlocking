@@ -176,8 +176,11 @@ export function createCombat(opts) {
   function gainHealth(amount) { const before = S.health; S.health = Math.min(stats.maxHealth, S.health + amount); return S.health - before; }
   function loseHealth(amount) { S.health -= amount; if (S.health < S.minHealth) S.minHealth = S.health; }
   function canTap() { return S.health > TAP_HP; }
-  // What one tick of a spell that also hits you (Hellfire) does to you: its base damage, no talents, no crit.
-  function selfTick(key) { const s = SPELLS[key]; return s.selfDamage ? Math.round(s.tickBase + s.tickCoef * spNow(table[key])) : 0; }
+  // Molten Skin (less damage taken) and Soul Link (30% goes to your demon, only while one is out) reduce what your own
+  // spells do to you; the two multiply. Life Tap is a cost and is not reduced.
+  function selfTakenMult() { return (1 - tv('moltenSkin', 'dmgTakenPct') / 100) * (stats.petActive ? 1 - tv('soulLink', 'toPetPct') / 100 : 1); }
+  // What one tick of a spell that also hits you (Hellfire) does to you: its base damage, no damage talents, no crit.
+  function selfTick(key) { const s = SPELLS[key]; return s.selfDamage ? Math.round((s.tickBase + s.tickCoef * spNow(table[key])) * selfTakenMult()) : 0; }
   function executePhase(ti) { return T[ti || S.target].hpPct < cfg.fight.executePct; }
   // Seconds into the fight (the engine's clock): from the reset in the check; in play from the moment the fight begins
   // (engage: your first spell taking effect, the pull timer running out, or your pet's first attack order).
@@ -1080,7 +1083,7 @@ export function createCombat(opts) {
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },
-    castTime: castTime, gcd: gcd, cost: effectiveCost, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
+    castTime: castTime, gcd: gcd, cost: effectiveCost, selfTick: selfTick, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
     alive: alive, havocOn: havocOn, eurekaUp: eurekaUp, executePhase: executePhase,
     timed: timed, duration: linear,
     // { moving, left } while you are made to move; { moving: false, next } = seconds until the next phase (null = none)
