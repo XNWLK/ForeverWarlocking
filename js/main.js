@@ -463,7 +463,8 @@ function onCombatEvent(e) {
     return;
   }
   if (e.amount > 0 && (e.type === 'hit' || e.type === 'tick' || e.type === 'havoc')) {
-    const second = Math.floor(combat.fightSeconds()) + 1;
+    let second = Math.floor(combat.fightSeconds()) + 1;
+    if (combat.timed) second = Math.min(second, Math.max(1, Math.ceil(combat.duration)));   // what lands as the time runs out belongs to the last second (as the sim's curve has it)
     while (myCurve.length <= second) myCurve.push(myCurve[myCurve.length - 1]);
     myCurve[second] += e.amount;
   }

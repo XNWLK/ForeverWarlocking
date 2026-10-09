@@ -350,9 +350,17 @@ export function createExtras(WL, handlers) {
 
   // ---------- the race against the sim ----------
   const raceYou = byId('raceYou'), raceSim = byId('raceSim'), raceText = byId('raceText');
-  function simAt(curve, t) {
-    if (!curve || !curve.length) return 0;
-    if (t >= curve.length - 1) return curve[curve.length - 1];
+  // The sim's damage by fight second t. Its curve ends when its own fight does (sim.seconds); in a fight on health
+  // you may need longer, and from then on the sim is counted on at its average pace, so that the share shown here
+  // ends at the review's (your DPS against the sim's) and not at "who filled the health pool".
+  function simAt(sim, t) {
+    const curve = sim.curve, last = curve.length - 1;
+    if (!curve.length) return 0;
+    if (sim.seconds > 0 && sim.dps > 0) {
+      if (t >= sim.seconds) return sim.dps * t;
+      if (t >= last - 1 && last >= 1) return curve[last - 1] + (curve[last] - curve[last - 1]) * (t - (last - 1)) / (sim.seconds - (last - 1));   // its last second may be a part of one
+    }
+    if (t >= last) return curve[last];
     const i = Math.floor(t), f = t - i;
     return curve[i] + (curve[i + 1] - curve[i]) * f;
   }
@@ -362,7 +370,7 @@ export function createExtras(WL, handlers) {
     let text = '', you = 0, them = 0;
     if (!sim || !sim.curve) text = 'The sim is still working out its fight';
     else {
-      const end = sim.curve[sim.curve.length - 1] || 1, theirs = simAt(sim.curve, t), gap = mine - theirs;
+      const theirs = simAt(sim, t), end = Math.max(sim.curve[sim.curve.length - 1] || 1, theirs), gap = mine - theirs;
       you = Math.min(100, 100 * mine / end); them = Math.min(100, 100 * theirs / end);
       if (t <= 0) text = 'Starts when your first spell takes effect';
       else if (Math.abs(gap) < 0.5) text = 'Level with the sim';
