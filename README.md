@@ -17,8 +17,10 @@ and hits taken. A spell you start casting before the fight is a precast: the fig
 is then measured with the same precast; a pull timer counts down to the pull. Challenges are graded against the sim: drills, scripted encounters and a seeded fight. Practice aids
 you can switch on: the sim's rotation, its next cast, DoT timers, mistake callouts. A link shares your setup.
 
-It uses the same spell values, talents and mechanics as Xn's Forever Warlock Sim, the DPS simulator; a copy of that
-sim's data and engine lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).
+It uses the same spell values, talents and mechanics as
+**[Xn's Forever Warlock Sim](https://xnwlk.github.io/WarlockSIM/)**, the DPS simulator that plays a build thousands of
+times and ranks them ([its repository](https://github.com/XNWLK/WarlockSIM)); a copy of that sim's data and engine
+lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).
 
 ## Run it locally
 
