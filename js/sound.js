@@ -3,7 +3,7 @@
 // pressed or clicked something.
 //
 // What they are modelled on: a spell in the game is mostly air - a breathy swirl while you cast, a whoosh when it
-// leaves, a muffled burst when it lands, a crackle for fire. So nearly everything here is hiss shaped by a filter;
+// leaves, a muffled burst when it lands, a soft crackle behind fire. So nearly everything here is hiss shaped by a filter;
 // tones are only used for the weight of an impact (a short thump that sinks), for the eerie voice of a curse, and
 // for the interface. Nothing rises in pitch while you cast, and damage over time is silent, as in the game.
 //
@@ -19,11 +19,11 @@ const LOOPS = {
     { type: 'bandpass', at: 250, q: 8, level: 1, sway: 0.8, by: 45, flutter: 1.1, depth: 0.5 },
     { type: 'bandpass', at: 520, q: 6, level: 0.5, sway: 1.3, by: 110, flutter: 1.7, depth: 0.6 },
     { type: 'bandpass', at: 1400, q: 4, level: 0.14, sway: 2.1, by: 500, flutter: 2.6, depth: 0.7 }] },
-  // A low flame that flutters, with crackles.
+  // A low flame that wavers, with a few soft crackles far behind it.
   fire: { level: 0.5, layers: [
-    { type: 'lowpass', at: 430, q: 0.5, level: 1, flutter: 9, depth: 0.7 },
-    { type: 'bandpass', at: 1100, q: 0.9, level: 0.22, flutter: 13, depth: 0.8 },
-    { crackle: true, type: 'highpass', at: 2200, q: 0.7, level: 0.3 }] },
+    { type: 'lowpass', at: 430, q: 0.5, level: 1, flutter: 5, depth: 0.5 },
+    { type: 'bandpass', at: 1000, q: 0.9, level: 0.22, flutter: 7, depth: 0.55 },
+    { crackle: true, type: 'bandpass', at: 1800, q: 0.7, level: 0.14 }] },
   // Drain Life: the same wind, pulled toward you in slow gulps.
   drain: { level: 1.55, layers: [
     { type: 'bandpass', at: 300, q: 8, level: 0.8, sway: 1.2, by: 60, flutter: 1.4, depth: 0.7 },
@@ -43,14 +43,16 @@ function kit(audio, out) {
   }
   // Plain hiss.
   const hiss = buffer(1, function (d) { for (let i = 0; i < d.length; i++) d[i] = rnd() * 2 - 1; });
-  // Crackle: silence with about sixteen pops a second, each a few milliseconds of hiss dying away.
+  // Crackle: silence with about twelve pops a second, each a few milliseconds of hiss that comes in softly (no
+  // click at its start) and dies away.
   const crackle = buffer(2, function (d) {
-    const fade = Math.exp(-1 / (0.009 * rate));
-    let level = 0;
+    const fade = Math.exp(-1 / (0.012 * rate)), rise = 1 - Math.exp(-1 / (0.0015 * rate));
+    let level = 0, aim = 0;
     for (let i = 0; i < d.length; i++) {
-      if (rnd() < 16 / rate) level = 0.25 + 0.75 * rnd();
+      if (rnd() < 12 / rate) aim = 0.25 + 0.75 * rnd();
+      level += (aim - level) * rise;
+      aim *= fade;
       d[i] = (rnd() * 2 - 1) * level;
-      level *= fade;
     }
   });
   // A slow random drift between -1 and 1 (sixteen turning points a second), for swaying and fluttering.
@@ -161,7 +163,7 @@ const SOUNDS = {
   boltFire: function (k) {
     k.air({ from: 600, to: 2400, seconds: 0.22, volume: 0.75, q: 0.9, attack: 0.1 });
     k.air({ type: 'lowpass', from: 2000, to: 400, seconds: 0.4, volume: 0.17, delay: 0.08 });
-    k.air({ crackle: true, type: 'highpass', from: 2000, seconds: 0.3, volume: 0.5 });
+    k.air({ crackle: true, from: 1800, seconds: 0.3, volume: 0.25, q: 0.7 });
   },
   // Something lands: a muffled burst with some weight under it and a tail that trails off.
   hitShadow: function (k) {
@@ -172,7 +174,7 @@ const SOUNDS = {
   hitFire: function (k) {
     k.air({ type: 'lowpass', from: 1800, to: 220, seconds: 0.42, volume: 0.42 });
     k.tone('sine', 96, 40, 0.26, 0.28);
-    k.air({ crackle: true, type: 'highpass', from: 1800, seconds: 0.5, volume: 1, delay: 0.04 });
+    k.air({ crackle: true, from: 1600, seconds: 0.5, volume: 0.5, q: 0.7, delay: 0.04 });
   },
   // On top of a hit that crits: more weight, no jingle.
   big: function (k) {
@@ -193,8 +195,8 @@ const SOUNDS = {
   // Immolate catches: a rush of flame, then it burns.
   ignite: function (k) {
     k.air({ from: 500, to: 2600, seconds: 0.3, volume: 0.75, q: 0.8, attack: 0.16 });
-    k.air({ type: 'lowpass', from: 900, to: 300, seconds: 0.55, volume: 0.3, delay: 0.1, flutter: 11, depth: 0.7 });
-    k.air({ crackle: true, type: 'highpass', from: 1900, seconds: 0.6, volume: 0.7, delay: 0.1 });
+    k.air({ type: 'lowpass', from: 900, to: 300, seconds: 0.55, volume: 0.3, delay: 0.1, flutter: 6, depth: 0.5 });
+    k.air({ crackle: true, from: 1700, seconds: 0.6, volume: 0.35, q: 0.7, delay: 0.1 });
   },
   // Life Tap: a dull pull, then mana rushing in.
   lifeTap: function (k) {
@@ -220,7 +222,7 @@ const SOUNDS = {
   pushback: function (k) { k.air({ type: 'lowpass', from: 420, to: 130, seconds: 0.1, volume: 0.3 }); k.tone('sine', 130, 85, 0.08, 0.14); },
   // The pet: a whip crack or a claw for the Succubus, a small puff of fire where the Imp's bolt lands.
   pet: function (k) { k.air({ type: 'highpass', from: 3500, seconds: 0.06, volume: 0.21 }); k.air({ type: 'lowpass', from: 600, to: 200, seconds: 0.09, volume: 0.21 }); },
-  petHit: function (k) { k.air({ from: 1400, to: 420, seconds: 0.2, volume: 0.3 }); k.air({ crackle: true, type: 'highpass', from: 2000, seconds: 0.22, volume: 0.4 }); },
+  petHit: function (k) { k.air({ from: 1400, to: 420, seconds: 0.2, volume: 0.38 }); k.air({ crackle: true, from: 1800, seconds: 0.22, volume: 0.2, q: 0.7 }); },
   death: function (k) { k.tone('sine', 110, 30, 0.9, 0.21, 0, 0.05); k.air({ type: 'lowpass', from: 600, to: 70, seconds: 0.75, volume: 0.34 }); },
   // The interface: short, soft, well behind the fight.
   error: function (k) { k.tone('sine', 150, 112, 0.14, 0.15); k.air({ type: 'lowpass', from: 350, seconds: 0.05, volume: 0.15 }); },
