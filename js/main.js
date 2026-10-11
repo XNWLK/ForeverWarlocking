@@ -20,7 +20,12 @@ import { makeLink, readLink } from './share.js';
 import { createTouch, isTouch } from './touch.js';
 
 const WL = window.WL;
-const PET_MELEE_RANGE = 5;      // the Succubus's melee reach in yards: this project's own number (not in the sim data)
+// A demon's melee reach in yards, from the Warlock data (the Succubus: 5). The data names none for the Felhunter and
+// the Voidwalker, which an imported build may bring: they get the same 5.
+function petMeleeRange(cfg, key) {
+  const pc = cfg && cfg.pets && cfg.pets[key];
+  return (pc && pc.melee && pc.melee.range) || 5;
+}
 
 // Where the dummies stand (yards; the first one in the middle of the summoning circle). Six yards apart: Rain of Fire
 // on the middle one reaches all three, and Hellfire reaches all three when you stand between them.
@@ -585,7 +590,7 @@ function newCharacter() {
   config = buildConfig();
   const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
-                          timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: PET_MELEE_RANGE,
+                          timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: petMeleeRange(config, build.pet),
                           seed: challenge && challenge.seeded ? challenge.seed : undefined });   // a seeded fight rolls the same dice every time
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
@@ -617,7 +622,7 @@ function newCharacter() {
   if (rings) scene.remove(rings);
   const list = [{ yards: character.maxRange, color: 0xb9a8ff }];
   if (combat.table.drainLife && combat.table.drainLife.range !== character.maxRange) list.push({ yards: combat.table.drainLife.range, color: 0x58e0a8 });
-  if (build.pet === 'succubus') list.push({ yards: PET_MELEE_RANGE, color: 0xff9d7a });
+  if (build.pet === 'succubus') list.push({ yards: petMeleeRange(config, build.pet), color: 0xff9d7a });
   rings = makeRangeRings(list);
   rings.visible = getSetting('rings');
   scene.add(rings);

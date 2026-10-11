@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "4598b8a",
-    "subject":  "Molten Skin and Soul Link also reduce the Demonic Rune and the Goblin Sapper",
+    "commit":  "0cf68e7",
+    "subject":  "Succubus melee range in the data: 5 yards",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-09 03:44",
+    "synced":  "2026-10-11 04:43",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
