@@ -17,6 +17,21 @@ export const RACE_LOOKS = {
   troll:  { size: 1.13, wide: 0.92, lean: 0.17, arm: 1.2,  bulk: 0.9,  hood: false, skin: 0x4a93ad, hair: 0xff7a2a }
 };
 
+// The robes you can wear. The first is yours from the start; the others are earned in the Challenges (which grades
+// it takes is decided in js/extras.js, next to the challenges themselves). Colours only: cloth, its darker parts,
+// the lining, and the trim.
+export const ROBES = [
+  { key: 'violet', name: 'Shadowweave', robe: 0x6a2f96, dark: 0x42195f, lining: 0x241036, trim: 0xd2a83c },
+  { key: 'ash', name: 'Ashen', robe: 0x74707f, dark: 0x45424e, lining: 0x1f1d26, trim: 0xc3bdd0 },
+  { key: 'fel', name: 'Fel', robe: 0x3f8a3a, dark: 0x1f4f24, lining: 0x10261a, trim: 0xd2a83c },
+  { key: 'ember', name: 'Ember', robe: 0xa8322a, dark: 0x5e1714, lining: 0x2a0c0c, trim: 0xf0a23c },
+  { key: 'frost', name: 'Frost', robe: 0x3566b0, dark: 0x1c3566, lining: 0x0f1c36, trim: 0xcfe2ff },
+  { key: 'bone', name: 'Bone', robe: 0xcfc6ae, dark: 0x8d8570, lining: 0x3a3428, trim: 0x8a4fc0 },
+  { key: 'void', name: 'Void', robe: 0x231d2e, dark: 0x120e19, lining: 0x08060c, trim: 0xb98aff },
+  { key: 'gold', name: 'Sovereign', robe: 0xd9b24a, dark: 0x8a6a1c, lining: 0x3a2a0c, trim: 0xfff4d6 }
+];
+function robeOf(key) { return ROBES.filter(function (r) { return r.key === key; })[0] || ROBES[0]; }
+
 function darker(color, by) { return new THREE.Color(color).multiplyScalar(by).getHex(); }
 // A ball squashed or stretched into shape.
 function blob(parent, radius, material, x, y, z, sx, sy, sz, detail) {
@@ -128,8 +143,8 @@ const HEADS = {
 };
 
 // ---------- the body, the same for every race but for its measures ----------
-function build(race) {
-  const look = RACE_LOOKS[race], w = look.wide, gaunt = race === 'undead';
+function build(race, robeKey) {
+  const look = RACE_LOOKS[race], w = look.wide, gaunt = race === 'undead', cloth = robeOf(robeKey);
   const root = new THREE.Group();   // what makeWarlock swaps when the race changes
   const rig = new THREE.Group();    // the body: bobs while walking, rises in a jump
   rig.scale.setScalar(look.size);
@@ -137,7 +152,7 @@ function build(race) {
   root.add(groundShadow(0.75 * look.size * Math.max(0.85, w)));
 
   const m = {
-    robe: flat(0x6a2f96), robeDark: flat(0x42195f), lining: flat(0x241036), gold: flat(0xd2a83c), skin: flat(look.skin),
+    robe: flat(cloth.robe), robeDark: flat(cloth.dark), lining: flat(cloth.lining), gold: flat(cloth.trim), skin: flat(look.skin),
     skinDark: flat(darker(look.skin, 0.62)), hair: flat(look.hair || 0x302821), dark: flat(0x16121a),
     bone: flat(0xcabfa6), wood: flat(0x4a2f1a), leather: flat(0x3a2414), iron: flat(0x3b3846)
   };
@@ -293,13 +308,14 @@ function build(race) {
   };
 }
 
-// The Warlock in the scene. Its root stays the same object whatever the race; setRace swaps what is inside it.
+// The Warlock in the scene. Its root stays the same object whatever the race and the robe; setRace and setRobe swap
+// what is inside it.
 export function makeWarlock(race) {
   const root = new THREE.Group();
-  let body = null, current = null;
+  let body = null, current = null, robe = ROBES[0].key, worn = null;
   function setRace(key) {
     const next = RACE_LOOKS[key] ? key : 'human';
-    if (next === current) return;
+    if (next === current && worn === robe) return;
     if (body) {
       root.remove(body.root);
       body.root.traverse(function (part) {            // free what the old shape held (the glow's shared picture stays)
@@ -307,13 +323,15 @@ export function makeWarlock(race) {
         if (part.material) part.material.dispose();
       });
     }
-    current = next;
-    body = build(next);
+    current = next; worn = robe;
+    body = build(next, robe);
     root.add(body.root);
   }
   setRace(race || 'human');
   return {
     root: root, setRace: setRace,
+    setRobe: function (key) { robe = robeOf(key).key; setRace(current); },
+    get robe() { return robe; },
     get race() { return current; },
     get size() { return RACE_LOOKS[current].size; },             // against a Human: the camera and a few effects follow it
     update: function (dt, time, moving, jumpHeight, school) { body.update(dt, time, moving, jumpHeight, school); },

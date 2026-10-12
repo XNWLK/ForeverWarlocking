@@ -4,35 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Forever Warlocking</title>
-<link rel="stylesheet" href="css/game.css?v=bd4239f5c5">
+<link rel="stylesheet" href="css/game.css?v=0590c6e4e8">
 <script type="importmap">
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js",
-    "./js/aids.js": "./js/aids.js?v=bd4239f5c5",
-    "./js/chamber.js": "./js/chamber.js?v=bd4239f5c5",
-    "./js/combat.js": "./js/combat.js?v=bd4239f5c5",
-    "./js/controls.js": "./js/controls.js?v=bd4239f5c5",
-    "./js/cost.js": "./js/cost.js?v=bd4239f5c5",
-    "./js/effects.js": "./js/effects.js?v=bd4239f5c5",
-    "./js/encounter.js": "./js/encounter.js?v=bd4239f5c5",
-    "./js/extras.js": "./js/extras.js?v=bd4239f5c5",
-    "./js/hud.js": "./js/hud.js?v=bd4239f5c5",
-    "./js/keys.js": "./js/keys.js?v=bd4239f5c5",
-    "./js/kit.js": "./js/kit.js?v=bd4239f5c5",
-    "./js/main.js": "./js/main.js?v=bd4239f5c5",
-    "./js/models.js": "./js/models.js?v=bd4239f5c5",
-    "./js/names.js": "./js/names.js?v=bd4239f5c5",
-    "./js/panels.js": "./js/panels.js?v=bd4239f5c5",
-    "./js/pets.js": "./js/pets.js?v=bd4239f5c5",
-    "./js/record.js": "./js/record.js?v=bd4239f5c5",
-    "./js/settings.js": "./js/settings.js?v=bd4239f5c5",
-    "./js/share.js": "./js/share.js?v=bd4239f5c5",
-    "./js/sound.js": "./js/sound.js?v=bd4239f5c5",
-    "./js/timeline.js": "./js/timeline.js?v=bd4239f5c5",
-    "./js/tooltip.js": "./js/tooltip.js?v=bd4239f5c5",
-    "./js/touch.js": "./js/touch.js?v=bd4239f5c5",
-    "./js/warlock.js": "./js/warlock.js?v=bd4239f5c5"
+    "./js/aids.js": "./js/aids.js?v=0590c6e4e8",
+    "./js/card.js": "./js/card.js?v=0590c6e4e8",
+    "./js/chamber.js": "./js/chamber.js?v=0590c6e4e8",
+    "./js/combat.js": "./js/combat.js?v=0590c6e4e8",
+    "./js/controls.js": "./js/controls.js?v=0590c6e4e8",
+    "./js/cost.js": "./js/cost.js?v=0590c6e4e8",
+    "./js/effects.js": "./js/effects.js?v=0590c6e4e8",
+    "./js/encounter.js": "./js/encounter.js?v=0590c6e4e8",
+    "./js/extras.js": "./js/extras.js?v=0590c6e4e8",
+    "./js/gamepad.js": "./js/gamepad.js?v=0590c6e4e8",
+    "./js/hud.js": "./js/hud.js?v=0590c6e4e8",
+    "./js/keys.js": "./js/keys.js?v=0590c6e4e8",
+    "./js/kit.js": "./js/kit.js?v=0590c6e4e8",
+    "./js/main.js": "./js/main.js?v=0590c6e4e8",
+    "./js/models.js": "./js/models.js?v=0590c6e4e8",
+    "./js/names.js": "./js/names.js?v=0590c6e4e8",
+    "./js/panels.js": "./js/panels.js?v=0590c6e4e8",
+    "./js/pets.js": "./js/pets.js?v=0590c6e4e8",
+    "./js/record.js": "./js/record.js?v=0590c6e4e8",
+    "./js/settings.js": "./js/settings.js?v=0590c6e4e8",
+    "./js/share.js": "./js/share.js?v=0590c6e4e8",
+    "./js/sound.js": "./js/sound.js?v=0590c6e4e8",
+    "./js/timeline.js": "./js/timeline.js?v=0590c6e4e8",
+    "./js/tooltip.js": "./js/tooltip.js?v=0590c6e4e8",
+    "./js/touch.js": "./js/touch.js?v=0590c6e4e8",
+    "./js/warlock.js": "./js/warlock.js?v=0590c6e4e8"
   }
 }
 </script>
@@ -40,30 +42,32 @@
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.min.js">
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.min.js">
-<link rel="modulepreload" href="js/main.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/chamber.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/warlock.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/models.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/controls.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/hud.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/names.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/combat.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/settings.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/pets.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/effects.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/panels.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/sound.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/kit.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/tooltip.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/extras.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/keys.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/record.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/timeline.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/encounter.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/share.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/touch.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/aids.js?v=bd4239f5c5">
-<link rel="modulepreload" href="js/cost.js?v=bd4239f5c5">
+<link rel="modulepreload" href="js/main.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/chamber.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/warlock.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/models.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/controls.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/hud.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/names.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/combat.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/settings.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/pets.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/effects.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/panels.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/sound.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/kit.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/tooltip.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/extras.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/keys.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/record.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/timeline.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/encounter.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/share.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/touch.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/aids.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/card.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/gamepad.js?v=0590c6e4e8">
+<link rel="modulepreload" href="js/cost.js?v=0590c6e4e8">
 </head>
 <body>
 <canvas id="scene"></canvas>
@@ -145,6 +149,7 @@
       <p class="hint">Click a key, then press the new one. Escape leaves it as it is. A key that is already in use trades places. Spells, targeting, the pet, Reset, the pull timer and zooming also take a key with Shift, Ctrl or Alt held, the middle mouse button, the thumb buttons, and the wheel with a modifier.</p>
       <div class="binds"><div id="bindsLeft"></div><div id="bindsRight"></div></div>
       <p class="hint">Mouse: hold right to steer, hold left to look around, both buttons walk forward, the wheel zooms (Zoom in and Zoom out can have keys as well). Click a dummy to target it. The arrow keys always move you. "Edit bar" moves spells between slots. A few combinations belong to the browser and never reach the game (Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Tab, and Ctrl+1 to 9 in some browsers).</p>
+      <p class="hint">Controller: the left stick walks, the right stick turns and looks. A B X Y cast slots 1 to 4; with the left trigger held slots 5 to 8, with the right trigger 9 to 12, with both 13 to 15. LB jumps, RB takes the next dummy. D-pad: up pull timer, down stop casting, left pet follow, right pet attack. Start resets the fight, Back opens the review. While you use it the slots show its buttons. Menus still take the mouse.</p>
       <button type="button" id="bindsReset" class="wide">All keys back to default</button>
     </div>
   </section>
@@ -175,6 +180,11 @@
       <label title="How long the Pull button at the top counts down before the fight begins">Pull timer <input type="number" id="pullSeconds" min="1" max="30" step="1" value="5"> s</label>
       <p class="hint">Presets (they replace your fight settings):</p>
       <div class="stack" id="presets"></div>
+    </details>
+    <details>
+      <summary>Screen</summary>
+      <label class="range" id="uiScaleLabel" title="Makes the frames, bars, panels and windows smaller or bigger. Bigger only as far as your window has room for the whole layout. The plates and damage numbers over the dummies keep their size.">Interface size <input type="range" id="uiScale" min="80" max="140" step="5" value="100"><b id="uiScaleText">100%</b></label>
+      <label class="switch" title="Other colours for everything that is told apart by red against green: health and hostile bars, DoT timers, the sim's next cast, the opener trainer, the review's marks and its timeline. Marks get a shape as well as a colour."><input type="checkbox" id="swColorBlind"><span>Colour-blind colours</span></label>
     </details>
     <details>
       <summary>Sound, link, log</summary>
@@ -317,6 +327,9 @@
   <h3>Encounters</h3>
   <p class="hint">Scripted fights: things happen at set moments. The sim cannot follow a script, so it plays a fight of the same length with about as much moving and as many hits, spread evenly.</p>
   <div class="cards" id="encounters"></div>
+  <h3>Robes</h3>
+  <p class="hint">Earned with your grades in the drills and encounters above. Looks only.</p>
+  <div class="cards" id="robes"></div>
   <h3>Seeded fight</h3>
   <div class="card wide-card">
     <p>Two minutes on one dummy with the dice fixed by a seed: everyone who types the same seed gets the same rolls, so results can be compared. The box starts with today's date. After the fight, "Copy the result" in the review gives you one line to pass on.</p>
@@ -338,24 +351,24 @@
 <div id="fatal" hidden></div>
 
 <!-- The Warlock data and engine, in the order of vendor/warlock-sim/manifest.json -->
-<script src="vendor/warlock-sim/data/consumables.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/config.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/talents.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/spells.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/races.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/builds.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/stats.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/spelltable.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/rng.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/resist.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/rotation.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/sim.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/custom-builds.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/engine/settings-code.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/icons.js?v=bd4239f5c5"></script>
-<script src="vendor/warlock-sim/data/tooltips.js?v=bd4239f5c5"></script>
+<script src="vendor/warlock-sim/data/consumables.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/config.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/talents.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/spells.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/races.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/builds.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/stats.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/spelltable.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/rng.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/resist.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/rotation.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/sim.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/custom-builds.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/engine/settings-code.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/icons.js?v=0590c6e4e8"></script>
+<script src="vendor/warlock-sim/data/tooltips.js?v=0590c6e4e8"></script>
 <!-- The ready builds ranked by their DPS in the DPS sim (tools/gen-build-order.js) -->
-<script src="data/build-order.js?v=bd4239f5c5"></script>
+<script src="data/build-order.js?v=0590c6e4e8"></script>
 
 <script>
 // Shown when the 3D library or the game code cannot start (module errors do not reach the page otherwise).
@@ -366,6 +379,6 @@ window.addEventListener('error', function (e) {
   box.textContent = 'Forever Warlocking could not start: ' + (e.message || 'a file did not load') + '. Check your connection and reload.';
 }, true);
 </script>
-<script type="module" src="js/main.js?v=bd4239f5c5"></script>
+<script type="module" src="js/main.js?v=0590c6e4e8"></script>
 </body>
 </html>

@@ -35,6 +35,7 @@ export function createControls(canvas, camera, world) {
   const mouse = { left: false, right: false };
   const fingers = new Map();                              // fingers on the scene: pointer id -> { x, y }
   const stick = { x: 0, y: 0 };                           // the walking stick of a touch screen: x to the right, y forward
+  const pad = { x: 0, y: 0 };                             // the left stick of a controller, the same way
   let pinch = 0, jumpAsked = false;
 
   function reset() {
@@ -162,7 +163,7 @@ export function createControls(canvas, camera, world) {
     let sideways = (keys.has(B.strafeRight) ? 1 : 0) - (keys.has(B.strafeLeft) ? 1 : 0);
     if (mouse.right) sideways += right - left;            // while steering, A and D step sideways
     else player.yaw = wrapAngle(player.yaw + (left - right) * TURN_SPEED * dt);
-    forward += stick.y; sideways += stick.x;
+    forward += stick.y + pad.y; sideways += stick.x + pad.x;
     forward = Math.max(-1, Math.min(1, forward));
     sideways = Math.max(-1, Math.min(1, sideways));
 
@@ -205,6 +206,14 @@ export function createControls(canvas, camera, world) {
     player: player, view: view, update: update, reset: reset, zoom: zoom,
     setEyeHeight: function (height) { if (height > 0) eyeHeight = Math.max(0.6, Math.min(2.6, height)); },
     setStick: function (x, y) { stick.x = x; stick.y = y; },
+    setPad: function (x, y) { pad.x = x; pad.y = y; },
+    // A controller's right stick: you turn with the camera (as with the right mouse button held), and look up or down.
+    turn: function (yaw, pitch) {
+      if (!yaw && !pitch) return;
+      player.yaw = wrapAngle(player.yaw + view.offset - yaw);
+      view.offset = 0;
+      view.pitch = Math.min(1.45, Math.max(-0.12, view.pitch + pitch));
+    },
     jump: function () { jumpAsked = true; }
   };
 }

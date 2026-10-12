@@ -60,10 +60,12 @@ function update() {
   }
   box.hidden = false;
   // Above what it belongs to when there is room, otherwise below; never off the screen.
-  const r = owner.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+  // The box is drawn at the interface's size (css: zoom); where it goes is worked out in screen pixels.
+  const z = Number(window.getComputedStyle(box).zoom) || 1;
+  const r = owner.getBoundingClientRect(), w = box.offsetWidth * z, h = box.offsetHeight * z;
   const x = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
   const y = r.top - h - 8 >= 8 ? r.top - h - 8 : Math.min(window.innerHeight - h - 8, r.bottom + 8);
-  box.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+  box.style.transform = 'translate(' + Math.round(x / z) + 'px,' + Math.round(y / z) + 'px)';
 }
 
 export function initTips() {

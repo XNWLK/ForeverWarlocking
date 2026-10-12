@@ -101,6 +101,16 @@ export function createPanels(handlers) {
     if (sim) head.appendChild(document.createTextNode('  ·  the sim: ' + whole(sim.dps) + ' DPS  ·  you reached ' + Math.round(100 * dps / sim.dps) + '%'));
     else head.appendChild(document.createTextNode('  ·  the sim\'s numbers are still being worked out'));
     body.appendChild(head);
+    // The result as a picture to pass on, once the fight is over.
+    if (d.over && d.picture) {
+      const row = el('p', null, 'card-line'), copy = el('button', 'Copy the result as a picture'), save = el('button', 'Save the picture');
+      copy.type = save.type = 'button';
+      copy.title = 'A card with your name, build, race, the fight, your DPS and the damage curve, to paste into a chat';
+      copy.addEventListener('click', function () { copy.blur(); d.picture('copy', copy); });
+      save.addEventListener('click', function () { save.blur(); d.picture('save', save); });
+      row.append(copy, save);
+      body.appendChild(row);
+    }
     // Your best in this very fight (same build, race, dummies and fight options), outside challenges.
     if (d.best) {
       const b = d.best;

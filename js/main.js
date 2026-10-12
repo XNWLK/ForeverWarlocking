@@ -18,6 +18,9 @@ import { createEncounter } from './encounter.js';
 import { createAids } from './aids.js';
 import { makeLink, readLink } from './share.js';
 import { createTouch, isTouch } from './touch.js';
+import { createGamepad, PAD_LABELS } from './gamepad.js';
+import { makeCard, copyCard, saveCard } from './card.js';
+import { getName } from './names.js';
 
 const WL = window.WL;
 // A demon's melee reach in yards, from the Warlock data (the Succubus: 5). The data names none for the Felhunter and
@@ -265,6 +268,8 @@ const extras = createExtras(WL, {
     hud.log(ms ? 'Latency: ' + ms + ' ms. Every key press arrives that much later; the sim average waits as long after each cast.' : 'No latency.');
   },
   onVolume: function (value) { setSetting('volume', value); sound.setVolume(value); },
+  onRobe: function (key) { warlock.setRobe(key); hud.log('You put on another robe.', 'proc'); },
+  onUiScale: function (value) { hud.setScale(value); },
   shareLink: shareLink,
   fullLog: function () { return hud.fullLog(); },
   log: function (text, kind) { hud.log(text, kind); }
@@ -432,6 +437,11 @@ function challengeResult() {
     showBest();
   }
   out.notes = [encounter.notes(), challenge.procs ? procNotes() : null].filter(Boolean);
+  const robes = challenge.drill ? extras.newRobes() : [];   // a grade may have earned you a robe
+  if (robes.length) {
+    out.notes.push((robes.length === 1 ? 'A new robe is yours: ' : 'New robes are yours: ') + robes.join(', ') + '. Put it on in the Challenges window.');
+    hud.log((robes.length === 1 ? 'New robe earned: ' : 'New robes earned: ') + robes.join(', ') + '.', 'crit');
+  }
   out.link = shareLink();
   challengeOut = out;
   return out;
@@ -445,9 +455,39 @@ function procNotes() {
   return 'Procs: ' + all + '. ' + (used.length ? 'You used ' + used.length + ', after ' + mean.toFixed(1) + ' s on average (slowest ' + slow.toFixed(1) + ' s)' : 'You used none') +
     (lost ? '; ' + lost + ' ran out or ' + (lost === 1 ? 'was' : 'were') + ' overwritten unused' : '') + (open && !late ? '; one was still up at the end' : '') + '.';
 }
+// The fight that is set up, in a few words (for the result picture).
+function fightWords() {
+  if (challenge) return (challenge.encounter ? 'Encounter: ' : challenge.seeded ? '' : 'Drill: ') + challenge.name;
+  const f = fightOptions();
+  return (targets === 1 ? '1 dummy' : targets + ' dummies') + '  \u00b7  ' + (f.timed ? f.seconds + ' s' : character.dummyHealth.toLocaleString('en-US') + ' health' + (targets > 1 ? ' each' : '')) +
+    (f.moveEvery > 0 && f.moveDuration > 0 ? '  \u00b7  moving ' + f.moveDuration + ' s every ' + f.moveEvery + ' s' : '') + (f.hitEvery > 0 ? '  \u00b7  a hit every ' + f.hitEvery + ' s' : '');
+}
+const CARD_NAMES = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Pet melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem',
+                     'pet:brand': 'Demonic Brand', touchOfTheGrave: 'Touch of the Grave' };
+const CARD_ICONS = { 'pet:firebolt': 'firebolt', 'pet:lashOfPain': 'lashOfPain', 'pet:brand': 'searingPain' };
+// The result of the fight as a picture: how = 'copy' (onto the clipboard) or 'save' (as a file). The button says how it went.
+function resultPicture(how, button) {
+  const seconds = combat.fightSeconds(), res = combat.result, sums = {}, drill = challengeOut;
+  Object.keys(res.bySpell).forEach(function (k) { const base = k.replace(/^x\d:/, ''); if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg; });
+  const spells = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; }).slice(0, 3).map(function (k) {
+    const pet = k.indexOf('pet:') === 0;
+    return { name: combat.spells[k] ? combat.spells[k].name : CARD_NAMES[k] || k, pct: 100 * sums[k] / res.total,
+             icon: WL.ICONS[CARD_ICONS[k]] || (pet ? WL.ICONS['pet_' + character.build.pet] : iconFor(k)) || '' };
+  });
+  const say = function (text) { const was = button.textContent; button.textContent = text; window.setTimeout(function () { button.textContent = was; }, 1800); };
+  makeCard({ name: getName('warlock'), build: character.build.short, race: WL.RACES[character.raceKey].name, raceIcon: WL.ICONS['race_' + character.raceKey] || '',
+             fight: fightWords(), dps: seconds > 0 ? res.total / seconds : 0, seconds: seconds, simDps: simResult ? simResult.dps : 0,
+             grade: drill && drill.grade ? drill.grade : '', curve: myCurve.slice(), simCurve: simResult && simResult.curve ? simResult.curve : null, spells: spells,
+             site: window.location.host + window.location.pathname.replace(/\/$/, '') }).then(function (canvas) {
+    const file = 'forever-warlocking-' + Math.round(seconds > 0 ? res.total / seconds : 0) + '-dps.png';
+    if (how === 'save') { saveCard(canvas, file); say('Saved'); return; }
+    copyCard(canvas).then(function (ok) { if (ok) say('Copied'); else { saveCard(canvas, file); say('Saved as a file instead'); } });
+  });
+}
 function showReview() {
   if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
   panels.showReview({
+    picture: resultPicture,
     curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     health: { min: combat.state.minHealth, max: character.stats.maxHealth },
@@ -855,6 +895,8 @@ if (shared) {
 // A share link pasted into the address bar while the page is open only changes the part after the #: load it properly.
 window.addEventListener('hashchange', function () { if (/(^#|&)v=1(&|$)/.test(window.location.hash)) window.location.reload(); });
 if (readCustomBuild().length && getSetting('build') === 'custom') setSetting('build', null);   // a code that cannot be played here
+hud.setScale(getSetting('uiScale'));
+warlock.setRobe(extras.wornRobe());
 newCharacter();
 hud.setKeys(keyCodes);
 hud.setBinds(binds);
@@ -911,6 +953,7 @@ function frame() {
   const elapsed = clock.getDelta(), dt = Math.min(0.05, elapsed), time = clock.elapsedTime;
   watchSpeed(elapsed, time);
 
+  gamepad.poll(dt);
   controls.update(dt);
   const player = controls.player;
   // A scripted fight says when you are made to move, lands its fire and its hits, and says what to show.
@@ -1040,12 +1083,29 @@ function frame() {
 }
 renderer.setAnimationLoop(frame);
 
+// ---------- a controller ----------
+const gamepad = createGamepad({
+  walk: function (x, y) { controls.setPad(x, y); },
+  turn: function (yaw, pitch) { controls.turn(yaw, pitch); },
+  slot: function (i) { press(character.bar[i]); },
+  jump: function () { controls.jump(); },
+  nextTarget: function () { nextTarget(); },
+  pull: function () { togglePull(); },
+  cancel: function () { combat.cancel(); },
+  pet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); },
+  reset: function () { resetFight(); hud.log('Fight reset.'); },
+  review: function () { if (panels.reviewOpen()) panels.hideReview(); else showReview(); },
+  inUse: function () { hud.setPadLabels(PAD_LABELS); }       // the slots show what to press on the controller
+});
+// A key or a mouse button: the slots show the keys again.
+['keydown', 'mousedown'].forEach(function (type) { window.addEventListener(type, function () { hud.setPadLabels(null); }, true); });
+
 // For checks from the browser console.
 window.FW = {
   extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
   touch: touch, controls: controls, recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
   get keyCodes() { return keyCodes; }, binds: binds, togglePull: togglePull, get pull() { return pull; }, get pullInfo() { return pullInfo; },
-  get simResults() { return simResults; }, get raceBest() { return raceBest; }, get procLog() { return procLog; },
+  gamepad: gamepad, resultPicture: resultPicture, makeCard: makeCard, get simResults() { return simResults; }, get raceBest() { return raceBest; }, get procLog() { return procLog; },
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,

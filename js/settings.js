@@ -14,7 +14,9 @@ const DEFAULTS = {
   volume: 0.6,                         // how loud the sounds are, 0 to 1
   touchHelp: false,                    // the note about touch controls was shown (touch screens only)
   pullSeconds: 5,                      // how long the pull timer counts down
-  resultsVersion: 0                    // bests and drill grades start over when the way they are measured changes
+  resultsVersion: 0,                   // bests and drill grades start over when the way they are measured changes
+  robe: 'violet', robesSeen: null,     // the robe you wear, and the robes you were already told you earned
+  uiScale: 1, colorBlind: false        // the interface's size (0.8 to 1.4), and colours that do not lean on red against green
 };
 
 let saved = {};

@@ -9,6 +9,7 @@ import { getSetting, setSetting } from './settings.js';
 import { setTip } from './tooltip.js';
 import { ACTION_SPELLS } from './combat.js';
 import { ENCOUNTERS, simFight } from './encounter.js';
+import { ROBES } from './warlock.js';
 
 // Drills: short fights with one thing to practise. They do not change your saved fight settings.
 export const DRILLS = [
@@ -30,6 +31,19 @@ export const PRESETS = [
 ];
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
+
+// Robes are earned with grades in the challenges (drills and encounters alike). What each one takes:
+const ROBE_HOW = { violet: 'Yours from the start.', ash: 'Finish any challenge.', fel: 'A grade of B or better in any challenge.', ember: 'An A or better in three challenges.',
+                   frost: 'An S in any challenge.', bone: 'An A or better in every encounter.', void: 'An S in five challenges.', gold: 'An S in every drill and every encounter.' };
+const GRADE_RANK = { S: 5, A: 4, B: 3, C: 2, D: 1 };
+// drills: your best per challenge ({ id: { grade } }). Returns { robe key: true when you may wear it }.
+export function robesEarned(drills) {
+  const rank = function (d) { return GRADE_RANK[((drills || {})[d.id] || {}).grade] || 0; };
+  const all = DRILLS.concat(ENCOUNTERS).map(rank), fights = ENCOUNTERS.map(rank);
+  const count = function (min) { return all.filter(function (g) { return g >= min; }).length; };
+  return { violet: true, ash: count(1) >= 1, fel: count(3) >= 1, ember: count(4) >= 3, frost: count(5) >= 1,
+           bone: fights.every(function (g) { return g >= 4; }), void: count(5) >= 5, gold: all.every(function (g) { return g >= 5; }) };
+}
 
 const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, opener: false };
 const FROM_SIM = 'Read-only: this comes from the Warlock SIM. To change it, change it there and bring the codes over with Import.';
@@ -73,7 +87,7 @@ function copyText(text, button) {
 }
 
 // handlers: onChallenge(challenge or null), onPreset(preset), onLatency(ms), onVolume(0..1), shareLink() -> address,
-//           fullLog() -> text, log(text, kind)
+//           fullLog() -> text, log(text, kind), onRobe(key), onUiScale(0.8..1.4)
 export function createExtras(WL, handlers) {
   let character = null, config = null, leftOut = [], challenge = null;
   function show() { return Object.assign({}, SHOW_DEFAULT, getSetting('show') || {}); }
@@ -279,6 +293,32 @@ export function createExtras(WL, handlers) {
       card.box.classList.toggle('on', running);
     });
     challengeButton.classList.toggle('on', !!challenge);
+    fillRobes();
+  }
+  // The robes: a card each with its colours, what it takes, and a button to put it on once it is yours.
+  const robeCards = {};
+  function hex(n) { return '#' + ('000000' + n.toString(16)).slice(-6); }
+  function wornRobe() { const key = getSetting('robe'), earned = robesEarned(getSetting('drills')); return earned[key] ? key : 'violet'; }
+  function fillRobes() {
+    const earned = robesEarned(getSetting('drills')), worn = wornRobe();
+    ROBES.forEach(function (r) {
+      let card = robeCards[r.key];
+      if (!card) {
+        const box = el('div', null, 'card robe'), head = el('h4'), swatch = el('i', null, 'swatch'), button = el('button');
+        swatch.style.background = 'linear-gradient(135deg, ' + hex(r.robe) + ' 0 50%, ' + hex(r.dark) + ' 50% 100%)';
+        swatch.style.borderColor = hex(r.trim);
+        head.append(el('span', r.name), swatch);
+        button.type = 'button';
+        button.addEventListener('click', function () { button.blur(); setSetting('robe', r.key); handlers.onRobe(r.key); fillRobes(); });
+        box.append(head, el('p', ROBE_HOW[r.key]), button);
+        byId('robes').appendChild(box);
+        card = robeCards[r.key] = { box: box, button: button };
+      }
+      card.button.textContent = !earned[r.key] ? 'Not earned yet' : r.key === worn ? 'Wearing it' : 'Wear';
+      card.button.disabled = !earned[r.key] || r.key === worn;
+      card.box.classList.toggle('on', r.key === worn);
+      card.box.classList.toggle('locked', !earned[r.key]);
+    });
   }
   challengeButton.addEventListener('click', function () { challengeButton.blur(); fillDrills(); challengeWindow.hidden = !challengeWindow.hidden; });
   byId('challengesClose').addEventListener('click', function () { challengeWindow.hidden = true; });
@@ -300,6 +340,21 @@ export function createExtras(WL, handlers) {
   });
   byId('challengeEnd').addEventListener('click', function () { handlers.onChallenge(null); });
   byId('btnCopyLog').addEventListener('click', function () { byId('btnCopyLog').blur(); copyText(handlers.fullLog(), byId('btnCopyLog')); });
+
+  // ---------- the screen: interface size, colour-blind colours ----------
+  const sizeBox = byId('uiScale'), sizeText = byId('uiScaleText'), colourBox = byId('swColorBlind');
+  function showSize(value) { sizeBox.value = String(Math.round(100 * value)); sizeText.textContent = Math.round(100 * value) + '%'; }
+  showSize(getSetting('uiScale') || 1);
+  sizeBox.addEventListener('input', function () {
+    const value = Math.max(80, Math.min(140, Number(sizeBox.value) || 100)) / 100;
+    sizeText.textContent = Math.round(100 * value) + '%';
+    setSetting('uiScale', value);
+    handlers.onUiScale(value);
+  });
+  sizeBox.addEventListener('change', function () { sizeBox.blur(); });
+  function applyColours() { document.documentElement.classList.toggle('cb', getSetting('colorBlind') === true); colourBox.checked = getSetting('colorBlind') === true; }
+  colourBox.addEventListener('change', function () { setSetting('colorBlind', colourBox.checked); colourBox.blur(); applyColours(); });
+  applyColours();
 
   // ---------- callouts ----------
   const calloutBox = byId('callout');
@@ -433,6 +488,14 @@ export function createExtras(WL, handlers) {
     // An event from the casting rules (only what the callouts need to know).
     event: function (e, combat) { if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t; },
     refreshDrills: fillDrills,
+    wornRobe: wornRobe,
+    // The names of robes your grades have earned since this was last asked (each is named once).
+    newRobes: function () {
+      const earned = robesEarned(getSetting('drills')), seen = getSetting('robesSeen') || ['violet'];
+      const fresh = ROBES.filter(function (r) { return earned[r.key] && seen.indexOf(r.key) < 0; });
+      if (fresh.length) { setSetting('robesSeen', seen.concat(fresh.map(function (r) { return r.key; }))); fillRobes(); }
+      return fresh.map(function (r) { return r.name; });
+    },
     show: show,
     // A challenge named in a share link ('drill:opener', 'encounter:fireDance', 'seed:word'): start it. False when
     // there is no such challenge.

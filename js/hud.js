@@ -75,7 +75,8 @@ export function createHud(WL, handlers) {
   // A key with its modifiers in full ("Shift+1", "Mouse 4"), and the short form that fits on a slot ("S-1", "M4").
   function labelFor(code) { return comboLabel(code, layout, false); }
   function slotLabel(code) { return comboLabel(code, layout, true); }
-  function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = slotLabel(codes[i]); }); }
+  let padLabels = null;                                    // while a controller is in use: what to press for each slot
+  function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = padLabels ? padLabels[i] || '' : slotLabel(codes[i]); }); }
 
   // With several dummies each gets a number after its name.
   function dummyName(ti) { return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : ''); }
@@ -99,9 +100,15 @@ export function createHud(WL, handlers) {
 
   // Desktop only, but keep the frames from overlapping in a small window.
   // On a touch screen the layout is made for a phone held either way: it is scaled by the short side.
+  // On a desktop "Interface size" (the bar on the right) makes everything smaller or bigger - bigger only as far as
+  // the window has room for the 1280 units the layout is made for.
+  let scale = 1;
   function fit() {
+    const room = Math.min(window.innerWidth / 1280, Math.max(1, window.innerHeight / 700));
     hud.style.zoom = String(isTouch ? Math.min(1.5, Math.max(0.8, Math.min(window.innerWidth, window.innerHeight) / 390))
-                                    : Math.min(1, Math.max(0.5, window.innerWidth / 1280)));
+                                    : Math.max(0.5, Math.min(scale, room)));
+    // The windows over the game and the tooltips follow your choice, but are never shrunk because the window is small.
+    document.documentElement.style.setProperty('--ui', String(isTouch ? 1 : scale > 1 ? Math.max(1, Math.min(scale, room)) : scale));
   }
   window.addEventListener('resize', fit);
   fit();
@@ -812,6 +819,9 @@ export function createHud(WL, handlers) {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
     setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound, setHint: setHint, setBest: setBest, setPull: setPull,
     labelFor: labelFor,
+    setScale: function (value) { scale = Math.max(0.8, Math.min(1.4, Number(value) || 1)); fit(); },
+    // labels: what to press on a controller for each slot (an array), or null to show the keys again.
+    setPadLabels: function (labels) { if (padLabels === labels) return; padLabels = labels; showKeyLabels(); },
     fullLog: function () { return everything.join('\n'); },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
     setBinds: function (map) { binds = map; if (character) showBinds(); },

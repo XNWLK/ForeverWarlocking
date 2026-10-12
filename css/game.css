@@ -110,6 +110,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .stack { display: grid; gap: 3px; }
 #side label.range { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 #side label.range input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; accent-color: var(--accent); }
+#side label.range b { flex: none; width: 34px; text-align: right; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--ink-dim); }
+.touch #uiScaleLabel { display: none !important; }        /* a phone's layout sets its own size */
 .stack button { text-align: left; }
 .seed { display: flex; gap: 4px; }
 .seed input { flex: 1; min-width: 0; }
@@ -393,6 +395,11 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .card small { font-size: 11px; color: var(--ink-dim); }
 .card button { align-self: flex-start; }
 .wide-card { max-width: 100%; }
+.card.robe h4 { align-items: center; }
+.swatch { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid; }
+.card.locked { opacity: 0.6; }
+.card button:disabled { cursor: default; color: var(--ink-dim); background: none; }
+.card-line { display: flex; gap: 6px; margin: 8px 0 0; }
 #challenges input { user-select: text; font: inherit; font-size: 12px; color: var(--ink); background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
 #challenges input:focus { outline: 1px solid var(--accent); }
 /* The timeline in the review: names on the left, the fight scrolling sideways on the right. */
@@ -556,6 +563,54 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 }
 .touch .review { max-height: calc(100% - 16px); -webkit-overflow-scrolling: touch; }
 .touch .review button { padding: 7px 12px; font-size: 13px; }
+
+/* --- Interface size: the windows over the game and the tooltips follow it (js/hud.js sets --ui) --- */
+.review { zoom: var(--ui, 1); width: min(640px, calc(92vw / var(--ui, 1))); max-height: calc(84vh / var(--ui, 1)); }
+.sheet { width: min(760px, calc(94vw / var(--ui, 1))); }
+#tip, #moveBanner { zoom: var(--ui, 1); }
+.touch .review { max-height: calc(100% - 16px); }
+
+/* --- Colour-blind colours: html gets the class "cb". Nothing is told apart by red against green alone; marks
+       that matter get a shape as well. Blue, orange, yellow and pink are the colours of the Okabe-Ito set. --- */
+.cb { --health: #009e73; --mana: #0072b2; --hostile: #d55e00; --bad: #f0b27a; }
+.cb .execute .bar.health i { background: #f0e442; }
+.cb .execute .bar.health button { color: #17101f; text-shadow: none; }
+.cb .bar.health.low i { background: #cc79a7; }
+.cb .castbar.channel i { background: #56b4e9; }
+.cb .castbar.interrupted { box-shadow: 0 0 0 2px #fff; }
+.cb .castbar.interrupted i { background: #7a3a00; }
+.cb .error-text, .cb .distance.far { color: #f0b27a; }
+.cb .dotbar i { background: rgba(204, 121, 167, 0.75); }
+.cb .dotbar.fire i { background: rgba(230, 159, 0, 0.8); }
+.cb .dotbar.now .dotbar-track { box-shadow: 0 0 0 2px #f0e442 inset; }
+.cb .dotbar.now b { color: #f0e442; }
+.cb .dotbar.now b::before { content: '! '; }
+.cb .dotbar.next .dotbar-track { box-shadow: none; outline: 1px dashed #fff; outline-offset: -1px; }
+.cb .sim-hint { box-shadow: 0 0 0 1px #56b4e9; }
+.cb .sim-hint b, .cb .rotation li.now, .cb .rotation li.now::before { color: #56b4e9; }
+.cb .slot.hint { border-color: #56b4e9; box-shadow: 0 0 0 2px #56b4e9 inset, 0 0 9px rgba(86, 180, 233, 0.6); outline: 2px dashed #fff; outline-offset: -6px; }
+.cb .opener i.right { box-shadow: 0 0 0 2px #56b4e9; }
+.cb .opener i.right::after { color: #56b4e9; }
+.cb .opener i.wrong { box-shadow: 0 0 0 2px #e69f00; outline: 1px dashed #fff; outline-offset: 2px; }
+.cb .opener i.wrong::after { color: #e69f00; }
+.cb .meter li i { background: rgba(204, 121, 167, 0.55); }
+.cb .meter li.fire i { background: rgba(230, 159, 0, 0.6); }
+.cb .meter li.pet i { background: rgba(86, 180, 233, 0.5); }
+.cb .plate, .cb .hostile .unit-name { color: #f3c08f; }
+.cb .plate.called .tag { border-color: #f0e442; box-shadow: 0 0 9px 1px #f0e442; }
+.cb .plate.called .tag::before { color: #f0e442; }
+.cb #moveBanner { background: rgba(120, 62, 0, 0.92); border-color: #e69f00; }
+.cb .review tr.behind td, .cb .review table.cost td:last-child { color: #f3c08f; }
+.cb .review tr.behind td:first-child::before { content: '\25BC  '; font-size: 9px; }
+.cb .tl-casts i.idle { background: repeating-linear-gradient(45deg, rgba(230, 159, 0, 0.55) 0 3px, transparent 3px 7px); box-shadow: 0 0 0 1px #e69f00 inset; }
+.cb .tl-casts i { background: #f0e442; }
+.cb .tl-casts i.chan { background: #56b4e9; }
+.cb .tl-casts i.stopped { background: #8a8a8a; }
+.cb .tl-aura i { background: #cc79a7; }
+.cb .tl-aura.fire i { background: #e69f00; }
+.cb .tl-aura i.clip, .cb .tl-aura.fire i.clip { background: #fff; }
+.cb .log li.miss { color: #9aa0b5; }
+.cb .float.miss { color: #cfe6ff; }
 
 /* --- Start-up failure ---------------------------------------------------- */
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }

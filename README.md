@@ -14,8 +14,13 @@ sim, with a timeline of what you cast and when, how your mana and Life Taps went
 early. You can import your own build and settings from the DPS sim, change
 the action bar and its keys (also with Shift, Ctrl or Alt, and mouse buttons), and set timed fights, movement phases
 and hits taken. A spell you start casting before the fight is a precast: the fight begins when it lands, and the sim
-is then measured with the same precast; a pull timer counts down to the pull. Challenges are graded against the sim: drills, scripted encounters and a seeded fight. Practice aids
-you can switch on: the sim's rotation, its next cast, DoT timers, mistake callouts. A link shares your setup.
+is then measured with the same precast; a pull timer counts down to the pull. The review also lists what your
+mistakes cost in DPS and charts your last results in the same fight; the meter races you against the sim and against
+your own best run. Challenges are graded against the sim: drills, scripted encounters (fire, barrages, target calls,
+adds that join mid-fight) and a seeded fight; good grades earn robes in other colours. Practice aids you can switch
+on: the sim's rotation, its next cast and why, an opener trainer, DoT timers, mistake callouts. A link shares your
+setup, and a finished fight can be saved as a picture. There is an interface size setting, colour-blind colours, and
+controller support.
 
 It uses the same spell values, talents and mechanics as
 **[Xn's Forever Warlock Sim](https://xnwlk.github.io/WarlockSIM/)**, the DPS simulator that plays a build thousands of
