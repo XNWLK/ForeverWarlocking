@@ -41,25 +41,29 @@ self.onmessage = function (e) {
   // its fights (each with other dice).
   // The review's timeline also shows what the sim cast in the first of those fights (job.seed: a seeded fight plays
   // it with the same dice as you).
-  var curve = null, casts = null, mana = null;
+  var curve = null, casts = null, mana = null, opener = null;
   try {
     var count = Math.max(1, Math.ceil(seconds)), sums = new Array(count + 1).fill(0), RUNS = 40;
     var taps = 0, tapMana = 0, endMana = 0, lowMana = 0, movingTaps = 0;       // the mana review: averages of these fights
+    var starts = {};                                                           // how each of these fights opened: its first 8 casts
     cfg.fight.duration = seconds;
     for (var n = 0; n < RUNS; n++) {
       var one = WL.simulateOnce(job.build, job.race, cfg, { seed: n === 0 && job.seed != null ? job.seed : 1000 + n * 7919, log: true });
       (one.log || []).forEach(function (line) { if (line.dmg > 0) sums[Math.min(count, Math.floor(line.t) + 1)] += line.dmg; });
       taps += one.lifeTaps || 0; tapMana += one.manaFromTaps || 0; endMana += one.endMana || 0; lowMana += isFinite(one.minMana) ? one.minMana : 0; movingTaps += one.movingTaps || 0;
-      if (n === 0) {
-        casts = (one.log || []).filter(function (line) { return line.type === 'cast' && !/^(summon:|demonicSacrifice|felDomination)/.test(line.spell); })
-          .map(function (line) { return { t: line.t, k: line.spell, d: line.channel || line.castTime || 0, ch: line.channel ? 1 : 0 }; });
-      }
+      var cast = (one.log || []).filter(function (line) { return line.type === 'cast' && !/^(summon:|demonicSacrifice|felDomination)/.test(line.spell); });
+      var first = cast.slice(0, 8).map(function (line) { return line.spell.replace(/^x\d:/, ''); }).join(' ');   // the spell, whichever dummy it went to
+      starts[first] = (starts[first] || 0) + 1;
+      if (n === 0) casts = cast.map(function (line) { return { t: line.t, k: line.spell, d: line.channel || line.castTime || 0, ch: line.channel ? 1 : 0 }; });
     }
     curve = [0];
     for (var i = 1; i <= count; i++) curve.push(curve[i - 1] + sums[i] / RUNS);
     var scale = curve[count] > 0 ? result.dps * seconds / curve[count] : 1;     // ends exactly where the average does
     curve = curve.map(function (v) { return v * scale; });
     mana = { taps: taps / RUNS, tapMana: tapMana / RUNS, end: endMana / RUNS, min: lowMana / RUNS, movingTaps: movingTaps / RUNS };
+    // The opener: the way most of these fights began (one fight alone may hold a miss, and so a spell cast twice).
+    var usual = Object.keys(starts).sort(function (a, b) { return starts[b] - starts[a]; })[0];
+    opener = usual ? usual.split(' ') : null;
   } catch (err) { curve = null; }
   // The sim's highest fight, for the faint line in the review's graph: the same fights again to find which one it
   // was, then that one with its log. It runs the sim's full time also when the fight ends on health, so that the line
@@ -82,5 +86,5 @@ self.onmessage = function (e) {
   var rows = {};
   Object.keys(result.bySpell).forEach(function (k) { rows[k] = { casts: result.bySpell[k].casts, dmg: result.bySpell[k].dmg }; });
   self.postMessage({ id: job.id, precast: job.precast || '', dps: result.dps, max: result.dpsMax, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, top: top, casts: casts, mana: mana });
+                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, top: top, casts: casts, mana: mana, opener: opener });
 };

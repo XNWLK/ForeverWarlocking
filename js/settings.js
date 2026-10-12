@@ -37,6 +37,19 @@ export function setSetting(key, value) {
   }
 }
 
+// Things that grow get a store of their own, so the settings stay small: 'history' (your last results per fight) and
+// 'curves' (the damage curve of your best per fight). Each is one object kept under its own name.
+const stores = {};
+export function getStore(name) {
+  if (!stores[name]) {
+    try { stores[name] = JSON.parse(window.localStorage.getItem(STORE_KEY.replace('settings', name))) || {}; } catch (e) { stores[name] = {}; }
+  }
+  return stores[name];
+}
+export function saveStore(name) {
+  try { window.localStorage.setItem(STORE_KEY.replace('settings', name), JSON.stringify(stores[name] || {})); } catch (e) { /* as above */ }
+}
+
 export const DUMMY_HEALTH_MIN = 100;
 export const DUMMY_HEALTH_MAX = 100000000;
 

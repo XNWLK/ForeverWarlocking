@@ -17,7 +17,9 @@ export const DRILLS = [
   { id: 'threeDummies', name: 'Three dummies', text: '90 seconds on three dummies: keep your DoTs on all of them.', targets: 3, fight: { timed: true, seconds: 90 } },
   { id: 'movement', name: 'Movement', text: 'Two minutes. Every 20 seconds you have to move for 5.', targets: 1, fight: { timed: true, seconds: 120, moveEvery: 20, moveDuration: 5 } },
   { id: 'underFire', name: 'Under fire', text: '90 seconds while you take a hit every 2 seconds.', targets: 1, fight: { timed: true, seconds: 90, hitEvery: 2 } },
-  { id: 'longHaul', name: 'Long haul', text: 'Five minutes on one dummy. Mana decides it.', targets: 1, fight: { timed: true, seconds: 300 } }
+  { id: 'longHaul', name: 'Long haul', text: 'Five minutes on one dummy. Mana decides it.', targets: 1, fight: { timed: true, seconds: 300 } },
+  { id: 'procs', name: 'Proc watch', text: 'Three minutes on three dummies in execute range: with DoTs on all of them Shadow Trance comes most often, and Decimation builds get theirs. The review says how fast you used each proc.',
+    targets: 3, fight: { timed: true, seconds: 180 }, executePct: 100, procs: true }
 ];
 // Presets: one click for a common fight. These do change your saved fight settings.
 export const PRESETS = [
@@ -29,7 +31,7 @@ export const PRESETS = [
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
 
-const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false };
+const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, opener: false };
 const FROM_SIM = 'Read-only: this comes from the Warlock SIM. To change it, change it there and bring the codes over with Import.';
 const TREES = [['affliction', 'Affliction'], ['demonology', 'Demonology'], ['destruction', 'Destruction']];
 const STATS = [
@@ -78,7 +80,7 @@ export function createExtras(WL, handlers) {
 
   // ---------- the switches ----------
   const rotationPanel = byId('rotationPanel'), race = byId('race');
-  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint') };
+  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint'), opener: byId('swOpener') };
   function applyShow() {
     const s = show();
     Object.keys(switches).forEach(function (k) { switches[k].checked = !!s[k]; });
@@ -350,6 +352,16 @@ export function createExtras(WL, handlers) {
 
   // ---------- the race against the sim ----------
   const raceYou = byId('raceYou'), raceSim = byId('raceSim'), raceText = byId('raceText');
+  const raceBestRow = byId('raceBestRow'), raceBestBar = byId('raceBest'), raceBestText = byId('raceBestText');
+  // Your best in this fight by fight second t: its damage curve ({ s: seconds, d: damage, n: seconds a point, c }),
+  // or only its average pace ({ pace }) for a best from before curves were kept. Past its own end it counts on at
+  // its average pace, as the sim does.
+  function bestAt(best, t) {
+    if (best.pace) return best.pace * t;
+    if (t >= best.s) return best.d / best.s * t;
+    const i = Math.floor(t / best.n), from = best.c[i] || 0, more = i + 1 < best.c.length;
+    return from + ((more ? best.c[i + 1] : best.d) - from) * (t - i * best.n) / (more ? best.n : Math.max(0.01, best.s - i * best.n));
+  }
   // The sim's damage by fight second t. Its curve ends when its own fight does (sim.seconds); in a fight on health
   // you may need longer, and from then on the sim is counted on at its average pace, so that the share shown here
   // ends at the review's (your DPS against the sim's) and not at "who filled the health pool".
@@ -365,23 +377,36 @@ export function createExtras(WL, handlers) {
     return curve[i] + (curve[i + 1] - curve[i]) * f;
   }
   let lastRace = '';
-  function showRace(combat, sim) {
-    const t = combat.fightSeconds(), mine = combat.result.total;
-    let text = '', you = 0, them = 0;
-    if (!sim || !sim.curve) text = 'The sim is still working out its fight';
+  // best: your best in this fight (see bestAt), or null when there is none yet.
+  function showRace(combat, sim, best) {
+    const t = combat.fightSeconds(), mine = combat.result.total, ready = !!(sim && sim.curve);
+    const theirs = ready ? simAt(sim, t) : 0, old = best ? bestAt(best, t) : 0;
+    // All bars are measured against the same length: the longest of the sim's whole fight, your best's whole fight,
+    // and where each of them stands right now.
+    const end = Math.max(ready ? sim.curve[sim.curve.length - 1] || 1 : 1, theirs, best && best.d ? best.d : 0, old, 1);
+    const you = Math.min(100, 100 * mine / end), them = Math.min(100, 100 * theirs / end), before = Math.min(100, 100 * old / end);
+    let text = '', bestText = '';
+    if (!ready) text = 'The sim is still working out its fight';
     else {
-      const theirs = simAt(sim, t), end = Math.max(sim.curve[sim.curve.length - 1] || 1, theirs), gap = mine - theirs;
-      you = Math.min(100, 100 * mine / end); them = Math.min(100, 100 * theirs / end);
+      const gap = mine - theirs;
       if (t <= 0) text = 'Starts when your first spell takes effect';
       else if (Math.abs(gap) < 0.5) text = 'Level with the sim';
       else text = (gap > 0 ? whole(gap) + ' ahead' : whole(-gap) + ' behind') + (theirs > 0 ? ' · ' + Math.round(100 * mine / theirs) + '% of the sim' : '');
     }
-    const id = text + '|' + you.toFixed(1) + '|' + them.toFixed(1);
+    if (best && t > 0) {
+      const gap = mine - old;
+      bestText = Math.abs(gap) < 0.5 ? 'Level with your best' : (gap > 0 ? whole(gap) + ' ahead of' : whole(-gap) + ' behind') + ' your best';
+    }
+    const id = text + '|' + bestText + '|' + you.toFixed(1) + '|' + them.toFixed(1) + '|' + before.toFixed(1) + '|' + !!best;
     if (id === lastRace) return;
     lastRace = id;
     raceText.textContent = text;
     raceYou.style.width = you.toFixed(1) + '%';
     raceSim.style.width = them.toFixed(1) + '%';
+    raceBestRow.hidden = !best;
+    raceBestBar.style.width = before.toFixed(1) + '%';
+    raceBestText.textContent = bestText;
+    raceBestText.hidden = !bestText;
   }
 
   return {
@@ -398,12 +423,12 @@ export function createExtras(WL, handlers) {
       if (!sheet.hidden && openTab) showSheet(openTab);
       lastRace = '';
     },
-    render: function (combat, now, sim) {
+    render: function (combat, now, sim, best) {
       clock = now;
       if (calloutUntil && now > calloutUntil) { calloutUntil = 0; calloutBox.classList.remove('show'); }
       const s = show();
       if (s.callouts && character) watchFight(combat, now);
-      if (s.race) showRace(combat, sim);
+      if (s.race) showRace(combat, sim, best);
     },
     // An event from the casting rules (only what the callouts need to know).
     event: function (e, combat) { if (e.type === 'consume') watch.consumed[e.key + e.target] = combat.state.t; },

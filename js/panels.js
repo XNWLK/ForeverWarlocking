@@ -1,5 +1,6 @@
 // The three panels that are more than a list: fight options, import from the DPS sim, and the review after a fight.
 import { drawTimeline } from './timeline.js';
+import { costs } from './cost.js';
 
 function byId(id) { return document.getElementById(id); }
 function whole(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -91,6 +92,7 @@ export function createPanels(handlers) {
         }
       }
       body.appendChild(line);
+      (c.notes || []).forEach(function (note) { body.appendChild(el('p', note, 'challenge-note')); });
     }
 
     const head = el('p', null, 'review-head');
@@ -142,6 +144,57 @@ export function createPanels(handlers) {
       body.appendChild(key);
     }
 
+    // What it cost you: what went wrong, each as the DPS it took, biggest first (js/cost.js).
+    const cost = costs(d);
+    if (cost) {
+      body.appendChild(el('h3', 'What it cost you'));
+      const behind = cost.gap != null && cost.gap > 0.5;
+      if (cost.rows.length) {
+        body.appendChild(table(['', 'What happened', 'About'], cost.rows.map(function (r) { return { cells: [r.what, r.detail, '\u2212' + whole(Math.max(1, r.dps)) + ' DPS'] }; })));
+        body.lastChild.classList.add('cost');
+        body.appendChild(el('p', (cost.gap == null ? 'Together about ' + whole(cost.total) + ' DPS.'
+          : behind ? 'Together about ' + whole(cost.total) + ' DPS. You were ' + whole(cost.gap) + ' DPS behind the sim; what the list does not cover is dice (crits, misses, procs) and the order of your casts.'
+          : 'Together about ' + whole(cost.total) + ' DPS - and you still beat the sim\'s average by ' + whole(-cost.gap) + '.') +
+          ' Estimates: a second without a cast is counted at what a second of your casting did in this fight (' + whole(cost.rate) + ' damage), a second without a DoT at its ticks less the cast it saves.', 'hint'));
+      } else {
+        body.appendChild(el('p', 'Nothing stands out: no time lost between casts to speak of, your DoTs were up as long as the sim\'s, and no ticks were cut off.' +
+          (behind ? ' The ' + whole(cost.gap) + ' DPS to the sim are dice (crits, misses, procs) and the order of your casts.' : ''), 'hint'));
+      }
+    }
+
+    // How you did the last times you played this very fight.
+    const past = d.history && d.history.list ? d.history.list : [];
+    if (past.length > 1 || (past.length === 1 && d.history.counted)) {
+      body.appendChild(el('h3', 'Your results in this fight'));
+      if (past.length === 1) body.appendChild(el('p', 'This is your first finished run of this fight. Play it again and a chart of your results builds up here.', 'hint'));
+      else {
+        const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), W = 600, H = 70, pad = 4;
+        const shown = past.slice(-20), high = Math.max.apply(null, shown.map(function (r) { return r[1]; })), low = Math.min.apply(null, shown.map(function (r) { return r[1]; }));
+        const floor = Math.max(0, low - (high - low) * 0.5 - high * 0.03), step = (W - 2 * pad) / Math.max(12, shown.length);   // a few results do not become a few very wide bars
+        svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'graph history-graph');
+        shown.forEach(function (r, i) {
+          const bar = document.createElementNS(NS, 'rect'), h = Math.max(2, (H - 2 * pad) * (r[1] - floor) / Math.max(1, high - floor)), last = i === shown.length - 1 && d.history.counted;
+          bar.setAttribute('x', (pad + i * step + step * 0.12).toFixed(1)); bar.setAttribute('width', (step * 0.76).toFixed(1));
+          bar.setAttribute('y', (H - pad - h).toFixed(1)); bar.setAttribute('height', h.toFixed(1)); bar.setAttribute('rx', '2');
+          bar.setAttribute('fill', last ? '#b98aff' : r[1] === high ? 'rgba(240,207,122,0.8)' : 'rgba(255,255,255,0.3)');
+          const title = document.createElementNS(NS, 'title');
+          title.textContent = whole(r[1]) + ' DPS, ' + new Date(r[0]).toLocaleString();
+          bar.appendChild(title);
+          svg.appendChild(bar);
+        });
+        body.appendChild(svg);
+        const before = d.history.counted ? past.slice(0, -1) : past, recent = before.slice(-5);
+        const mean = recent.reduce(function (sum, r) { return sum + r[1]; }, 0) / Math.max(1, recent.length), now = past[past.length - 1][1];
+        const key = el('p', null, 'graph-key');
+        if (d.history.counted) { const s = el('span', 'This fight: ' + whole(now) + ' DPS'); s.insertBefore(el('i'), s.firstChild); key.appendChild(s); }
+        const top = el('span', 'Your highest: ' + whole(high)); top.insertBefore(el('i', null, 'gold'), top.firstChild); key.appendChild(top);
+        key.appendChild(el('span', (recent.length === 1 ? 'The one before: ' : 'The ' + recent.length + ' before it, on average: ') + whole(mean) +
+          (d.history.counted ? ' (' + (now >= mean ? '+' : '\u2212') + whole(Math.abs(now - mean)) + ')' : '')));
+        key.appendChild(el('span', 'Oldest on the left, ' + shown.length + ' of your last runs' + (floor > 0 ? '; the bars start at ' + whole(floor) : '')));
+        body.appendChild(key);
+      }
+    }
+
     // The fight from left to right: your casts, the sim's, and when each DoT was up.
     if (d.record && d.record.casts.length) {
       body.appendChild(el('h3', 'Timeline'));
@@ -156,6 +209,7 @@ export function createPanels(handlers) {
     // How the fight was opened: a precast, and how close to the pull timer's zero you were.
     if (d.precast) notes.push(['Precast', (d.spells[d.precast] ? d.spells[d.precast].name : d.precast) + (k.first > 0.005 ? ', landed ' + k.first.toFixed(2) + ' s into the fight' : ', landed as the fight began'),
                               sim ? (sim.precast === d.precast ? 'the same spell, landing at 0 s' : 'not worked out with it yet') : '']);
+    if (d.opener) notes.push(['Your first ' + d.opener.of + ' casts', d.opener.text, 'its usual opener']);
     if (d.pull) notes.push(['Pull timer (' + d.pull.seconds + ' s)', d.pull.early > 0.005 ? 'you pulled ' + d.pull.early.toFixed(2) + ' s early'
                               : k.first != null ? 'your first spell took effect ' + k.first.toFixed(2) + ' s after the pull' : 'no spell cast yet', '']);
     notes.push(['Not casting', idle.toFixed(1) + ' s (' + pct(idle, d.seconds) + ' of the fight)', sim ? sim.idle.toFixed(1) + ' s' : '']);

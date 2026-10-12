@@ -3,6 +3,8 @@
 //           burns, you take a hit (your cast is pushed back).
 //   move  - you are made to move for a while: only instant spells work.
 //   hits  - a barrage: for a while you take a hit every so often.
+//   call  - a dummy is called out: switch to it. Nothing else happens; how fast you switched is kept for the review.
+//   add   - a dummy joins the fight, in the first place that is free (it waits for one if none is).
 // The rules of casting stay in combat.js: this file only says when you are made to move, calls combat.hit(), and
 // draws the fire. The sim cannot follow a script, so its number is for a fight of the same length with about as much
 // moving and as many hits, spread evenly (see simFight below).
@@ -17,7 +19,16 @@ function every(first, step, until, make) {
   return list;
 }
 
+// Which dummy is called when: never the one called before, and each about as often.
+const CALLS = [2, 3, 1, 3, 2, 1, 2, 3, 1, 2];
+
 export const ENCOUNTERS = [
+  { id: 'targetCalls', name: 'Target calls', targets: 3, fight: { timed: true, seconds: 120 },
+    text: 'Two minutes on three dummies. Every 12 seconds another dummy is called out: switch to it (Tab or a click) as fast as you can. The review says how fast you were.',
+    script: CALLS.map(function (n, i) { return { at: 6 + i * 12, call: n }; }) },
+  { id: 'adds', name: 'Reinforcements', targets: 3, fight: { timed: false, seconds: 120 }, healths: [60000, 12000, 12000], absent: [2, 3], simTargets: 1, simHealth: 96000,
+    text: 'A boss with 60,000 health. After 15, 45 and 75 seconds an add with 12,000 health joins it. It ends when everything is dead. The sim cannot do adds: it is measured on one dummy with the same total health.',
+    script: [{ at: 15, add: true }, { at: 45, add: true }, { at: 75, add: true }] },
   { id: 'fireDance', name: 'Fire dance', targets: 1, fight: { timed: true, seconds: 120 },
     text: 'Two minutes. Every 15 seconds fire lands where you stand: step out of it, or it pushes your casts back.',
     script: every(10, 15, 100, function (at) { return { at: at, fire: true }; }) },
@@ -47,7 +58,7 @@ export function simFight(encounter) {
 export function createEncounter(scene, handlers) {
   const patches = [];                                      // fire on the floor: { group, disc, ring, x, z, at, done, nextHit }
   let script = null, state = [], wasOver = false;
-  const out = { forced: false, banner: null };
+  const out = { forced: false, banner: null, called: 0 };  // called: the dummy that is called out right now (0 = none)
 
   function patch() {
     const group = new THREE.Group(), disc = new THREE.Mesh(new THREE.CircleGeometry(FIRE_RADIUS, 40), light(0xff5a1a, 0.2));
@@ -67,23 +78,23 @@ export function createEncounter(scene, handlers) {
   }
 
   function reset() {
-    state = (script || []).map(function () { return { started: false, hitsDone: 0 }; });
+    state = (script || []).map(function () { return { started: false, hitsDone: 0, reaction: null }; });
     patches.forEach(function (p) { p.live = false; p.group.visible = false; });
-    out.forced = false; out.banner = null; wasOver = false;
+    out.forced = false; out.banner = null; out.called = 0; wasOver = false;
   }
   function start(encounter) { script = encounter ? encounter.script : null; reset(); }
 
   // t: seconds into the fight (0 before it starts); player: { x, z }; combat: the casting rules; dt: seconds since
   // the last picture. Sets out.forced (you are made to move) and out.banner ({ text, soon } or null).
   function update(dt, time, player, combat) {
-    out.forced = false; out.banner = null;
+    out.forced = false; out.banner = null; out.called = 0;
     if (!script) return out;
     const S = combat.state, t = combat.fightSeconds();
     if (S.over || S.fightStart === null) {
       if (S.over && !wasOver) { wasOver = true; patches.forEach(function (p) { p.live = false; p.group.visible = false; }); }
       return out;
     }
-    let soon = null, soonIn = Infinity, inFire = false;
+    let soon = null, soonIn = Infinity, inFire = false, call = null;
     script.forEach(function (e, i) {
       const st = state[i], until = e.at - t;
       if (e.fire) {
@@ -98,6 +109,13 @@ export function createEncounter(scene, handlers) {
       } else if (e.move) {
         if (until > 0 && until <= WARN && until < soonIn) { soonIn = until; soon = 'Move in ' + until.toFixed(1); }
         if (until <= 0 && until > -e.move) { out.forced = true; out.banner = { text: 'Move!  ' + (e.move + until).toFixed(1), soon: false }; }
+      } else if (e.call) {
+        if (until <= 0) { st.started = true; call = { e: e, st: st }; }   // the latest call that has come is the one that counts
+      } else if (e.add) {
+        if (until > 0 && until <= WARN && until < soonIn) { soonIn = until; soon = 'An add in ' + until.toFixed(1); }
+        if (until <= 0 && !st.started) {
+          for (let ti = 2; ti <= combat.targetCount && !st.started; ti++) if (!combat.alive(ti) && combat.spawn(ti)) st.started = true;
+        }
       } else if (e.hits) {
         if (until > 0 && until <= WARN && until < soonIn) { soonIn = until; soon = 'Barrage in ' + until.toFixed(1); }
         if (until <= 0 && until > -e.hits - 0.01) {
@@ -127,10 +145,26 @@ export function createEncounter(scene, handlers) {
         if (t >= p.nextHit) { p.nextHit = t + 1; combat.hit(); }
       } else p.nextHit = Math.max(p.nextHit, t + 0.25);    // stepping back in costs you again almost at once
     });
+    if (call) {
+      out.called = call.e.call;
+      if (S.target === call.e.call) { if (call.st.reaction === null) call.st.reaction = Math.max(0, t - call.e.at); }
+      else if (call.st.reaction === null && !out.banner) out.banner = { text: 'Switch to dummy ' + call.e.call + '!', soon: false };
+    }
     if (inFire) out.banner = { text: 'Get out of the fire!', soon: false };
     else if (!out.banner && soon) out.banner = { text: soon, soon: true };
     return out;
   }
 
-  return { start: start, reset: reset, update: update, state: out };
+  // What the review says about a fight with target calls (null when the script has none, or none has come yet).
+  function notes() {
+    const calls = (script || []).map(function (e, i) { return e.call && state[i].started ? state[i] : null; }).filter(Boolean);
+    if (!calls.length) return null;
+    const made = calls.filter(function (st) { return st.reaction !== null; }).map(function (st) { return st.reaction; });
+    if (!made.length) return 'Target calls: ' + calls.length + ', and you followed none of them.';
+    const mean = made.reduce(function (a, b) { return a + b; }, 0) / made.length, slow = Math.max.apply(null, made), missed = calls.length - made.length;
+    return 'Target calls: ' + calls.length + '. You switched after ' + mean.toFixed(1) + ' s on average (slowest ' + slow.toFixed(1) + ' s)' +
+      (missed ? '; ' + (missed === 1 ? 'one call' : missed + ' calls') + ' you did not follow.' : '.');
+  }
+
+  return { start: start, reset: reset, update: update, state: out, notes: notes };
 }

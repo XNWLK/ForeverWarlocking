@@ -44,6 +44,9 @@ export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + k
 
 // opts: WL, build, raceKey, config, dummyHealth, targets (1-3), seed (optional), onEvent (optional),
 //       petMeleeRange (yards),
+//       healths: [h1, h2, h3] - a health pool per dummy instead of dummyHealth for all (optional),
+//       absent: [2, 3] - dummies that are not there when the fight starts; spawn(ti) brings one in (optional).
+//       Both are for scripted fights with adds; the engine has nothing like it, so the check never uses them.
 //       timedDuration: a fight of this many seconds instead of a health pool - health falls evenly with time (as in
 //       the engine) and the fight ends when the time is up,
 //       linearDuration: the same health model for the check script, with the clock running from the reset.
@@ -137,7 +140,9 @@ export function createCombat(opts) {
     };
     T = [null];
     for (let i = 1; i <= N; i++) {
-      T.push({ index: i, health: maxHealth, maxHealth: maxHealth, hpPct: 100, dead: false, dots: {}, deb: {}, brandCharges: 0 });
+      const pool = opts.healths && opts.healths[i - 1] > 0 ? opts.healths[i - 1] : maxHealth, gone = !!opts.absent && opts.absent.indexOf(i) >= 0;
+      // A dummy that is not there yet counts as down (every rule already leaves a dead target alone) until spawn(i).
+      T.push({ index: i, health: pool, maxHealth: pool, hpPct: 100, dead: gone, absent: gone, dots: {}, deb: {}, brandCharges: 0 });
       if (coeFromOthers && i === 1) T[i].deb.coe = Infinity;
     }
     S.targets = T;
@@ -835,6 +840,15 @@ export function createCombat(opts) {
     return tryCast(key, ctx);
   }
 
+  // A dummy joins the fight (or comes back after it fell) with full health and nothing on it.
+  function spawn(ti) {
+    const t = T[ti];
+    if (!t || !t.dead || S.over) return false;
+    t.dead = false; t.absent = false; t.health = t.maxHealth; t.hpPct = 100; t.dots = {}; t.deb = {}; t.brandCharges = 0;
+    emit({ type: 'spawn', target: ti });
+    return true;
+  }
+
   function setTarget(ti) {
     if (!T[ti] || S.target === ti) return false;
     S.target = ti;
@@ -990,7 +1004,8 @@ export function createCombat(opts) {
   // times cooldowns around Bane of Doom's explosion.
   // remaining: seconds the fight still lasts (Infinity when nobody knows).
   // Returns null when the list has nothing to cast, else { key, target, action (its line in the list, or null),
-  // racial (true = the sim would use the race's cooldown first) }.
+  // racial (true = the sim would use the race's cooldown first), why ('havoc', 'mana' or 'moving' for a cast that
+  // is not a line of the list), need (the spell the mana is for) }.
   function simWould(remaining) {
     if (S.over) return null;
     const standing = [];
@@ -1011,7 +1026,7 @@ export function createCombat(opts) {
     const wantsHavoc = standing.length >= 2 && !!table.baneOfHavoc && tv('baneOfHavoc') > 0;
     let mana = S.mana - (c ? c.cost : 0), shards = S.shards;
     if (c && SPELLS[c.key].shards && !c.decimation) shards -= SPELLS[c.key].shards;
-    if (wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false };
+    if (wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false, why: 'havoc' };
 
     const view = {
       t: at, remaining: remaining == null ? Infinity : remaining, cfg: cfg, build: build,
@@ -1057,7 +1072,7 @@ export function createCombat(opts) {
       if (k === 'lifeTap' && !canTap()) continue;          // a Life Tap the list would like but has no health for
       if (k && table[k] && fits(k) && affordable(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
     }
-    const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false };
+    const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false, why: found ? 'mana' : 'moving', need: found ? found.key : null };
     if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS && canTap() ? tap : null;
     if (found.key === 'lifeTap') return found;
     if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) || !canTap() ? null : tap;   // no health for the tap: it waits for a heal
@@ -1079,7 +1094,7 @@ export function createCombat(opts) {
     get pet() { return P; },
     get current() { return T[S.target]; },
     petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : 0; },
-    petCommand: petCommand, setTarget: setTarget, pull: pull, tapGain: tapGain,
+    petCommand: petCommand, setTarget: setTarget, spawn: spawn, pull: pull, tapGain: tapGain,
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },

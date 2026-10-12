@@ -6,7 +6,7 @@ import { makeWarlock } from './warlock.js';
 import { createControls } from './controls.js';
 import { createHud, ACTION_CODES, RACIAL_ICON } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
-import { getSetting, setSetting } from './settings.js';
+import { getSetting, setSetting, getStore, saveStore } from './settings.js';
 import { createPet } from './pets.js';
 import { createEffects, SPELL_FX } from './effects.js';
 import { createPanels } from './panels.js';
@@ -107,6 +107,10 @@ let challenge = null;
 let myCurve = [0];                                         // your damage by the end of each second of this fight (for the review's graph)
 let manaCurve = [], manaEnd = null;                        // your mana at the start of each second, and what was left when the fight ended
 let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
+let fightLogged = false;                                   // this fight is on the list of your results (once it has ended)
+let raceBest = null;                                       // your best in this fight, for the race in the meter: its damage curve, or just its pace
+// Procs you got and what became of them (the "Proc watch" drill): open = the one that is up, list = the ones before.
+let procLog = { open: null, list: [] };
 let prevCast = null, castStopped = false, humming = false, bannerKind = '';
 let keyCodes = ACTION_CODES.slice();
 
@@ -294,7 +298,48 @@ function fightKey() {
           code ? 's' + hash(code) : '', late ? 'l' + late : '',
           combat.state.precastKey ? 'p' + combat.state.precastKey : ''].join('|');   // a fight opened with a precast has its own best
 }
+// The name your results in this fight are kept under (the progress chart in the review, the curve of your best):
+// a fight you set up yourself by everything that changes its numbers, a challenge by itself, the build and the race.
+function resultKey() {
+  const b = character.build;
+  return challenge ? 'ch:' + challenge.share + '|' + (b.custom ? 'c' + hash(getSetting('buildCode')) : b.key) + '|' + character.raceKey : fightKey();
+}
+// A fight that ran to its end goes on the list of your results in this fight: [when, DPS], the last 30 of them.
+function noteResult() {
+  if (fightLogged || !combat.state.over) return;
+  const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
+  if (!(dps > 0)) return;
+  fightLogged = true;
+  const all = getStore('history'), key = resultKey(), list = all[key] || (all[key] = []);
+  list.push([Date.now(), Math.round(dps)]);
+  if (list.length > 30) list.splice(0, list.length - 30);
+  const keys = Object.keys(all), newest = function (k) { return all[k][all[k].length - 1][0]; };
+  if (keys.length > 200) keys.sort(function (a, b) { return newest(a) - newest(b); }).slice(0, keys.length - 200).forEach(function (k) { delete all[k]; });
+  saveStore('history');
+}
+// The name the curve of your best is kept under: the fight you set up, or the drill (whatever build you played it with,
+// like the drill's best itself). A seeded fight keeps no best.
+function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share : null) : fightKey(); }
+// Keeps the damage curve of a new best (at most 150 points, 80 fights), so that later runs can race it.
+function saveBestCurve() {
+  const key = bestKey(), seconds = combat.fightSeconds();
+  if (!key || !(seconds > 0)) return;
+  const all = getStore('curves'), step = Math.max(1, Math.ceil((myCurve.length - 1) / 150)), points = [];
+  for (let i = 0; i < myCurve.length; i += step) points.push(Math.round(myCurve[i]));
+  all[key] = { s: Math.round(seconds * 100) / 100, d: Math.round(combat.result.total), n: step, c: points, at: Date.now() };
+  const keys = Object.keys(all);
+  if (keys.length > 80) keys.sort(function (a, b) { return all[a].at - all[b].at; }).slice(0, keys.length - 80).forEach(function (k) { delete all[k]; });
+  saveStore('curves');
+}
 function showBest() {
+  const curveKey = bestKey(), curve = curveKey ? getStore('curves')[curveKey] || null : null;
+  if (challenge) {
+    const d = challenge.drill ? (getSetting('drills') || {})[challenge.id] : null;
+    raceBest = d ? curve || { pace: d.dps } : null;
+  } else {
+    const mine = (getSetting('bests') || {})[fightKey()];
+    raceBest = mine ? curve || { pace: mine.dps } : null;   // a best from before curves were kept: its average pace
+  }
   if (challenge) {
     const b = challenge.drill ? (getSetting('drills') || {})[challenge.id] : null;
     hud.setBest(b ? b.grade + ' \u00b7 ' + b.pct + '%' : '', b ? 'Your best in this challenge: ' + b.dps.toLocaleString('en-US') + ' DPS, ' + b.pct + '% of the sim' : 'No result yet in this challenge');
@@ -325,6 +370,7 @@ function settleBest() {
     const keys = Object.keys(all);
     if (keys.length > 300) keys.sort(function (a, b) { return all[a].at - all[b].at; }).slice(0, keys.length - 300).forEach(function (k) { delete all[k]; });
     setSetting('bests', all);
+    saveBestCurve();
     fightBest = { record: true, best: mine, previous: old };
   } else fightBest = { record: false, best: old, previous: null };
   showBest();
@@ -381,13 +427,23 @@ function challengeResult() {
     Math.round(dps).toLocaleString('en-US') + ' DPS · ' + pct + '% of the sim (' + out.grade + ')';
   if (challenge.drill) {
     const all = Object.assign({}, getSetting('drills')), old = all[challenge.id];
-    if (!old || pct > old.pct) { all[challenge.id] = { grade: out.grade, pct: pct, dps: Math.round(dps) }; setSetting('drills', all); out.record = true; extras.refreshDrills(); }
+    if (!old || pct > old.pct) { all[challenge.id] = { grade: out.grade, pct: pct, dps: Math.round(dps) }; setSetting('drills', all); out.record = true; extras.refreshDrills(); saveBestCurve(); }
     out.best = all[challenge.id];
     showBest();
   }
+  out.notes = [encounter.notes(), challenge.procs ? procNotes() : null].filter(Boolean);
   out.link = shareLink();
   challengeOut = out;
   return out;
+}
+// What became of your procs, for the review of the "Proc watch" drill.
+function procNotes() {
+  const used = procLog.list.filter(function (p) { return p.after != null; }), open = procLog.open;
+  const late = open && combat.state.t - open.at > 10 ? 1 : 0, lost = procLog.list.length - used.length + late, all = procLog.list.length + (open ? 1 : 0);
+  if (!all) return 'Procs: none came in this fight (Shadow Trance and Decimation; not every build has one).';
+  const mean = used.reduce(function (sum, p) { return sum + p.after; }, 0) / Math.max(1, used.length), slow = used.reduce(function (m, p) { return Math.max(m, p.after); }, 0);
+  return 'Procs: ' + all + '. ' + (used.length ? 'You used ' + used.length + ', after ' + mean.toFixed(1) + ' s on average (slowest ' + slow.toFixed(1) + ' s)' : 'You used none') +
+    (lost ? '; ' + lost + ' ran out or ' + (lost === 1 ? 'was' : 'were') + ' overwritten unused' : '') + (open && !late ? '; one was still up at the end' : '') + '.';
 }
 function showReview() {
   if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
@@ -396,6 +452,9 @@ function showReview() {
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     health: { min: combat.state.minHealth, max: character.stats.maxHealth },
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
+    table: combat.table, gcd: combat.gcd(),
+    history: { list: (getStore('history')[resultKey()] || []).slice(), counted: fightLogged },
+    opener: aids.openerResult(simResult, recorder.data()),
     pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
     mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
             tapHealth: combat.spells.lifeTap.healthCost || 0,
@@ -433,8 +492,8 @@ function askSimAverage() {
     }
     const fight = fightOptions(), simConfig = clone(config);
     if (challenge && challenge.sim) Object.assign(simConfig.fight, challenge.sim);   // an encounter: the even fight the sim plays instead
-    const job = { id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: targets,
-                  health: character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
+    const job = { id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: (challenge && challenge.simTargets) || targets,
+                  health: (challenge && challenge.simHealth) || character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
                   seed: challenge && challenge.seeded ? challenge.seed : null, precast: '' };
     simWorker.postMessage(job);
     // Then the same fight opened with each spell you could precast, so the right numbers are ready when you do.
@@ -466,6 +525,26 @@ function onCombatEvent(e) {
     showBest();
     if (e.key) hud.log('Precast: ' + combat.spells[e.key].name + '. The sim is measured with the same precast.', 'proc');
     return;
+  }
+  if (e.type === 'spawn') {                                // an add joins the fight (a scripted fight)
+    dummies[e.target].setDead(false);
+    boltsAt[e.target] = 0; deathWaiting[e.target] = false;
+    setColliders();
+    effects.ring(spot.set(SPOTS[e.target].x, 0.1, SPOTS[e.target].z), 0xb98aff, 0.4, 3.2, 0.7, false);
+    sound.play('warn');
+    hud.log(hud.dummyName(e.target) + ' joins the fight.', 'proc');
+    return;
+  }
+  if (e.type === 'proc' && (e.name === 'shadowTrance' || e.name === 'decimation')) {
+    if (procLog.open) procLog.list.push({ name: procLog.open.name });      // the one before was never used
+    procLog.open = { name: e.name, at: combat.state.t };
+  } else if (e.type === 'cast' && procLog.open) {
+    const o = procLog.open, fits = o.name === 'shadowTrance' ? WL.isShadowBolt(e.key) && !(e.castTime > 0) : e.key === 'soulFire';
+    if (fits) {
+      const after = combat.state.t - o.at;
+      procLog.list.push(after <= 10.05 ? { name: o.name, after: after } : { name: o.name });
+      procLog.open = null;
+    }
   }
   if (e.amount > 0 && (e.type === 'hit' || e.type === 'tick' || e.type === 'havoc')) {
     let second = Math.floor(combat.fightSeconds()) + 1;
@@ -540,6 +619,7 @@ function onCombatEvent(e) {
     if (e.last) manaEnd = combat.state.mana;               // what you had left: it keeps regenerating after the fight
     if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
     if (e.last) {
+      noteResult();
       const fight = combat, mine = settleBest(), drill = challengeResult();
       const better = (mine && mine.record && mine.previous) || (drill && drill.record);
       window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
@@ -591,6 +671,7 @@ function newCharacter() {
   const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
                           timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: petMeleeRange(config, build.pet),
+                          healths: challenge && challenge.healths, absent: challenge && challenge.absent,   // a scripted fight with adds
                           seed: challenge && challenge.seeded ? challenge.seed : undefined });   // a seeded fight rolls the same dice every time
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
@@ -611,12 +692,8 @@ function newCharacter() {
   encounter.start(challenge && challenge.encounter ? challenge : null);
   showBest();
 
-  // The dummies in the room, and what you cannot walk through.
-  colliders.length = fixedColliders;
-  for (let i = 1; i <= 3; i++) {
-    dummies[i].root.visible = i <= targets;
-    if (i <= targets) colliders.push({ x: SPOTS[i].x, z: SPOTS[i].z, r: dummies[i].radius });
-  }
+  // The dummies in the room (what you cannot walk through is set with every new fight: setColliders).
+  for (let i = 1; i <= 3; i++) dummies[i].root.visible = i <= targets;
 
   // Range rings around your target: your spell range (Destructive Reach included), Drain Life, the Succubus.
   if (rings) scene.remove(rings);
@@ -630,12 +707,20 @@ function newCharacter() {
   askSimAverage();
 }
 
+// What you cannot walk through: the room's own things and every dummy that is there right now.
+function setColliders() {
+  colliders.length = fixedColliders;
+  for (let i = 1; i <= targets; i++) if (!combat.state.targets[i].absent) colliders.push({ x: SPOTS[i].x, z: SPOTS[i].z, r: dummies[i].radius });
+}
+
 function resetFight() {
   combat.reset();
+  setColliders();
+  procLog = { open: null, list: [] };
   recorder.reset();
   encounter.reset();
   sound.stopCasting();
-  fightBest = null; challengeOut = null; prevCast = null; castStopped = false; humming = false; bannerKind = '';
+  fightBest = null; challengeOut = null; fightLogged = false; prevCast = null; castStopped = false; humming = false; bannerKind = '';
   myCurve = [0]; manaCurve = []; manaEnd = null;
   fightClock = 0;
   pull = null; pullInfo = null; pullNote = null;
@@ -830,7 +915,7 @@ function frame() {
   const player = controls.player;
   // A scripted fight says when you are made to move, lands its fire and its hits, and says what to show.
   const script = encounter.update(dt, time, player, combat);
-  ctx.forced = script.forced; ctx.banner = script.banner;
+  ctx.forced = script.forced; ctx.banner = script.banner; ctx.called = script.called;
   if (script.forced && !combat.state.over) combat.result.track.moved += Math.min(0.25, elapsed);
   const kind = script.banner ? script.banner.text.replace(/[\d.\s]+/g, '') : '';
   if (kind !== bannerKind) { bannerKind = kind; if (script.banner) sound.play(script.banner.soon ? 'warn' : 'move'); }
@@ -894,6 +979,7 @@ function frame() {
   warlock.root.rotation.y = player.yaw;
   warlock.update(dt, time, player.moving, player.height, school);
   for (let i = 1; i <= targets; i++) {
+    dummies[i].root.visible = !S.targets[i].absent;        // an add that has not joined yet
     dummies[i].update(dt, time);
     dummies[i].setSelected(i === S.target);
   }
@@ -942,15 +1028,15 @@ function frame() {
 
   for (let i = 1; i <= 3; i++) {
     const anchor = anchors[i];
-    if (i > targets) { anchor.visible = false; continue; }  // a dummy that is gone takes its damage numbers with it
+    if (i > targets || S.targets[i].absent) { anchor.visible = false; continue; }  // a dummy that is gone (or not there yet) takes its damage numbers with it
     head.copy(dummies[i].headAt).project(camera);
     anchor.visible = head.z < 1 && Math.abs(head.x) < 1.1 && Math.abs(head.y) < 1.1;
     anchor.x = (head.x * 0.5 + 0.5) * window.innerWidth;
     anchor.y = (-head.y * 0.5 + 0.5) * window.innerHeight;
   }
   hud.render(combat, ctx, time, anchors);
-  extras.render(combat, time, simResult);
-  aids.render(combat, time, extras.show(), simResult);
+  extras.render(combat, time, simResult, raceBest);
+  aids.render(combat, time, extras.show(), simResult, recorder);
 }
 renderer.setAnimationLoop(frame);
 
@@ -959,7 +1045,7 @@ window.FW = {
   extras: extras, get challenge() { return challenge; }, get myCurve() { return myCurve; },
   touch: touch, controls: controls, recorder: recorder, encounter: encounter, aids: aids, act: act, bound: bound, shareLink: shareLink, warlock: warlock,
   get keyCodes() { return keyCodes; }, binds: binds, togglePull: togglePull, get pull() { return pull; }, get pullInfo() { return pullInfo; },
-  get simResults() { return simResults; },
+  get simResults() { return simResults; }, get raceBest() { return raceBest; }, get procLog() { return procLog; },
   player: controls.player, view: controls.view, scene: scene, camera: camera, renderer: renderer, frame: frame,
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,

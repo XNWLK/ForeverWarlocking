@@ -132,7 +132,23 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .sim-hint { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: 11px; background: rgba(13, 7, 20, 0.72); box-shadow: 0 0 0 1px rgba(125, 255, 192, 0.4); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
 .sim-hint img { width: 16px; height: 16px; border-radius: 3px; }
 .sim-hint b { color: #7dffc0; font-weight: 600; }
+.sim-hint small { font-size: 11px; color: var(--ink-dim); }
+.touch .sim-hint small { display: none; }                  /* no room for the reason on a phone */
 .slot.hint { border-color: #7dffc0; box-shadow: 0 0 0 2px #7dffc0 inset, 0 0 9px rgba(125, 255, 192, 0.55); }
+
+/* The opener trainer: the sim's first casts in a row; yours tick them off. */
+.opener { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 15px; background: rgba(13, 7, 20, 0.72); box-shadow: 0 0 0 1px var(--line-bright); font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+.opener div { display: flex; gap: 4px; }
+.opener i { position: relative; display: block; width: 22px; height: 22px; border-radius: 4px; background: #1b1226 center / cover; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7); opacity: 0.55; }
+.opener i.next { opacity: 1; box-shadow: 0 0 0 2px #fff; }
+.opener i.right { opacity: 1; box-shadow: 0 0 0 2px #7dffc0; }
+.opener i.wrong { opacity: 1; box-shadow: 0 0 0 2px #ff5b4f; }
+.opener i.right::after, .opener i.wrong::after { position: absolute; right: -4px; bottom: -5px; font: 700 12px/1 "Segoe UI", system-ui, sans-serif; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.opener i.right::after { content: '\2713'; color: #7dffc0; }
+.opener i.wrong::after { content: '\2717'; color: #ff5b4f; }
+.opener b { color: var(--ink); font-weight: 600; }
+.touch .opener { position: absolute; left: var(--mid); bottom: calc(94px + var(--sb)); transform: translateX(-50%); }
+@media (orientation: portrait) { .touch .opener { bottom: calc(268px + var(--sb)); } }
 
 /* DoT timers: a stack of bars above your target's debuffs, growing upward. */
 #auraRow { position: relative; }
@@ -158,6 +174,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .race-row i { flex: 1; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, 0.5); overflow: hidden; }
 .race-row b { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--accent); }
 .race-row.sim b { background: rgba(255, 255, 255, 0.55); }
+.race-row.best b { background: var(--gold); }
+#raceBestText { color: var(--ink-dim); }
 .race p { margin: 0; font-size: 11px; color: var(--ink); }
 
 /* --- Bottom centre: cast bar, buffs and debuffs, the three frames, action bar --- */
@@ -295,6 +313,8 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .plate i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
 .plate.current { color: var(--gold); }
 .plate.current .tag { border-color: var(--gold); }
+.plate.called .tag { border-color: #ff6a5e; box-shadow: 0 0 9px 1px #ff6a5e; }       /* a scripted fight calls this dummy out */
+.plate.called .tag::before { content: '\25BC '; color: #ff6a5e; }
 .plate.dead { opacity: 0.45; }
 .plate.solo .tag { display: none; }
 .plate.solo { pointer-events: none; }
@@ -411,8 +431,16 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .graph-key i.mana { background: #6f9bff; }
 .graph-key i.tap { width: 2px; height: 10px; background: rgba(240, 207, 122, 0.8); }
 .mana-graph { height: 70px; }
+.history-graph { height: 70px; }
+.graph-key i.gold { background: rgba(240, 207, 122, 0.8); }
+/* "What it cost you": the middle column is the explanation and may wrap. */
+.review table.cost td:nth-child(2) { text-align: left; white-space: normal; color: var(--ink-dim); }
+.review table.cost th:nth-child(2) { text-align: left; }
+.review table.cost td:first-child { white-space: nowrap; }
+.review table.cost td:last-child { color: #ffb3a8; }
 .challenge-line { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: rgba(240, 207, 122, 0.1); font-size: 13px; }
 .challenge-line b { font-size: 26px; line-height: 1; color: var(--gold); }
+.challenge-note { margin: -4px 0 8px; font-size: 12px; color: var(--ink); }
 .challenge-line span { flex: 1; }
 
 /* --- Touch screens (phones, tablets without a mouse) ---------------------------------------------------------

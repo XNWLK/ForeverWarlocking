@@ -529,7 +529,7 @@ export function createHud(WL, handlers) {
     if (!nameButton.hidden) setText(nameButton, getName('dummy'));
 
     for (let i = 1; i <= 3; i++) {
-      const plate = plates[i], a = anchors && anchors[i], show = i <= c.targets && !!a && a.visible;
+      const plate = plates[i], a = anchors && anchors[i], show = i <= c.targets && !!a && a.visible && !S.targets[i].absent;
       if (plate.box.hidden !== !show) plate.box.hidden = !show;
       if (!show) continue;
       const t = S.targets[i], left = Math.round(a.x) + 'px', top = Math.round(a.y - 14) + 'px';
@@ -541,6 +541,7 @@ export function createHud(WL, handlers) {
       setWidth(plate.fill, 100 * t.health / t.maxHealth);
       setClass(plate.box, 'current', i === ti);
       setClass(plate.box, 'dead', t.dead);
+      setClass(plate.box, 'called', ctx.called === i);
     }
 
     const mana = Math.min(S.mana, c.stats.maxMana);
