@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "9293f2a",
-    "subject":  "Share link and Copy results",
+    "commit":  "d978a31",
+    "subject":  "Share link: a damaged link no longer leaves an uncaught error in the console",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-13 22:45",
+    "synced":  "2026-10-13 23:22",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
