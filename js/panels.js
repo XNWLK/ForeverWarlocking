@@ -35,11 +35,12 @@ export function createPanels(handlers) {
   }
 
   // ---------- import ----------
-  const buildBox = byId('importBuild'), settingsBox = byId('importSettings'), status = byId('importStatus');
-  byId('importApply').addEventListener('click', function () { handlers.onImport(buildBox.value.trim(), settingsBox.value.trim()); });
-  byId('importClear').addEventListener('click', function () { buildBox.value = ''; settingsBox.value = ''; handlers.onImport('', ''); });
-  function setImport(buildCode, settingsCode, lines, bad) {
-    buildBox.value = buildCode || ''; settingsBox.value = settingsCode || '';
+  const buildBox = byId('importBuild'), settingsBox = byId('importSettings'), linkBox = byId('importLink'), status = byId('importStatus');
+  byId('importApply').addEventListener('click', function () { handlers.onImport(buildBox.value.trim(), settingsBox.value.trim(), linkBox.value.trim()); });
+  byId('importClear').addEventListener('click', function () { buildBox.value = ''; settingsBox.value = ''; linkBox.value = ''; handlers.onImport('', '', ''); });
+  // link: a share link that could not be read stays in its box; one that was read has become the two codes above it.
+  function setImport(buildCode, settingsCode, lines, bad, link) {
+    buildBox.value = buildCode || ''; settingsBox.value = settingsCode || ''; linkBox.value = link || '';
     status.textContent = '';
     (lines || []).forEach(function (line) { status.appendChild(el('span', line)); status.appendChild(document.createElement('br')); });
     status.classList.toggle('bad', !!bad);

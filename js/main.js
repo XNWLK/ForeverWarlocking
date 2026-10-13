@@ -398,8 +398,29 @@ const panels = createPanels({
     if (config.fight.hitEvery) hud.log('You take a hit every ' + config.fight.hitEvery + ' s.');
   },
   // Codes from the DPS sim: a build (WFB1:...) and / or settings (WFS1:...). Empty = remove.
-  onImport: function (buildCode, settingsCode) {
-    const lines = [];
+  // link: a share link of the DPS sim instead (...#share=code) - it carries settings and maybe a build and a race.
+  // It is turned into the two codes (and the race is set), then everything goes on as if they had been pasted.
+  onImport: function (buildCode, settingsCode, link, first) {
+    if (link) {
+      const typed = { build: buildCode, settings: settingsCode }, self = this;
+      const fail = function (text) { panels.setImport(typed.build, typed.settings, ['Share link: ' + text], true, link); };
+      if (!WL.decodeShare) { fail('this copy of the sim cannot read share links.'); return; }
+      WL.decodeShare(WL.shareFromHash(link) || link).then(function (p) {
+        const cfg = clone(WL.DEFAULT_CONFIG), unknown = WL.applySettings(cfg, p.s || WL.settingsMerge(p.d)), said = ['its settings'];
+        let build = typed.build;
+        if (typeof p.b === 'string') {
+          if (WL.BUILDS.some(function (b) { return b.key === p.b; })) { setSetting('build', p.b); build = ''; said.push('the build ' + WL.BUILDS.filter(function (b) { return b.key === p.b; })[0].short); }
+          else said.push('a build that is not among the ready builds here (left out)');
+        } else if (p.b && typeof p.b === 'object') { build = WL.BUILD_CODE_PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(p.b)))); said.push('a build of its own'); }
+        if (p.r && WL.RACES[p.r] && WL.RACE_KEYS.indexOf(p.r) >= 0) { setSetting('race', p.r); said.push('the race ' + WL.RACES[p.r].name); }
+        const lines = ['Share link read: ' + said.join(', ') + '.'];
+        if (unknown.length) lines.push('Ignored (not in this copy of the sim): ' + unknown.join(', ') + '.');
+        if (p.d && p.f !== WL.defaultsMark()) lines.push('The link was made with another version of the sim: settings that were at their default then are at the defaults of this copy.');
+        self.onImport(build, WL.encodeSettings(cfg), '', lines);
+      }, function (e) { fail(e.message); });
+      return;
+    }
+    const lines = first || [];
     let bad = false, settingsInfo = null;
     if (settingsCode) {
       try { settingsInfo = WL.describeSettings(WL.decodeSettings(settingsCode)); }
