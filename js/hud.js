@@ -248,7 +248,7 @@ export function createHud(WL, handlers) {
   pullButton.addEventListener('click', function () { pullButton.blur(); handlers.onPull(); });
   function setPull(on) { if (pullButton.classList.contains('on') !== on) pullButton.classList.toggle('on', on); }
   // Top left: each button opens its address in a new tab.
-  document.querySelectorAll('#links button[data-link], #challengeBar button[data-link]').forEach(function (button) {
+  document.querySelectorAll('#links button[data-link]').forEach(function (button) {
     button.addEventListener('click', function () { button.blur(); window.open(button.dataset.link, '_blank', 'noopener'); });
   });
   const soundButton = byId('btnSound');
