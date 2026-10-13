@@ -180,6 +180,7 @@ export function createHud(WL, handlers) {
 
   editable(el.targetHealth, function () { return String(character ? character.dummyHealth : ''); }, function (value) {
     if (character && character.timed) { showError('This is a timed fight: change it under Fight'); return; }
+    if (character && character.endless) { showError('The dummies have infinite health: change it under Fight'); return; }
     const health = parseHealth(value);
     if (health === null) { showError('Health must be a number from 100 to 100,000,000'); return; }
     handlers.onDummyHealth(health);
@@ -564,7 +565,8 @@ export function createHud(WL, handlers) {
     if (combat.timed) {
       const left = combat.timeLeft();
       setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');
-    } else setText(el.targetHealth, amount(Math.ceil(cur.health), cur.maxHealth));
+    } else if (combat.endless) setText(el.targetHealth, 'Infinite health' + (cur.hpPct < 100 ? '  ·  ' + Math.round(cur.hpPct) + '%' : ''));
+    else setText(el.targetHealth, amount(Math.ceil(cur.health), cur.maxHealth));
     const phase = combat.movePhase(), banner = moveBanner;
     if (ctx.banner) { banner.hidden = false; setClass(banner, 'soon', !!ctx.banner.soon); setText(banner, ctx.banner.text); }   // a scripted fight says what is happening
     else if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
@@ -707,7 +709,10 @@ export function createHud(WL, handlers) {
   function setSimAverage(result) {
     simAverage = result;
     el.sim.textContent = result ? whole(result.dps) + ' DPS' : '\u2026';
-    el.sim.title = result ? 'The sim needs ' + result.seconds.toFixed(1) + ' s for the same total health (' + result.fights + ' fights)' : 'Calculating';
+    el.sim.title = !result ? 'Calculating'
+      : character && character.endless ? 'The sim\'s average over ' + (result.cut ? 'the first ' + result.seconds.toFixed(1) + ' s' : 'ten minutes') + ' on dummies with infinite health (' + result.fights + ' fights)'
+      : character && character.timed ? 'The sim over the same ' + result.seconds.toFixed(0) + ' s (' + result.fights + ' fights)'
+      : 'The sim needs ' + result.seconds.toFixed(1) + ' s for the same total health (' + result.fights + ' fights)';
   }
 
   // ---------- things that happen ----------
@@ -809,7 +814,7 @@ export function createHud(WL, handlers) {
       showError(e.text);
     } else if (e.type === 'death') {
       if (!e.last) { log(dummy + ' dies.', 'crit'); return; }
-      log((e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
+      log((e.stopped ? 'You end the fight. ' : e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
       if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
       log('Reset starts a new fight. "Review the fight" shows where the time went.');
     }

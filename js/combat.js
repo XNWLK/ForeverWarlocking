@@ -50,6 +50,9 @@ export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + k
 //       timedDuration: a fight of this many seconds instead of a health pool - health falls evenly with time (as in
 //       the engine) and the fight ends when the time is up,
 //       linearDuration: the same health model for the check script, with the clock running from the reset.
+//       endless: the dummies have infinite health - nothing takes it away, and the fight lasts until stop() is called;
+//       endlessPct: the health they stand at all the while (100, or a number under the execute threshold).
+//       The engine has no such fight, so the check never uses it.
 // From config.fight (as in the engine): moveEvery / moveDuration = every so many seconds you have to move for so
 //       long (only instants then); hitEvery = you take a hit every so many seconds, which pushes your casts back.
 // ctx (given to update, press and blocked): { moving, distances: [, d1, d2, d3] you to each target,
@@ -63,6 +66,7 @@ export function createCombat(opts) {
   const emit = opts.onEvent || function () {};
   const check = !!opts.linearDuration, timed = !check && !!opts.timedDuration;
   const linear = opts.linearDuration || opts.timedDuration || 0;
+  const endless = !linear && !!opts.endless, standPct = endless && opts.endlessPct > 0 ? Math.min(100, opts.endlessPct) : 100;
   const MOVE = cfg.fight.moveEvery > 0 && cfg.fight.moveDuration > 0 ? { every: cfg.fight.moveEvery, dur: cfg.fight.moveDuration } : null;
   const HIT = cfg.fight.hitEvery > 0 ? cfg.fight.hitEvery : 0;
   const AURA_PUSH = Object.keys(cfg.buffs || {}).reduce(function (a, k) { const b = cfg.buffs[k]; return a + (b.on && b.pushbackResistPct ? b.pushbackResistPct : 0); }, 0);
@@ -142,7 +146,7 @@ export function createCombat(opts) {
     for (let i = 1; i <= N; i++) {
       const pool = opts.healths && opts.healths[i - 1] > 0 ? opts.healths[i - 1] : maxHealth, gone = !!opts.absent && opts.absent.indexOf(i) >= 0;
       // A dummy that is not there yet counts as down (every rule already leaves a dead target alone) until spawn(i).
-      T.push({ index: i, health: pool, maxHealth: pool, hpPct: 100, dead: gone, absent: gone, dots: {}, deb: {}, brandCharges: 0 });
+      T.push({ index: i, health: pool * standPct / 100, maxHealth: pool, hpPct: standPct, dead: gone, absent: gone, dots: {}, deb: {}, brandCharges: 0 });
       if (coeFromOthers && i === 1) T[i].deb.coe = Infinity;
     }
     S.targets = T;
@@ -299,7 +303,7 @@ export function createCombat(opts) {
 
   function hurt(ti, amount) {
     res.byTarget[ti] += amount;
-    if (linear) return;
+    if (linear || endless) return;
     const t = T[ti];
     t.health = Math.max(0, t.health - amount);
     t.hpPct = 100 * t.health / t.maxHealth;
@@ -909,6 +913,17 @@ export function createCombat(opts) {
     emit({ type: 'death', target: S.target, last: true, timed: true, seconds: linear, total: res.total, dps: res.total / linear });
   }
 
+  // You end the fight yourself (an endless fight has no other end): the clock stops, everything stops.
+  function stop() {
+    if (S.over || S.fightStart === null) return false;
+    const seconds = S.t - S.fightStart;
+    S.over = true; S.fightEnd = S.t;
+    S.cast = null; S.channel = null; events.length = 0; queued = null; S.eurekaPending = 0;
+    if (P) { P.active = false; P.gen++; P.casting = null; }
+    emit({ type: 'death', target: S.target, last: true, timed: true, stopped: true, seconds: seconds, total: res.total, dps: seconds > 0 ? res.total / seconds : 0 });
+    return true;
+  }
+
   function handle(ev) {
     if (ev.type === 'castEnd') {
       const c = S.cast;
@@ -1100,7 +1115,7 @@ export function createCombat(opts) {
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },
     castTime: castTime, gcd: gcd, cost: effectiveCost, selfTick: selfTick, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
     alive: alive, havocOn: havocOn, eurekaUp: eurekaUp, executePhase: executePhase,
-    timed: timed, duration: linear,
+    timed: timed, duration: linear, endless: endless, stop: stop,
     // { moving, left } while you are made to move; { moving: false, next } = seconds until the next phase (null = none)
     movePhase: function () {
       if (!MOVE) return null;

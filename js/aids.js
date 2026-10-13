@@ -118,6 +118,7 @@ export function createAids(WL, handlers) {
     const S = combat.state;
     let remaining = Infinity;
     if (combat.timed) remaining = combat.timeLeft();
+    else if (combat.endless) remaining = Infinity;        // infinite health: nobody knows when it ends
     else if (sim && sim.dps > 0) {                         // about how long the dummies still last at the sim's pace
       let health = 0;
       for (let i = 1; i <= character.targets; i++) if (combat.alive(i)) health += S.targets[i].health;

@@ -21,15 +21,16 @@ export function createPanels(handlers) {
   function number(input, low, high) { const v = Number(input.value); return isFinite(v) ? Math.max(low, Math.min(high, v)) : low; }
   form.addEventListener('submit', function (e) {
     e.preventDefault();
+    const mode = form.elements.mode.value;
     handlers.onFight({
-      timed: form.elements.mode.value === 'timed',
+      timed: mode === 'timed', endless: mode === 'endless' ? 'full' : mode === 'execute' ? 'execute' : '',
       seconds: Math.round(number(field.seconds, 10, 1800)),
       moveEvery: number(field.moveEvery, 0, 600), moveDuration: number(field.moveDuration, 0, 60),
       hitEvery: number(field.hitEvery, 0, 60)
     });
   });
   function setFight(o) {
-    form.elements.mode.value = o.timed ? 'timed' : 'health';
+    form.elements.mode.value = o.endless === 'execute' ? 'execute' : o.endless ? 'endless' : o.timed ? 'timed' : 'health';
     field.seconds.value = o.seconds; field.moveEvery.value = o.moveEvery; field.moveDuration.value = o.moveDuration; field.hitEvery.value = o.hitEvery;
   }
 
@@ -47,7 +48,13 @@ export function createPanels(handlers) {
   // ---------- review ----------
   const review = byId('review'), body = byId('reviewBody');
   byId('reviewClose').addEventListener('click', function () { review.hidden = true; });
-  byId('btnReview').addEventListener('click', function () { handlers.onReview(); });
+  const reviewButton = byId('btnReview');
+  reviewButton.addEventListener('click', function () { reviewButton.blur(); handlers.onReview(); });
+  // ends = true while a fight with infinite health runs: the button is then what ends it.
+  function setReviewButton(ends) {
+    reviewButton.textContent = ends ? 'End the fight and review' : 'Review the fight';
+    reviewButton.title = ends ? 'The dummies have infinite health: this stops the clock and shows your result against the sim over the same time' : '';
+  }
 
   function table(head, rows) {
     const t = document.createElement('table'), thead = document.createElement('thead'), tr = document.createElement('tr');
@@ -354,14 +361,17 @@ export function createPanels(handlers) {
         body.appendChild(el('p', 'A DoT cast again before it has run out loses the ticks it had left; the new one starts counting afresh. The sim never does it: it starts a cast so that it lands as the old DoT ends, and recasts an instant one when it is gone. "Their damage" is those ticks at this fight\'s average tick - an estimate. Cutting a tick can still be right, before you have to move for example.', 'hint'));
       } else body.appendChild(el('p', 'None: no DoT was cast again while it still had ticks left.', 'hint'));
     }
-    body.appendChild(el('p', d.timed
+    body.appendChild(el('p', d.endless
+      ? 'The dummies had infinite health' + (d.endless === 'execute' ? ' and stood in execute range from the first second to the last' : ', so they never came into execute range') +
+        '. The sim\'s numbers are what its priority list had done by the same second on the same dummies, averaged over ' + (sim ? sim.fights : 'a number') + ' of its fights. Like you, it did not know when the fight would end.'
+      : d.timed
       ? 'The sim fought for the same length of time with its priority list, many times over; its numbers are averages.'
       : 'The sim fought until it had dealt the same total health with its priority list, many times over; its numbers are averages. Its pet attacks from the first second.', 'hint'));
     review.hidden = false;
   }
 
   return {
-    setFight: setFight, setImport: setImport, showReview: showReview,
+    setFight: setFight, setImport: setImport, showReview: showReview, setReviewButton: setReviewButton,
     hideReview: function () { review.hidden = true; },
     reviewOpen: function () { return !review.hidden; }
   };

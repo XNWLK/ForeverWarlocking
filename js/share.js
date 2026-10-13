@@ -4,7 +4,7 @@
 
 const NUMBER = /^\d+(\.\d+)?$/;
 
-// state: { build, race, dummies, health, fight: { timed, seconds, moveEvery, moveDuration, hitEvery }, latency,
+// state: { build, race, dummies, health, fight: { timed, seconds, endless, moveEvery, moveDuration, hitEvery }, latency,
 //          buildCode, settingsCode, challenge ('drill:opener' | 'encounter:fireDance' | 'seed:word' | '') }
 export function makeLink(state) {
   const p = new URLSearchParams(), f = state.fight || {};
@@ -12,7 +12,7 @@ export function makeLink(state) {
   if (state.build) p.set('build', state.build);
   if (state.race) p.set('race', state.race);
   p.set('dummies', String(state.dummies || 1));
-  p.set('fight', f.timed ? 't' + f.seconds : 'h' + state.health);
+  p.set('fight', f.endless ? (f.endless === 'execute' ? 'x' : 'e') : f.timed ? 't' + f.seconds : 'h' + state.health);   // e, x = infinite health (x: in execute range)
   if (f.moveEvery > 0 && f.moveDuration > 0) p.set('move', f.moveEvery + '-' + f.moveDuration);
   if (f.hitEvery > 0) p.set('hit', String(f.hitEvery));
   if (state.latency > 0) p.set('latency', String(state.latency));
@@ -34,11 +34,11 @@ export function readLink() {
   const out = { build: p.get('build') || '', race: p.get('race') || '', buildCode: p.get('bc') || '', settingsCode: p.get('sc') || '', challenge: p.get('play') || '' };
   const dummies = Number(p.get('dummies'));
   if (dummies >= 1 && dummies <= 3) out.dummies = Math.round(dummies);
-  const fight = p.get('fight') || '', amount = fight.slice(1);
-  if ((fight.charAt(0) === 't' || fight.charAt(0) === 'h') && NUMBER.test(amount)) {
-    out.fight = { timed: fight.charAt(0) === 't', seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
+  const fight = p.get('fight') || '', amount = fight.slice(1), endless = fight === 'e' ? 'full' : fight === 'x' ? 'execute' : '';
+  if (endless || ((fight.charAt(0) === 't' || fight.charAt(0) === 'h') && NUMBER.test(amount))) {
+    out.fight = { timed: fight.charAt(0) === 't', seconds: 120, endless: endless, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
     if (out.fight.timed) out.fight.seconds = Math.max(10, Math.min(1800, Math.round(Number(amount))));
-    else out.health = Math.max(100, Math.min(100000000, Math.round(Number(amount))));
+    else if (!endless) out.health = Math.max(100, Math.min(100000000, Math.round(Number(amount))));
     const move = (p.get('move') || '').split('-');
     if (move.length === 2 && NUMBER.test(move[0]) && NUMBER.test(move[1])) { out.fight.moveEvery = Math.min(600, Number(move[0])); out.fight.moveDuration = Math.min(60, Number(move[1])); }
     if (NUMBER.test(p.get('hit') || '')) out.fight.hitEvery = Math.min(60, Number(p.get('hit')));

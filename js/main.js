@@ -87,7 +87,7 @@ const touch = createTouch({
   jump: function () { controls.jump(); },
   cancel: function () { combat.cancel(); },
   nextTarget: function () { nextTarget(); },
-  review: function () { showReview(); },
+  review: function () { reviewOrEnd(); },
   helpSeen: function () { return getSetting('touchHelp') === true; },
   helpDone: function () { setSetting('touchHelp', true); }
 });
@@ -161,8 +161,10 @@ function buildConfig() {
   return cfg;
 }
 function fightOptions() {
-  const none = { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
-  return challenge ? Object.assign(none, challenge.fight) : Object.assign(none, getSetting('fight') || {});
+  const none = { timed: false, seconds: 120, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 };
+  const f = challenge ? Object.assign(none, challenge.fight) : Object.assign(none, getSetting('fight') || {});
+  if (f.endless) { f.endless = f.endless === 'execute' ? 'execute' : 'full'; f.timed = false; }   // infinite health: '' | 'full' | 'execute'
+  return f;
 }
 // Changing the fight by hand ends a drill or seeded fight.
 function leaveChallenge() { if (challenge) { challenge = null; hud.log('Challenge ended.'); } }
@@ -298,7 +300,7 @@ function shareLink() {
 function hash(text) { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36); }
 function fightKey() {
   const f = fightOptions(), b = character.build, code = getSetting('settingsCode'), late = Number(getSetting('latency')) || 0;
-  return [b.custom ? 'c' + hash(getSetting('buildCode')) : b.key, character.raceKey, targets, f.timed ? 't' + f.seconds : 'h' + character.dummyHealth,
+  return [b.custom ? 'c' + hash(getSetting('buildCode')) : b.key, character.raceKey, targets, f.endless ? 'e' + f.endless : f.timed ? 't' + f.seconds : 'h' + character.dummyHealth,
           f.moveEvery > 0 && f.moveDuration > 0 ? 'm' + f.moveEvery + '-' + f.moveDuration : '', f.hitEvery > 0 ? 'x' + f.hitEvery : '',
           code ? 's' + hash(code) : '', late ? 'l' + late : '',
           combat.state.precastKey ? 'p' + combat.state.precastKey : ''].join('|');   // a fight opened with a precast has its own best
@@ -311,7 +313,7 @@ function resultKey() {
 }
 // A fight that ran to its end goes on the list of your results in this fight: [when, DPS], the last 30 of them.
 function noteResult() {
-  if (fightLogged || !combat.state.over) return;
+  if (fightLogged || !combat.state.over || combat.endless) return;   // infinite health: you choose how long it lasts, so two of them do not compare
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
   if (!(dps > 0)) return;
   fightLogged = true;
@@ -324,7 +326,7 @@ function noteResult() {
 }
 // The name the curve of your best is kept under: the fight you set up, or the drill (whatever build you played it with,
 // like the drill's best itself). A seeded fight keeps no best.
-function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share : null) : fightKey(); }
+function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share : null) : combat.endless ? null : fightKey(); }
 // Keeps the damage curve of a new best (at most 150 points, 80 fights), so that later runs can race it.
 function saveBestCurve() {
   const key = bestKey(), seconds = combat.fightSeconds();
@@ -350,12 +352,13 @@ function showBest() {
     hud.setBest(b ? b.grade + ' \u00b7 ' + b.pct + '%' : '', b ? 'Your best in this challenge: ' + b.dps.toLocaleString('en-US') + ' DPS, ' + b.pct + '% of the sim' : 'No result yet in this challenge');
     return;
   }
+  if (combat.endless) { raceBest = null; hud.setBest('', 'A fight with infinite health keeps no best: you decide how long it lasts'); return; }
   const b = (getSetting('bests') || {})[fightKey()];
   hud.setBest(b ? b.dps.toLocaleString('en-US') + ' DPS' : '', b ? 'Your best in the fight that is set up now' + (b.pct ? ': ' + b.pct + '% of the sim' : '') : 'No result yet for the fight that is set up now');
 }
 // Once the fight is over: is this your best? Returns { record, best, previous } (null in a challenge or an empty fight).
 function settleBest() {
-  if (challenge || !combat.state.over) return null;
+  if (challenge || !combat.state.over || combat.endless) return null;
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
   if (!(dps > 0)) return null;
   const pct = simResult ? Math.round(100 * dps / simResult.dps) : 0;
@@ -389,7 +392,8 @@ const panels = createPanels({
     setSetting('fight', options);
     hud.closePanels();
     newCharacter();
-    hud.log(options.timed ? 'Timed fight: ' + options.seconds + ' s.' : 'The fight ends when the dummies are dead.', 'proc');
+    hud.log(options.endless ? 'The dummies have infinite health' + (options.endless === 'execute' ? ' and stand in execute range all the time' : '') + '. You end the fight yourself: "Review the fight" reads "End the fight and review" while it runs.'
+      : options.timed ? 'Timed fight: ' + options.seconds + ' s.' : 'The fight ends when the dummies are dead.', 'proc');
     if (config.fight.moveEvery) hud.log('You have to move every ' + config.fight.moveEvery + ' s for ' + config.fight.moveDuration + ' s.');
     if (config.fight.hitEvery) hud.log('You take a hit every ' + config.fight.hitEvery + ' s.');
   },
@@ -419,7 +423,7 @@ const panels = createPanels({
     if (!buildCode && !settingsCode) lines.push('Nothing imported: the ready builds with the default gear and buffs.');
     panels.setImport(getSetting('buildCode'), getSetting('settingsCode'), lines, bad);
   },
-  onReview: function () { showReview(); }
+  onReview: function () { reviewOrEnd(); }
 });
 
 // What a finished drill or seeded fight comes to: its grade against the sim, and a line to pass on.
@@ -459,7 +463,7 @@ function procNotes() {
 function fightWords() {
   if (challenge) return (challenge.encounter ? 'Encounter: ' : challenge.seeded ? '' : 'Drill: ') + challenge.name;
   const f = fightOptions();
-  return (targets === 1 ? '1 dummy' : targets + ' dummies') + '  \u00b7  ' + (f.timed ? f.seconds + ' s' : character.dummyHealth.toLocaleString('en-US') + ' health' + (targets > 1 ? ' each' : '')) +
+  return (targets === 1 ? '1 dummy' : targets + ' dummies') + '  \u00b7  ' + (f.endless ? 'infinite health' + (f.endless === 'execute' ? ', execute range' : '') : f.timed ? f.seconds + ' s' : character.dummyHealth.toLocaleString('en-US') + ' health' + (targets > 1 ? ' each' : '')) +
     (f.moveEvery > 0 && f.moveDuration > 0 ? '  \u00b7  moving ' + f.moveDuration + ' s every ' + f.moveEvery + ' s' : '') + (f.hitEvery > 0 ? '  \u00b7  a hit every ' + f.hitEvery + ' s' : '');
 }
 const CARD_NAMES = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Pet melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem',
@@ -484,6 +488,17 @@ function resultPicture(how, button) {
     copyCard(canvas).then(function (ok) { if (ok) say('Copied'); else { saveCard(canvas, file); say('Saved as a file instead'); } });
   });
 }
+// "Review the fight": a running fight with infinite health is ended by it. The sim is then asked what it had done by
+// that second, so that the review compares like with like (its numbers come in a moment later).
+function reviewOrEnd() {
+  if (!combat.endless || combat.state.over) { showReview(); return; }
+  combat.update(fightClock, ctx);
+  const seconds = combat.fightSeconds();
+  if (!(seconds > 0)) { hud.showError('Nothing to review yet: fight first'); return; }
+  askSimAverage(seconds);
+  combat.stop();
+  showReview();
+}
 function showReview() {
   if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
   panels.showReview({
@@ -499,12 +514,12 @@ function showReview() {
     mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
             tapHealth: combat.spells.lifeTap.healthCost || 0,
             rule: character.build.rotation.indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
-    timed: combat.timed, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
+    timed: combat.timed || combat.endless, endless: character.endless, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   });
 }
 
 // The DPS sim's average for this character on these dummies, worked out on another processor core.
-let simWorker = null, simJob = 0;
+let simWorker = null, simJob = 0, reviewEnds = false;
 // The spells of this character that can be cast before the fight so that they land as it begins.
 function precastChoices() {
   return (WL.PRECAST_SPELLS || []).filter(function (k) { return character.bar.indexOf(k) >= 0 && combat.table[k] && combat.table[k].cast > 0; });
@@ -517,8 +532,15 @@ function useSimResult() {
   hud.setSimAverage(next);
   if (panels.reviewOpen() && combat.fightSeconds() > 0) showReview();   // the review was waiting for these numbers
 }
-function askSimAverage() {
+// A fight with infinite health: while it runs, the sim's ten-minute fight on such dummies is what you are measured
+// against; ended (seconds = how long yours lasted), what the sim had done by that second of such a long fight (the
+// worker cuts it there: neither of you knew when the fight would end). The sim's health falls with time, so "never
+// in execute range" is an execute threshold of 0 for it, and "always" one above 100.
+const ENDLESS_SIM = 600;
+let simEnded = false;                                      // the sim's numbers are for a fight you ended, not for the next one
+function askSimAverage(seconds) {
   simResult = null; simResults = {};
+  simEnded = seconds > 0;
   hud.setSimAverage(null);
   try {
     if (!simWorker) {
@@ -532,9 +554,12 @@ function askSimAverage() {
     }
     const fight = fightOptions(), simConfig = clone(config);
     if (challenge && challenge.sim) Object.assign(simConfig.fight, challenge.sim);   // an encounter: the even fight the sim plays instead
+    if (fight.endless) simConfig.fight.executePct = fight.endless === 'execute' ? 101 : 0;
     const job = { id: ++simJob, build: clone(character.build), race: character.raceKey, config: simConfig, targets: (challenge && challenge.simTargets) || targets,
-                  health: (challenge && challenge.simHealth) || character.dummyHealth * targets, timed: fight.timed, seconds: fight.seconds,
+                  health: (challenge && challenge.simHealth) || character.dummyHealth * targets, timed: fight.timed || !!fight.endless,
+                  seconds: fight.endless ? (simEnded ? Math.max(ENDLESS_SIM, Math.ceil(seconds) + 120) : ENDLESS_SIM) : fight.seconds, cut: simEnded ? seconds : 0,
                   seed: challenge && challenge.seeded ? challenge.seed : null, precast: '' };
+    if (simEnded) { simWorker.postMessage(Object.assign(job, { precast: combat.state.precastKey || '' })); return; }   // the fight is over: only the way you opened it
     simWorker.postMessage(job);
     // Then the same fight opened with each spell you could precast, so the right numbers are ready when you do.
     precastChoices().forEach(function (k) { simWorker.postMessage(Object.assign({}, job, { precast: k })); });
@@ -663,7 +688,7 @@ function onCombatEvent(e) {
       const fight = combat, mine = settleBest(), drill = challengeResult();
       const better = (mine && mine.record && mine.previous) || (drill && drill.record);
       window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
-      window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself
+      if (!e.stopped) window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself (ended by you: it is open already)
     }
   }
 }
@@ -701,6 +726,7 @@ function standingBuffs(build, stats) {
 
 // Builds the character from the chosen build and race, sets up the dummies and starts a fresh fight.
 function newCharacter() {
+  simEnded = false;                                        // the sim is asked afresh at the end of this function
   const build = buildByKey(getSetting('build')) || startingBuild();
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
   warlock.setRace(raceKey);                                // the model takes the race's shape; the camera looks at its head
@@ -711,6 +737,7 @@ function newCharacter() {
   const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
                           timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: petMeleeRange(config, build.pet),
+                          endless: !!fight.endless, endlessPct: fight.endless === 'execute' ? (config.fight.executePct > 20 ? 20 : config.fight.executePct / 2) : 100,   // infinite health; "in execute range" = standing at 20%
                           healths: challenge && challenge.healths, absent: challenge && challenge.absent,   // a scripted fight with adds
                           seed: challenge && challenge.seeded ? challenge.seed : undefined });   // a seeded fight rolls the same dice every time
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
@@ -721,7 +748,7 @@ function newCharacter() {
   character = {
     build: build, raceKey: raceKey, stats: combat.stats, table: combat.table, spells: combat.spells, bar: bar,
     racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct, targets: targets,
-    builds: allBuilds(), timed: fight.timed,
+    builds: allBuilds(), timed: fight.timed, endless: fight.endless,
     maxRange: Math.max.apply(null, ranges.concat([0]))
   };
   character.standing = standingBuffs(build, combat.stats);
@@ -765,7 +792,7 @@ function resetFight() {
   fightClock = 0;
   pull = null; pullInfo = null; pullNote = null;
   hud.setPull(false);
-  useSimResult();                                          // back to the numbers without a precast
+  if (simEnded) askSimAverage(); else useSimResult();      // back to the numbers without a precast (after a fight you ended: the sim's long fight again)
   if (character) showBest();
   for (let i = 1; i <= 3; i++) { dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
   pet.sendHome();
@@ -1077,6 +1104,8 @@ function frame() {
     anchor.x = (head.x * 0.5 + 0.5) * window.innerWidth;
     anchor.y = (-head.y * 0.5 + 0.5) * window.innerHeight;
   }
+  const ends = combat.endless && !combat.state.over && combat.state.fightStart !== null;   // "Review the fight" is what ends a fight with infinite health
+  if (ends !== reviewEnds) { reviewEnds = ends; panels.setReviewButton(ends); }
   hud.render(combat, ctx, time, anchors);
   extras.render(combat, time, simResult, raceBest);
   aids.render(combat, time, extras.show(), simResult, recorder);
@@ -1094,7 +1123,7 @@ const gamepad = createGamepad({
   cancel: function () { combat.cancel(); },
   pet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); },
   reset: function () { resetFight(); hud.log('Fight reset.'); },
-  review: function () { if (panels.reviewOpen()) panels.hideReview(); else showReview(); },
+  review: function () { if (panels.reviewOpen()) panels.hideReview(); else reviewOrEnd(); },
   inUse: function () { hud.setPadLabels(PAD_LABELS); }       // the slots show what to press on the controller
 });
 // A key or a mouse button: the slots show the keys again.

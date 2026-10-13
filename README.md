@@ -12,7 +12,7 @@ damage meter that also shows what the DPS sim reaches on the same dummy. One, tw
 switching, Bane of Havoc, Rain of Fire and Hellfire. After a fight a review shows where you lost time against the
 sim, with a timeline of what you cast and when, how your mana and Life Taps went, and which DoTs you cast over too
 early. You can import your own build and settings from the DPS sim, change
-the action bar and its keys (also with Shift, Ctrl or Alt, and mouse buttons), and set timed fights, movement phases
+the action bar and its keys (also with Shift, Ctrl or Alt, and mouse buttons), and set timed fights, dummies with infinite health (also in execute range the whole time), movement phases
 and hits taken. A spell you start casting before the fight is a precast: the fight begins when it lands, and the sim
 is then measured with the same precast; a pull timer counts down to the pull. The review also lists what your
 mistakes cost in DPS and charts your last results in the same fight; the meter races you against the sim and against
