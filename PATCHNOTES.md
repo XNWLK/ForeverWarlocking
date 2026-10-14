@@ -4,6 +4,12 @@ What changed, newest first. The [page](https://xnwlk.github.io/ForeverWarlocking
 the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) mark a version now and then.
 
 ## Since v0.9.0
+
+### 2026-10-15
+- Brought up to date with the Warlock SIM. Its settings codes and share links can now also carry the items of its
+  new gear builder; Import takes the gear's numbers from them as before.
+
+### 2026-10-14
 - The page has a logo: a training dummy struck by a Shadow Bolt. It is the icon in the browser tab and stands at the
   start of the bar at the top left, in front of this project's GitHub button.
 

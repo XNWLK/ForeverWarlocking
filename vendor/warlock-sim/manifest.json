@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "d978a31",
-    "subject":  "Share link: a damaged link no longer leaves an uncaught error in the console",
+    "commit":  "f9abe0d",
+    "subject":  "Gear builder (under construction): character window, items add up into the stats",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-13 23:22",
+    "synced":  "2026-10-15 00:03",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
