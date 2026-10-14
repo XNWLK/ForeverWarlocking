@@ -1,3 +1,5 @@
+<img src="art/logo-400.png" alt="Forever Warlocking logo: a training dummy struck by a Shadow Bolt" width="128" align="right">
+
 # Forever Warlocking
 
 An interactive Warlock practice sim for WoW Forever: stand in front of a training dummy, press your spells in real
