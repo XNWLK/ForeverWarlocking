@@ -32,6 +32,8 @@ addon for WoW Forever that reads your own character (talents, race, demon and th
 and sims it. The build and settings codes it makes can be imported here, so you can practise the build you just
 simmed.
 
+What changed and when: the [patch notes](PATCHNOTES.md).
+
 ## Run it locally
 
 ```bash
