@@ -822,7 +822,7 @@ export function createHud(WL, handlers) {
 
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
-    setSimAverage: setSimAverage, floatFor: floatFor, setSound: setSound, setHint: setHint, setBest: setBest, setPull: setPull,
+    setSimAverage: setSimAverage, floatFor: floatFor, floats: function (now) { clock = now; moveFloats(now); }, setSound: setSound, setHint: setHint, setBest: setBest, setPull: setPull,
     labelFor: labelFor,
     setScale: function (value) { scale = Math.max(0.8, Math.min(1.4, Number(value) || 1)); fit(); },
     // labels: what to press on a controller for each slot (an array), or null to show the keys again.

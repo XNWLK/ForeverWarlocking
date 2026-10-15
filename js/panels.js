@@ -83,8 +83,20 @@ export function createPanels(handlers) {
     // A drill or seeded fight: its grade, and a line to pass on.
     if (d.challenge) {
       const c = d.challenge, line = el('div', null, 'challenge-line');
-      if (c.waiting) line.appendChild(el('span', c.name + ': the grade comes when the fight is over and the sim has its numbers.'));
-      else {
+      if (c.waiting) line.appendChild(el('span', c.name + ': the ' + (c.lesson ? 'result' : 'grade') + ' comes when the fight is over and the sim has its numbers.'));
+      else if (c.lesson) {
+        // A lesson: passed or not, what each check came to, and where to go from here.
+        line.classList.add('lesson-line');
+        line.appendChild(el('b', c.lesson.passed ? 'Passed' : 'Not yet', c.lesson.passed ? 'pass' : 'fail'));
+        line.appendChild(el('span', c.name + (c.lesson.passed ? (c.lesson.next ? ': passed. The next lesson is open.' : ': passed. That was the last lesson for this build.') : ': not passed yet.')));
+        [[c.lesson.next ? 'Next lesson' : '', c.lesson.next], ['Try again', c.lesson.again], ['All lessons', c.lesson.list]].forEach(function (b) {
+          if (!b[0]) return;
+          const button = el('button', b[0]);
+          button.type = 'button';
+          button.addEventListener('click', function () { button.blur(); review.hidden = true; b[1](); });
+          line.appendChild(button);
+        });
+      } else {
         line.appendChild(el('b', c.grade));
         line.appendChild(el('span', c.name + ': ' + c.pct + '% of the sim.' + (c.record ? ' A new best.' : c.best ? ' Your best: ' + c.best.grade + ' (' + c.best.pct + '%).' : '')));
         const copy = el('button', 'Copy the result');
@@ -100,6 +112,15 @@ export function createPanels(handlers) {
         }
       }
       body.appendChild(line);
+      if (c.lesson && !c.waiting) {
+        const checks = el('ul', null, 'lesson-checks');
+        c.lesson.rows.forEach(function (r) {
+          const li = el('li', null, r.ok ? 'ok' : 'bad');
+          li.append(el('i', r.ok ? '✓' : '✗'), el('span', r.label), el('b', r.value || ''));
+          checks.appendChild(li);
+        });
+        body.appendChild(checks);
+      }
       (c.notes || []).forEach(function (note) { body.appendChild(el('p', note, 'challenge-note')); });
     }
 
@@ -113,6 +134,13 @@ export function createPanels(handlers) {
     if (d.over && d.picture) {
       const row = el('p', null, 'card-line'), copy = el('button', 'Copy the result as a picture'), save = el('button', 'Save the picture');
       copy.type = save.type = 'button';
+      if (d.replay) {
+        const watch = el('button', 'Watch it again', 'watch');
+        watch.type = 'button';
+        watch.title = 'Plays the fight back in the room: you, your demon and the dummies as they were, with a slider to go to any moment';
+        watch.addEventListener('click', function () { watch.blur(); d.replay(); });
+        row.appendChild(watch);
+      }
       copy.title = 'A card with your name, build, race, the fight, your DPS and the damage curve, to paste into a chat';
       copy.addEventListener('click', function () { copy.blur(); d.picture('copy', copy); });
       save.addEventListener('click', function () { save.blur(); d.picture('save', save); });

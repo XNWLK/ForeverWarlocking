@@ -304,6 +304,15 @@ export function createPet(scene) {
   return {
     state: pet, setKind: setKind, update: update,
     strike: function () { if (pet.kind) models[pet.kind].strike(); },
-    sendHome: function () { placed = false; }
+    sendHome: function () { placed = false; },
+    // Watching a fight again: stands where the record says, walking or not (no path of its own).
+    place: function (x, z, yaw, moving, dt, time) {
+      if (!pet.kind) return;
+      pet.x = x; pet.z = z; pet.yaw = yaw; pet.moving = moving; placed = true;
+      const model = models[pet.kind];
+      model.root.position.set(x, 0, z);
+      model.root.rotation.y = yaw;
+      model.update(dt, time, moving, 0);
+    }
   };
 }

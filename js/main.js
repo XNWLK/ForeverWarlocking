@@ -21,6 +21,11 @@ import { createTouch, isTouch } from './touch.js';
 import { createGamepad, PAD_LABELS } from './gamepad.js';
 import { makeCard, copyCard, saveCard } from './card.js';
 import { getName } from './names.js';
+import { createGhost } from './ghost.js';
+import { createReplay } from './replay.js';
+import { judgeLesson } from './lessons.js';
+import { noteProgress } from './progress.js';
+import { costs } from './cost.js';
 
 const WL = window.WL;
 // A demon's melee reach in yards, from the Warlock data (the Succubus: 5). The data names none for the Felhunter and
@@ -65,6 +70,8 @@ const beam = makeBeam();
 scene.add(beam.mesh);
 const pet = createPet(scene);
 const effects = createEffects(scene);
+// The sim as a ghost beside you (a switch in the bar on the right): looks only.
+const ghost = createGhost(scene, makeWarlock, effects, window.WL, function (key) { return iconFor(key); });
 
 // Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
 const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
@@ -104,6 +111,8 @@ let codePrecast = '';                                      // the precast an imp
 let pull = null, pullInfo = null, pullNote = null;
 const sound = createSound(getSetting('sound') === true, getSetting('volume'));   // off until you switch it on (Xn)
 const recorder = createRecorder();                          // what happened when, for the review's timeline
+// Where everyone was and what happened, for watching the fight again afterwards (the review's "Watch it again").
+const replay = createReplay({ onClose: function () { endReplay(); }, onSeek: function () { seekReplay(); } });
 // A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
 // settings alone. null = your own settings.
 let challenge = null;
@@ -111,6 +120,7 @@ let myCurve = [0];                                         // your damage by the
 let manaCurve = [], manaEnd = null;                        // your mana at the start of each second, and what was left when the fight ended
 let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
 let fightLogged = false;                                   // this fight is on the list of your results (once it has ended)
+let progressDue = false;                                   // this fight goes on the Progress page once the sim's number is in
 let raceBest = null;                                       // your best in this fight, for the race in the meter: its damage curve, or just its pace
 // Procs you got and what became of them (the "Proc watch" drill): open = the one that is up, list = the ones before.
 let procLog = { open: null, list: [] };
@@ -324,6 +334,20 @@ function noteResult() {
   if (keys.length > 200) keys.sort(function (a, b) { return newest(a) - newest(b); }).slice(0, keys.length - 200).forEach(function (k) { delete all[k]; });
   saveStore('history');
 }
+// A fight that ran to its end goes on the Progress page: your share of the sim and what "What it cost you" lists,
+// each kind of mistake as a share of your DPS. Waits for the sim's number (progressDue).
+function noteProgressNow() {
+  if (!progressDue || !combat.state.over || !simResult) return;
+  progressDue = false;
+  const d = reviewData(), dps = d.seconds > 0 ? combat.result.total / d.seconds : 0;
+  if (!(dps > 0)) return;
+  const c = costs(d), m = {};
+  if (c) c.rows.forEach(function (r) { m[r.kind] = (m[r.kind] || 0) + 100 * r.dps / dps; });
+  Object.keys(m).forEach(function (k) { m[k] = Math.round(m[k] * 10) / 10; });
+  noteProgress({ b: character.lessonKey, n: character.build.short, r: character.raceKey, s: Math.round(d.seconds * 10) / 10, dps: Math.round(dps),
+                 f: challenge ? (challenge.lesson ? 'lesson' : challenge.daily ? 'daily' : challenge.seeded ? 'seed' : 'challenge') : 'own',
+                 pct: Math.round(100 * dps / simResult.dps), m: m });
+}
 // The name the curve of your best is kept under: the fight you set up, or the drill (whatever build you played it with,
 // like the drill's best itself). A seeded fight keeps no best.
 function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share : null) : combat.endless ? null : fightKey(); }
@@ -449,7 +473,7 @@ const panels = createPanels({
 
 // What a finished drill or seeded fight comes to: its grade against the sim, and a line to pass on.
 function challengeResult() {
-  if (!challenge || !combat.state.over || !simResult) return challenge ? { name: challenge.name, waiting: true } : null;
+  if (!challenge || !combat.state.over || !simResult) return challenge ? { name: challenge.name, waiting: true, lesson: !!challenge.lesson } : null;
   if (challengeOut) return challengeOut;
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0, pct = Math.round(100 * dps / simResult.dps);
   const out = { name: challenge.name, grade: gradeFor(pct), pct: pct, dps: dps };
@@ -461,7 +485,17 @@ function challengeResult() {
     out.best = all[challenge.id];
     showBest();
   }
-  out.notes = [encounter.notes(), challenge.procs ? procNotes() : null].filter(Boolean);
+  // A lesson: its checks decide whether it is passed (and the next one opens).
+  if (challenge.lesson) {
+    const verdict = judgeLesson(challenge.lesson, { res: combat.result, seconds: seconds, sim: simResult, procs: procSummary(), targets: targets });
+    if (verdict.waiting) return { name: challenge.name, waiting: true, lesson: true };
+    const lesson = challenge, next = verdict.passed ? extras.nextLesson(lesson) : null;
+    if (verdict.passed) extras.lessonPassed(lesson);
+    out.lesson = { passed: verdict.passed, rows: verdict.rows,
+                   again: function () { extras.startLesson(lesson); }, next: next ? function () { extras.startLesson(next); } : null, list: function () { extras.openLessons(); } };
+  }
+  const daily = challenge.daily ? extras.recordDaily(challenge, out) : null;   // today's fight: your result of the day and your streak
+  out.notes = [encounter.notes(), challenge.procs ? procNotes() : null, daily].filter(Boolean);
   const robes = challenge.drill ? extras.newRobes() : [];   // a grade may have earned you a robe
   if (robes.length) {
     out.notes.push((robes.length === 1 ? 'A new robe is yours: ' : 'New robes are yours: ') + robes.join(', ') + '. Put it on in the Challenges window.');
@@ -470,6 +504,13 @@ function challengeResult() {
   out.link = shareLink();
   challengeOut = out;
   return out;
+}
+// Your procs in numbers (for the lessons): how many came, how many you used, how fast on average, how many were wasted.
+function procSummary() {
+  const used = procLog.list.filter(function (p) { return p.after != null; }), open = procLog.open;
+  const late = open && combat.state.t - open.at > 10 ? 1 : 0;
+  return { all: procLog.list.length + (open ? 1 : 0), used: used.length, lost: procLog.list.length - used.length + late,
+           mean: used.length ? used.reduce(function (sum, p) { return sum + p.after; }, 0) / used.length : 0 };
 }
 // What became of your procs, for the review of the "Proc watch" drill.
 function procNotes() {
@@ -520,23 +561,28 @@ function reviewOrEnd() {
   combat.stop();
   showReview();
 }
-function showReview() {
-  if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
-  panels.showReview({
-    picture: resultPicture,
-    curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
+// What the review shows (and what "What it cost you" is worked out from).
+function reviewData() {
+  return {
     record: recorder.data(), icon: iconFor, racialName: character.racial ? character.racial.name : '', sameDice: !!(challenge && challenge.seeded),
     health: { min: combat.state.minHealth, max: character.stats.maxHealth },
     seconds: combat.fightSeconds(), result: combat.result, sim: simResult, spells: combat.spells, targets: targets,
-    table: combat.table, gcd: combat.gcd(),
-    history: { list: (getStore('history')[resultKey()] || []).slice(), counted: fightLogged },
-    opener: aids.openerResult(simResult, recorder.data()),
-    pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
+    table: combat.table, gcd: combat.gcd(), pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
     mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
             tapHealth: combat.spells.lifeTap.healthCost || 0,
             rule: character.build.rotation.indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
     timed: combat.timed || combat.endless, endless: character.endless, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
-  });
+  };
+}
+function showReview() {
+  if (!combat || combat.fightSeconds() <= 0) { hud.showError('Nothing to review yet: fight first'); return; }
+  const d = reviewData();
+  panels.showReview(Object.assign(d, {
+    picture: resultPicture, replay: combat.state.over && replay.has() ? startReplay : null,
+    curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
+    history: { list: (getStore('history')[resultKey()] || []).slice(), counted: fightLogged },
+    opener: aids.openerResult(simResult, d.record)
+  }));
 }
 
 // The DPS sim's average for this character on these dummies, worked out on another processor core.
@@ -551,6 +597,7 @@ function useSimResult() {
   if (next === simResult) return;
   simResult = next;
   hud.setSimAverage(next);
+  noteProgressNow();                                       // a fight that ended before the sim's number was in
   if (panels.reviewOpen() && combat.fightSeconds() > 0) showReview();   // the review was waiting for these numbers
 }
 // A fight with infinite health: while it runs, the sim's ten-minute fight on such dummies is what you are measured
@@ -640,7 +687,38 @@ function onCombatEvent(e) {
   }
   extras.event(e, combat);
   recorder.event(e, combat);
-  const ti = e.target || combat.state.target, dummy = dummies[ti], anchor = anchors[ti];
+  if (combat.state.fightStart !== null) replay.event(combat.fightSeconds(), e);
+  showLooks(e, false);
+  if (e.type === 'death' && e.last) {
+    manaEnd = combat.state.mana;                           // what you had left: it keeps regenerating after the fight
+    sampleReplay(true);
+    noteResult();
+    progressDue = !combat.endless;
+    noteProgressNow();
+    const fight = combat, mine = settleBest(), drill = challengeResult();
+    const better = (mine && mine.record && mine.previous) || (drill && drill.record);
+    window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
+    if (!e.stopped) window.setTimeout(function () { if (combat.state.over && !replay.state.active) showReview(); }, 1200);   // the review opens by itself (ended by you: it is open already)
+  }
+}
+
+// Shadow Trance and Decimation, made hard to miss (a switch): a word at the top, a chime, a strong glow on the button.
+const ALERTS = { shadowTrance: 'Shadow Trance: Shadow Bolt is instant', decimation: 'Decimation: Soul Fire is fast and free' };
+let alertTimer = 0;
+function procAlert(name) {
+  if (!ALERTS[name] || !extras.show().alerts) return false;
+  const box = document.getElementById('procAlert');
+  box.textContent = ALERTS[name];
+  box.classList.remove('show'); void box.offsetWidth; box.classList.add('show');
+  window.clearTimeout(alertTimer);
+  alertTimer = window.setTimeout(function () { box.classList.remove('show'); }, 1800);
+  return true;
+}
+
+// What you see and hear when something happens. again: the replay plays it once more (no log lines, no casting
+// hum; the dummies fall as its record says).
+function showLooks(e, again) {
+  const ti = e.target || (again ? 1 : combat.state.target), dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
   const rides = e.key === 'pet:brand' || e.key === 'pet:flametongue';   // extra damage that comes with the pet's own hit: no second strike, no second sound
   if (e.pet && lands && !rides) pet.strike();
@@ -648,14 +726,14 @@ function onCombatEvent(e) {
   // Sounds.
   if (e.type === 'cast') {
     if (e.key === 'lifeTap') sound.play('lifeTap');
-    else if (e.castTime > 0 || e.channel) {                // it sounds for as long as it lasts
+    else if ((e.castTime > 0 || e.channel) && !again) {    // it sounds for as long as it lasts
       sound.casting(castSound(e.key), e.channel || e.castTime);
       humming = true;
     }
   } else if (e.type === 'fail') sound.play('error');
   else if (e.type === 'interrupt') { castStopped = true; if (e.reason === 'moving' || e.reason === 'cancelled' || e.reason === 'health') sound.play('fizzle'); }
   else if (e.type === 'apply') sound.play(APPLY_SOUND[e.key]);
-  else if (e.type === 'proc') sound.play('proc');
+  else if (e.type === 'proc') sound.play(!again && procAlert(e.name) ? 'alert' : 'proc');
   else if (e.type === 'pushback') sound.play('pushback');
   else if (e.type === 'death') sound.play('death');
   else if (e.type === 'miss' && !e.pet) sound.play('miss');
@@ -674,7 +752,7 @@ function onCombatEvent(e) {
   }
 
   if (lands && fx && fx.bolt) {
-    hud.event(e, anchor, true);
+    if (!again) hud.event(e, anchor, true);
     if (e.pet) spot.set(pet.state.x, 0.65, pet.state.z); else spot.copy(staffAt);
     boltsAt[ti]++;
     effects.bolt(spot, dummy.chestAt, fx.bolt, function () {
@@ -686,7 +764,8 @@ function onCombatEvent(e) {
     return;
   }
 
-  hud.event(e, anchor);
+  if (!again) hud.event(e, anchor);
+  else if (e.type === 'hit' || e.type === 'tick' || e.type === 'miss') hud.floatFor(e, anchor);
   if (e.type === 'hit') {
     dummy.hit(e.pet ? 0.5 : e.crit ? 1.6 : 1);
     if (fx && fx.land) effects.play(fx.land, where);
@@ -702,15 +781,8 @@ function onCombatEvent(e) {
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
     effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2 * warlock.size, controls.player.z) });
   } else if (e.type === 'death') {
-    if (e.last) manaEnd = combat.state.mana;               // what you had left: it keeps regenerating after the fight
-    if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
-    if (e.last) {
-      noteResult();
-      const fight = combat, mine = settleBest(), drill = challengeResult();
-      const better = (mine && mine.record && mine.previous) || (drill && drill.record);
-      window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
-      if (!e.stopped) window.setTimeout(function () { if (combat.state.over) showReview(); }, 1200);   // the review opens by itself (ended by you: it is open already)
-    }
+    if (again) { if (!e.timed) effects.play('death', where); }
+    else if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
   }
 }
 
@@ -747,6 +819,7 @@ function standingBuffs(build, stats) {
 
 // Builds the character from the chosen build and race, sets up the dummies and starts a fresh fight.
 function newCharacter() {
+  endReplay(true);
   simEnded = false;                                        // the sim is asked afresh at the end of this function
   const build = buildByKey(getSetting('build')) || startingBuild();
   const raceKey = WL.RACES[getSetting('race')] && WL.RACE_KEYS.indexOf(getSetting('race')) >= 0 ? getSetting('race') : 'human';
@@ -770,7 +843,8 @@ function newCharacter() {
     build: build, raceKey: raceKey, stats: combat.stats, table: combat.table, spells: combat.spells, bar: bar,
     racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct, targets: targets,
     builds: allBuilds(), timed: fight.timed, endless: fight.endless,
-    maxRange: Math.max.apply(null, ranges.concat([0]))
+    maxRange: Math.max.apply(null, ranges.concat([0])),
+    lessonKey: build.custom ? 'c' + hash(getSetting('buildCode')) : build.key   // lessons and progress are kept per build
   };
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
@@ -802,13 +876,16 @@ function setColliders() {
 }
 
 function resetFight() {
+  endReplay(true);
   combat.reset();
+  replay.reset();
+  ghost.place();
   setColliders();
   procLog = { open: null, list: [] };
   recorder.reset();
   encounter.reset();
   sound.stopCasting();
-  fightBest = null; challengeOut = null; fightLogged = false; prevCast = null; castStopped = false; humming = false; bannerKind = '';
+  fightBest = null; challengeOut = null; fightLogged = false; progressDue = false; prevCast = null; castStopped = false; humming = false; bannerKind = '';
   myCurve = [0]; manaCurve = []; manaEnd = null;
   fightClock = 0;
   pull = null; pullInfo = null; pullNote = null;
@@ -835,7 +912,7 @@ function togglePull() {
 }
 
 function press(key) {
-  if (!key) return;
+  if (!key || replay.state.active) return;
   const late = Math.max(0, Number(getSetting('latency')) || 0), fight = combat;
   if (late > 0) { window.setTimeout(function () { if (combat === fight) { combat.update(fightClock, ctx); combat.press(key, ctx); } }, late); return; }
   combat.update(fightClock, ctx);
@@ -875,6 +952,10 @@ function bound(combo) { return !!combo && (keyCodes.indexOf(combo) >= 0 || ACTIO
 // Does what it is bound to. True when it was bound to something.
 function act(combo) {
   if (!combo) return false;
+  if (replay.state.active) {                               // watching a fight again: Escape stops it, other keys do nothing
+    if (combo === binds.cancel) { endReplay(); return true; }
+    return bound(combo);
+  }
   if (combo === binds.cancel) { combat.cancel(); return true; }
   if (combo === binds.nextTarget) { nextTarget(); return true; }
   if (combo === binds.petAttack) { combat.update(fightClock, ctx); combat.petCommand('attack'); return true; }
@@ -1000,6 +1081,7 @@ let areaPulse = 0, wasMoving = false;
 function frame() {
   const elapsed = clock.getDelta(), dt = Math.min(0.05, elapsed), time = clock.elapsedTime;
   watchSpeed(elapsed, time);
+  if (replay.state.active) { replayFrame(dt, time); return; }
 
   gamepad.poll(dt);
   controls.update(dt);
@@ -1062,6 +1144,7 @@ function frame() {
   const S = combat.state, casting = S.cast || S.channel;
   const school = casting ? combat.spells[casting.key].school : null;
   recorder.sample(combat, targets, mustMove || script.forced);
+  sampleReplay(false);
   // A cast that ended by itself (not stopped) goes off: the staff arm is thrust forward. The casting hum ends with it.
   if (prevCast && S.cast !== prevCast && !castStopped) warlock.release();
   prevCast = S.cast; castStopped = false;
@@ -1069,12 +1152,14 @@ function frame() {
   warlock.root.position.set(player.x, 0, player.z);
   warlock.root.rotation.y = player.yaw;
   warlock.update(dt, time, player.moving, player.height, school);
+  ghost.update(dt, time, ghostView(player, S.fightStart !== null ? combat.fightSeconds() : null));
   for (let i = 1; i <= targets; i++) {
     dummies[i].root.visible = !S.targets[i].absent;        // an add that has not joined yet
     dummies[i].update(dt, time);
     dummies[i].setSelected(i === S.target);
   }
   rings.position.set(SPOTS[S.target].x, 0, SPOTS[S.target].z);
+  rings.visible = getSetting('rings');
   chamber.update(time);
 
   // Spell looks: motes at the staff while casting, marks on the dummies for what is on them, bolts and bursts.
@@ -1133,6 +1218,108 @@ function frame() {
 }
 renderer.setAnimationLoop(frame);
 
+// What the ghost needs to know: where you stand, the second of the fight (null before it begins), the sim's casts.
+function ghostView(player, t) {
+  return { show: extras.show().ghost, race: character.raceKey, player: player, t: t, casts: simResult && simResult.casts, targets: targets, camera: camera,
+           spot: function (i) { return SPOTS[i]; }, chest: function (i) { return dummies[i].chestAt; } };
+}
+
+// ---------- watching the fight again ----------
+// While the fight runs: where everyone is, ten times a second (and once more as it ends).
+function sampleReplay(last) {
+  const S = combat.state;
+  if (S.fightStart === null || (S.over && !last)) return;
+  const player = controls.player, P = combat.pet, c = S.cast || S.channel, hp = [0], dead = [false], gone = [false];
+  for (let i = 1; i <= targets; i++) {
+    hp.push(S.targets[i].hpPct / 100);
+    dead.push(!!S.targets[i].dead && !combat.timed && !combat.endless);   // a timed fight ends on the clock: nobody falls
+    gone.push(!!S.targets[i].absent);
+  }
+  replay.sample(combat.fightSeconds(), last, {
+    x: player.x, z: player.z, yaw: player.yaw, h: player.height, mv: player.moving,
+    pet: P ? { x: pet.state.x, z: pet.state.z, yaw: pet.state.yaw, mv: pet.state.moving } : null,
+    hp: hp, dead: dead, gone: gone, mana: S.mana / character.stats.maxMana, dmg: combat.result.total,
+    cast: c ? { key: c.key, target: c.target, ch: S.channel ? 1 : 0, p: S.cast ? Math.min(1, (S.t - S.cast.start) / (S.cast.end - S.cast.start)) : 0.6 } : null
+  });
+}
+let replayDead = [false, false, false, false], replayAuras = {}, replaySaved = null;
+function startReplay() {
+  if (!replay.has() || !combat.state.over) { hud.showError('Nothing to watch yet: finish a fight first'); return; }
+  panels.hideReview(); touch.closeMenu(); hud.closePanels();
+  const p = controls.player;
+  replaySaved = { x: p.x, z: p.z, yaw: p.yaw, height: p.height };
+  replayAuras = recorder.data().auras;
+  replayDead = [false, false, false, false];
+  for (let i = 1; i <= 3; i++) dummies[i].setDead(false);
+  seekReplay();
+  sound.stopCasting();
+  replay.open(combat.fightSeconds());
+  ghost.place();
+}
+function seekReplay() {
+  effects.clear(); beam.hide();
+  for (let i = 1; i <= 3; i++) { boltsAt[i] = 0; deathWaiting[i] = false; }
+}
+// quiet: a new fight or character is on its way, so the review is not opened again.
+function endReplay(quiet) {
+  if (!replay.state.active) return;
+  replay.close();
+  const p = controls.player;
+  p.x = replaySaved.x; p.z = replaySaved.z; p.yaw = replaySaved.yaw; p.height = replaySaved.height;
+  seekReplay();
+  for (let i = 1; i <= targets; i++) dummies[i].setDead(!combat.timed && !combat.endless && combat.state.targets[i].dead);   // as the fight ended
+  ghost.place();
+  if (!quiet) showReview();
+}
+// The marks on dummy i (DoTs, curse, Havoc) at second t of the fight, from the review's record.
+function marksAt(i, t) {
+  const on = function (k) { return (replayAuras[i + ':' + k] || []).some(function (span) { return span[0] <= t && t < span[1]; }); };
+  return { immolate: on('immolate'), corruption: on('corruption'), siphonLife: on('siphonLife'), baneOfAgony: on('baneOfAgony'), baneOfDoom: on('baneOfDoom'), coe: on('coe'), havoc: on('baneOfHavoc') };
+}
+function replayFrame(dt, time) {
+  const R = replay.state;
+  replay.advance(dt).forEach(function (e) { showLooks(e, true); });
+  const s = replay.at(R.t), player = controls.player, cast = s.cast;
+  player.x = s.x; player.z = s.z; player.yaw = s.yaw; player.height = s.h;
+  controls.aim();                                          // the camera follows; the left mouse button still looks around
+  const spell = cast ? combat.spells[cast.key] : null;
+  warlock.root.position.set(s.x, 0, s.z);
+  warlock.root.rotation.y = s.yaw;
+  warlock.update(dt, time, s.mv, s.h, spell ? spell.school : null);
+  if (combat.pet && s.pet) pet.place(s.pet.x, s.pet.z, s.pet.yaw, s.pet.mv, dt, time);
+  for (let i = 1; i <= targets; i++) {
+    dummies[i].root.visible = !s.gone[i];
+    if (!!s.dead[i] !== replayDead[i]) { replayDead[i] = !!s.dead[i]; dummies[i].setDead(replayDead[i]); }
+    dummies[i].update(dt, time);
+    dummies[i].setSelected(false);
+  }
+  rings.visible = false;
+  chamber.update(time);
+  warlock.root.updateMatrixWorld();
+  if (cast) { const fx = SPELL_FX[cast.key]; effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, cast.p, time, player, dt); }
+  else effects.casting(null, 0, 0, time, player, dt);
+  for (let i = 1; i <= 3; i++) effects.setMarks(i, SPOTS[i], i <= targets && !s.dead[i] && !s.gone[i] ? marksAt(i, R.t) : {}, time);
+  if (cast && cast.ch && spell && !spell.aoe) {
+    beam.material.color.set(cast.key === 'wrack' ? 0xb07cff : 0x8dff9a);
+    beam.set(warlock.orbPosition(from), dummies[cast.target || 1].chestAt, time);
+  } else beam.hide();
+  effects.update(dt, camera.position);
+  ghost.update(dt, time, ghostView({ x: s.x, z: s.z, yaw: s.yaw, moving: s.mv }, R.t >= 0 ? R.t : null));
+  renderer.render(scene, camera);
+  for (let i = 1; i <= 3; i++) {
+    const anchor = anchors[i];
+    if (i > targets || s.gone[i]) { anchor.visible = false; continue; }
+    head.copy(dummies[i].headAt).project(camera);
+    anchor.visible = head.z < 1 && Math.abs(head.x) < 1.1 && Math.abs(head.y) < 1.1;
+    anchor.x = (head.x * 0.5 + 0.5) * window.innerWidth;
+    anchor.y = (-head.y * 0.5 + 0.5) * window.innerHeight;
+  }
+  hud.floats(time);
+  const seconds = Math.max(0, R.t);
+  replay.say((spell ? (cast.ch ? 'Channelling ' : 'Casting ') + spell.name : 'Not casting') + '  ·  ' +
+             Math.round(seconds > 0.5 ? s.dmg / seconds : 0).toLocaleString('en-US') + ' DPS so far  ·  mana ' + Math.round(100 * s.mana) + '%');
+}
+
 // ---------- a controller ----------
 const gamepad = createGamepad({
   walk: function (x, y) { controls.setPad(x, y); },
@@ -1160,5 +1347,6 @@ window.FW = {
   speed: speed, watchSpeed: watchSpeed, press: press, setTarget: setTarget, nextTarget: nextTarget, clickScene: clickScene,
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,
   get config() { return config; }, get simResult() { return simResult; },
+  ghost: ghost, replay: replay, startReplay: startReplay, endReplay: endReplay, reviewData: reviewData, procSummary: procSummary,
   get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
 };

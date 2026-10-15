@@ -6,6 +6,21 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-10-15
+- **Lessons** (a new button at the top left): a short series for the build you play, made from its rotation - never
+  stop casting, damage over time, curses and Banes, Demonic Brand, procs, cooldowns, mana and Life Tap, the whole
+  rotation. Each ends with a test, a short fight with a few things to reach; passing it opens the next lesson.
+- **Progress** (also at the top left): every fight you finish is counted per build. A chart of your share of the
+  sim's DPS day by day, your best, the last seven days against the seven before, and whether your mistakes from
+  "What it cost you" are getting smaller. Kept in your browser.
+- **Today's fight**, at the top of the Challenges window: a new fight every day, the same dice for everyone, with your
+  own build. Play it every day for a streak.
+- **The sim as a ghost** (a switch, on at first): a see-through Warlock a little to your right casts what the sim
+  casts at the same second, with the spell over its head.
+- **Proc alerts** (a switch, on at first): when Shadow Trance or Decimation comes up, a word at the top of the screen,
+  a chime and a strong glow on the button to press.
+- **Watch it again**: the review plays a finished fight back in the room - you, your demon and the dummies as they
+  were - with play, pause, speed and a slider to go to any moment.
+- The character sheet lists the items you wear when your imported settings come from the Warlock SIM's gear builder.
 - Brought up to date with the Warlock SIM. Its settings codes and share links can now also carry the items of its
   new gear builder; Import takes the gear's numbers from them as before.
 

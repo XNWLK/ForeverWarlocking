@@ -451,6 +451,71 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .challenge-note { margin: -4px 0 8px; font-size: 12px; color: var(--ink); }
 .challenge-line span { flex: 1; }
 
+/* --- Lessons, Progress, today's fight, the ghost, proc alerts, watching a fight again ------------------------ */
+/* Lessons: one card a lesson, a row each; its test under the text. */
+.lesson-cards { grid-template-columns: 1fr; }
+.card.lesson h4 b { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+.card.lesson.passed h4 b { color: #9fe0b4; }
+.card.lesson.passed h4 b::before { content: '\2713  '; }
+.card.lesson p { flex: none; }
+.lesson-test { font-size: 12px; color: var(--ink); padding: 6px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.25); }
+.lesson-test ul { margin: 4px 0 0; padding-left: 18px; color: var(--ink-dim); }
+.challenge-line.lesson-line b { font-size: 16px; }
+.challenge-line b.pass { color: #9fe0b4; }
+.challenge-line b.fail { color: #ffb3a8; }
+.lesson-checks { list-style: none; margin: -2px 0 10px; padding: 0; display: grid; gap: 3px; font-size: 12px; }
+.lesson-checks li { display: flex; align-items: baseline; gap: 8px; }
+.lesson-checks li i { flex: none; width: 14px; font-style: normal; font-weight: 700; }
+.lesson-checks li.ok i { color: #9fe0b4; }
+.lesson-checks li.bad i { color: #ff8478; }
+.lesson-checks li span { flex: 1; }
+.lesson-checks li b { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Today's fight: one wide card at the top of the Challenges window. */
+#daily { grid-template-columns: 1fr; }
+.card.daily .streak { color: var(--gold); }
+/* Progress: tiles with the headline numbers, the chart, the table of mistakes. */
+.progress-tabs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 10px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); }
+.tile b { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--ink); }
+.tile small { font-size: 11px; color: var(--ink-dim); }
+.progress-graph { height: auto; aspect-ratio: 600 / 170; }
+.progress-graph text.axis { font-size: 10px; fill: var(--ink-dim); }
+.graph-key i.range { height: 6px; background: rgba(185, 138, 255, 0.35); }
+.review table.progress-table td.trend { color: var(--ink-dim); }
+.review table.progress-table td.trend.good { color: #9fe0b4; }
+.review table.progress-table td.trend.bad { color: #ffb3a8; }
+.review table.progress-table td.trend.good::before { content: '\2193  '; }
+.review table.progress-table td.trend.bad::before { content: '\2191  '; }
+/* The items you wear, on the character sheet; their colour by quality, as in the game. */
+.sheet table.gear td.item { color: var(--ink); }
+.sheet table.gear td.q-uncommon { color: #4fd36a; } .sheet table.gear td.q-rare { color: #5b9dff; } .sheet table.gear td.q-epic { color: #b56bff; }
+.sheet table.gear td.q-legendary { color: #ff9a2e; } .sheet table.gear td.q-poor { color: #9d9d9d; }
+/* The ghost's name over its head, with what it casts and how far along it is. */
+.ghost-tag { position: absolute; transform: translate(-50%, -100%); display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 4px; padding: 2px 7px 4px; border-radius: 8px;
+  background: rgba(20, 12, 32, 0.55); color: #ddd0ff; font: 600 11px/1.2 "Segoe UI", system-ui, sans-serif; white-space: nowrap; pointer-events: none; box-shadow: 0 0 0 1px rgba(205, 184, 255, 0.25); }
+.ghost-tag b { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #b9a5ef; }
+.ghost-tag img { width: 14px; height: 14px; border-radius: 3px; opacity: 0.9; }
+.ghost-tag span { font-weight: 400; color: #eee6ff; }
+.ghost-tag i { grid-column: 1 / -1; display: block; height: 2px; border-radius: 1px; background: #cdb8ff; }
+/* Proc alerts: a word at the top of the screen, and a strong pulsing glow on the button to press. */
+.proc-alert { font-size: 18px; font-weight: 700; color: #ffe6a8; text-shadow: 0 1px 3px #000, 0 0 12px rgba(240, 207, 122, 0.7); opacity: 0; transform: scale(0.9); transition: opacity 0.4s, transform 0.4s; pointer-events: none; }
+.proc-alert:empty { display: none; }
+.proc-alert.show { opacity: 1; transform: scale(1); transition: opacity 0.08s, transform 0.12s; }
+@keyframes procGlow { 0%, 100% { box-shadow: 0 0 0 2px var(--gold) inset, 0 0 8px 2px var(--gold); } 50% { box-shadow: 0 0 0 2px #fff4cc inset, 0 0 18px 6px var(--gold); } }
+.alerts .slot.proc { border-color: #fff4cc; animation: procGlow 0.7s ease-in-out infinite; }
+/* Watching a fight again: the frames and bars step aside for the play bar. */
+.replaying #hud, .replaying .plate { display: none !important; }
+.replay-bar { position: fixed; z-index: 3; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(720px, calc(100vw - 32px)); box-sizing: border-box; display: grid; gap: 4px; zoom: var(--ui, 1); }
+.replay-row { display: flex; align-items: center; gap: 8px; }
+.replay-row input[type="range"] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+#replayTime { flex: none; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.speeds { display: flex; gap: 2px; }
+.speeds button { padding: 2px 6px; }
+#replayWhat { margin: 0; font-size: 12px; color: var(--ink-dim); text-align: center; }
+#replayPlay { min-width: 92px; }
+
 /* --- Touch screens (phones, tablets without a mouse) ---------------------------------------------------------
    html gets the class "touch" (js/touch.js). The same pieces as on a desktop, placed for thumbs: you and your
    target at the top, the stick bottom left, the spells in a grid bottom right, the cast bar between them, and one
@@ -561,6 +626,8 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
   .trees { grid-template-columns: 1fr; }
   .review { padding: 12px; }
   .challenge-line { flex-wrap: wrap; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .speeds { display: none; }
 }
 .touch .review { max-height: calc(100% - 16px); -webkit-overflow-scrolling: touch; }
 .touch .review button { padding: 7px 12px; font-size: 13px; }
@@ -612,6 +679,8 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .cb .tl-aura i.clip, .cb .tl-aura.fire i.clip { background: #fff; }
 .cb .log li.miss { color: #9aa0b5; }
 .cb .float.miss { color: #cfe6ff; }
+.cb .lesson-checks li.ok i, .cb .challenge-line b.pass, .cb .card.lesson.passed h4 b, .cb .review table.progress-table td.trend.good { color: #56b4e9; }
+.cb .lesson-checks li.bad i, .cb .challenge-line b.fail, .cb .review table.progress-table td.trend.bad { color: #e69f00; }
 
 /* --- Start-up failure ---------------------------------------------------- */
 #fatal { position: fixed; z-index: 40; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 480px; padding: 16px 20px; background: #2a1014; border: 1px solid var(--hostile); border-radius: 8px; color: #ffd9d5; font-size: 14px; text-align: center; }

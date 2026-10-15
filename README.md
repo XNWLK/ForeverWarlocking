@@ -17,9 +17,12 @@ and hits taken. A spell you start casting before the fight is a precast: the fig
 is then measured with the same precast; a pull timer counts down to the pull. The review also lists what your
 mistakes cost in DPS and charts your last results in the same fight; the meter races you against the sim and against
 your own best run. Challenges are graded against the sim: drills, scripted encounters (fire, barrages, target calls,
-adds that join mid-fight) and a seeded fight; good grades earn robes in other colours. Practice aids you can switch
-on: the sim's rotation, its next cast and why, an opener trainer, DoT timers, mistake callouts. A link shares your
-setup, and a finished fight can be saved as a picture. There is an interface size setting, colour-blind colours, and
+adds that join mid-fight), a seeded fight and a new fight every day for a streak; good grades earn robes in other
+colours. Lessons for each build explain its rotation step by step, each with a test that opens the next. A Progress
+page shows your share of the sim day by day and whether your mistakes are getting smaller, and the review can play a
+finished fight back in the room. Practice aids you can switch on: the sim as a see-through ghost beside you casting
+what it casts, the sim's rotation, its next cast and why, an opener trainer, DoT timers, proc alerts, mistake
+callouts. A link shares your setup, and a finished fight can be saved as a picture. There is an interface size setting, colour-blind colours, and
 controller support.
 
 It uses the same spell values, talents and mechanics as

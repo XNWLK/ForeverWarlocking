@@ -186,7 +186,12 @@ export function createControls(canvas, camera, world) {
       if (player.height <= 0) { player.height = 0; player.fall = 0; }
     }
 
-    // Camera: on a sphere around the character's head, pulled in when a wall, the floor or the ceiling is in the way.
+    aim();
+  }
+
+  // Camera: on a sphere around the character's head, pulled in when a wall, the floor or the ceiling is in the way.
+  // Also called alone while a fight is watched again (the record moves the character, not the keys).
+  function aim() {
     const yaw = player.yaw + view.offset, flat = Math.cos(view.pitch);
     target.set(player.x, eyeHeight + player.height, player.z);
     dir.set(Math.sin(yaw) * flat, Math.sin(view.pitch), Math.cos(yaw) * flat);
@@ -203,7 +208,7 @@ export function createControls(canvas, camera, world) {
   }
 
   return {
-    player: player, view: view, update: update, reset: reset, zoom: zoom,
+    player: player, view: view, update: update, aim: aim, reset: reset, zoom: zoom,
     setEyeHeight: function (height) { if (height > 0) eyeHeight = Math.max(0.6, Math.min(2.6, height)); },
     setStick: function (x, y) { stick.x = x; stick.y = y; },
     setPad: function (x, y) { pad.x = x; pad.y = y; },

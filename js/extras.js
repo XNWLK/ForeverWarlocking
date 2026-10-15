@@ -2,14 +2,16 @@
 //   - the rotation panel (what the sim plays), the race against the sim, mistake callouts;
 //   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM;
 //   - latency, fight presets, the volume, a link to share, and copying the combat log.
-// Challenges (drills, scripted encounters and the seeded fight) have a window of their own, opened by the gold
-// button on the left.
+// Challenges (today's fight, drills, scripted encounters and the seeded fight), Lessons and Progress have windows of
+// their own, opened by the buttons on the left.
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
 import { setTip } from './tooltip.js';
 import { ACTION_SPELLS } from './combat.js';
 import { ENCOUNTERS, simFight } from './encounter.js';
 import { ROBES } from './warlock.js';
+import { lessonsFor } from './lessons.js';
+import { drawProgress } from './progress.js';
 
 // Drills: short fights with one thing to practise. They do not change your saved fight settings.
 export const DRILLS = [
@@ -22,6 +24,38 @@ export const DRILLS = [
   { id: 'procs', name: 'Proc watch', text: 'Three minutes on three dummies in execute range: with DoTs on all of them Shadow Trance comes most often, and Decimation builds get theirs. The review says how fast you used each proc.',
     targets: 3, fight: { timed: true, seconds: 180 }, executePct: 100, procs: true }
 ];
+// Today's fight: one a day, the same for everyone (the dice are fixed by the date), with your own build. The kind of
+// fight changes from day to day in this order. A day is a day in UTC, so it changes at the same moment everywhere.
+const DAILY = [
+  { text: 'Two minutes on one dummy.', targets: 1, fight: { timed: true, seconds: 120 } },
+  { text: 'Ninety seconds on three dummies.', targets: 3, fight: { timed: true, seconds: 90 } },
+  { text: 'Two and a half minutes on one dummy; every 25 seconds you have to move for 4.', targets: 1, fight: { timed: true, seconds: 150, moveEvery: 25, moveDuration: 4 } },
+  { text: 'Two minutes on two dummies.', targets: 2, fight: { timed: true, seconds: 120 } },
+  { text: 'Two minutes on one dummy while you take a hit every 3 seconds.', targets: 1, fight: { timed: true, seconds: 120, hitEvery: 3 } },
+  { text: 'One minute on a dummy that is in execute range from the first second.', targets: 1, fight: { timed: true, seconds: 60 }, executePct: 100 },
+  { text: 'Three minutes on one dummy.', targets: 1, fight: { timed: true, seconds: 180 } }
+];
+const DAY = 86400000;
+function dayKey(offset) { return new Date(Date.now() + (offset || 0) * DAY).toISOString().slice(0, 10); }   // 'YYYY-MM-DD' in UTC
+function dayWords(key) { return new Date(key + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }); }
+export function dailyFor(key) {
+  const v = DAILY[Math.floor(Date.parse(key + 'T00:00:00Z') / DAY) % DAILY.length];
+  return { id: 'daily', daily: true, seeded: true, day: key, name: 'Today\'s fight (' + dayWords(key) + ')', word: key, seed: Number(key.replace(/-/g, '')),
+           targets: v.targets, fight: Object.assign({}, v.fight), executePct: v.executePct, share: 'daily:' + key,
+           text: v.text + ' Everyone has the same dice today.' };
+}
+// Days in a row with today's fight played: up to today, or up to yesterday while today is still open. And the longest.
+function streaks(days) {
+  let now = 0;
+  for (let d = days[dayKey(0)] ? 0 : 1; days[dayKey(-d)]; d++) now++;
+  let longest = 0, run = 0, prev = null;
+  Object.keys(days).sort().forEach(function (k) {
+    run = prev && Date.parse(k + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === DAY ? run + 1 : 1;
+    longest = Math.max(longest, run); prev = k;
+  });
+  return { now: now, longest: longest, today: !!days[dayKey(0)] };
+}
+
 // Presets: one click for a common fight. These do change your saved fight settings.
 export const PRESETS = [
   { name: '1 dummy, 50,000 health', dummies: 1, health: 50000, fight: { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 } },
@@ -45,7 +79,7 @@ export function robesEarned(drills) {
            bone: fights.every(function (g) { return g >= 4; }), void: count(5) >= 5, gold: all.every(function (g) { return g >= 5; }) };
 }
 
-const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, opener: false };
+const SHOW_DEFAULT = { rotation: false, race: true, callouts: false, dotBars: false, hint: false, opener: false, ghost: true, alerts: true };
 const FROM_SIM = 'Read-only: this comes from the Warlock SIM. To change it, change it there and bring the codes over with Import.';
 const TREES = [['affliction', 'Affliction'], ['demonology', 'Demonology'], ['destruction', 'Destruction']];
 const STATS = [
@@ -55,6 +89,15 @@ const STATS = [
   ['mp5', 'Mana every 5 s', 0], ['shadowDmgPct', 'Shadow damage', 1, true, '%'], ['fireDmgPct', 'Fire damage', 1, true, '%'], ['allDmgPct', 'All damage', 1, true, '%']
 ];
 const WATCHED = ['immolate', 'corruption', 'baneOfAgony', 'siphonLife'];   // DoTs whose falling off is worth a word
+// The gear builder of the Warlock SIM: its slots and the stats an item can carry (an imported code may hold them).
+const SLOT_NAMES = { head: 'Head', neck: 'Neck', shoulder: 'Shoulder', back: 'Back', chest: 'Chest', shirt: 'Shirt', tabard: 'Tabard', wrist: 'Wrist',
+                     hands: 'Hands', waist: 'Waist', legs: 'Legs', feet: 'Feet', finger1: 'Ring', finger2: 'Ring', trinket1: 'Trinket', trinket2: 'Trinket',
+                     mainHand: 'Main Hand', offHand: 'Off Hand', ranged: 'Wand' };
+const GEAR_STATS = [['sp', ' spell power'], ['shadowSp', ' Shadow spell power'], ['fireSp', ' Fire spell power'], ['hitPct', '% hit'], ['critPct', '% crit'],
+                    ['hastePct', '% haste'], ['pierce', ' Spell Pierce'], ['int', ' Intellect'], ['spi', ' Spirit'], ['sta', ' Stamina'], ['agi', ' Agility'], ['mp5', ' mana every 5 s']];
+function statText(stats) {
+  return GEAR_STATS.filter(function (g) { return +(stats || {})[g[0]]; }).map(function (g) { const v = +stats[g[0]]; return (v > 0 ? '+' : '\u2212') + Math.abs(v) + g[1]; }).join(', ');
+}
 
 function byId(id) { return document.getElementById(id); }
 function whole(n) { return Math.round(n).toLocaleString('en-US'); }
@@ -94,12 +137,14 @@ export function createExtras(WL, handlers) {
 
   // ---------- the switches ----------
   const rotationPanel = byId('rotationPanel'), race = byId('race');
-  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint'), opener: byId('swOpener') };
+  const switches = { rotation: byId('swRotation'), race: byId('swRace'), callouts: byId('swCallouts'), dotBars: byId('swDotBars'), hint: byId('swHint'), opener: byId('swOpener'),
+                    ghost: byId('swGhost'), alerts: byId('swAlerts') };
   function applyShow() {
     const s = show();
     Object.keys(switches).forEach(function (k) { switches[k].checked = !!s[k]; });
     rotationPanel.hidden = !s.rotation;
     race.hidden = !s.race;
+    document.documentElement.classList.toggle('alerts', !!s.alerts);   // the strong glow on a button whose proc is up
   }
   Object.keys(switches).forEach(function (k) {
     switches[k].addEventListener('change', function () {
@@ -159,7 +204,37 @@ export function createExtras(WL, handlers) {
     table.appendChild(body);
     sheetBody.appendChild(el('p', character.build.name + ' · ' + WL.RACES[character.raceKey].name + ' · level 60', 'review-head'));
     sheetBody.appendChild(table);
+    gearList();
     if (character.build.notes) { sheetBody.appendChild(el('h3', 'Notes on this build')); sheetBody.appendChild(el('p', tidy([].concat(character.build.notes).join(' ')), 'hint')); }
+  }
+  // The items you wear, when the imported settings come from the Warlock SIM's gear builder. The numbers above
+  // already hold them (the sim adds them up into the gear values); this only says what they are.
+  function gearList() {
+    const gb = config && config.gearBuilder;
+    if (!gb || !gb.on) return;
+    sheetBody.appendChild(el('h3', 'Your gear'));
+    const slots = gb.slots || {}, rows = [];
+    Object.keys(SLOT_NAMES).forEach(function (k) {
+      const entry = slots[k];
+      if (!entry) return;
+      const item = entry.custom || (entry.id != null && WL.ITEMS && WL.ITEMS[entry.id]) || null;
+      rows.push([SLOT_NAMES[k], item ? item.name || 'An item without a name' : 'Item ' + entry.id + ' (this page does not know it yet)', item ? statText(item.stats) : '', item && item.quality ? item.quality : '']);
+    });
+    const hand = statText(gb.manual);
+    if (hand) rows.push(['Added by hand', 'What you typed into the sim\'s stats on top of your items', hand, '']);
+    if (!rows.length) { sheetBody.appendChild(el('p', 'The gear builder is on in the imported settings, but no slot holds an item.', 'hint')); return; }
+    const table = document.createElement('table'), body = document.createElement('tbody');
+    rows.forEach(function (r) {
+      const tr = document.createElement('tr');
+      tr.appendChild(el('td', r[0]));
+      tr.appendChild(el('td', r[1], 'item' + (r[3] ? ' q-' + r[3] : '')));
+      tr.appendChild(el('td', r[2], 'from'));
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    table.className = 'gear';
+    sheetBody.appendChild(table);
+    sheetBody.appendChild(el('p', 'From the gear builder of the Warlock SIM, brought over with Import. The numbers above already hold these items.', 'hint'));
   }
   function talentSheet() {
     const ranks = character.build.talents || {}, wrap = el('div', null, 'trees');
@@ -320,7 +395,81 @@ export function createExtras(WL, handlers) {
       card.box.classList.toggle('locked', !earned[r.key]);
     });
   }
-  challengeButton.addEventListener('click', function () { challengeButton.blur(); fillDrills(); challengeWindow.hidden = !challengeWindow.hidden; });
+  // Today's fight: a card at the top of the Challenges window, with your result of the day and your streak.
+  const dailyCard = { box: null };
+  function dailyDays() { return (getSetting('daily') || {}).days || {}; }
+  function fillDaily() {
+    const today = dailyFor(dayKey(0)), mine = dailyDays()[today.day], st = streaks(dailyDays()), running = !!challenge && challenge.daily;
+    if (!dailyCard.box) {
+      const box = el('div', null, 'card wide-card daily'), head = el('h4'), grade = el('b'), text = el('p'), record = el('small'), streak = el('small', null, 'streak'), button = el('button');
+      head.append(el('span'), grade);
+      button.type = 'button';
+      button.addEventListener('click', function () {
+        button.blur();
+        const on = !!challenge && challenge.daily;
+        challengeWindow.hidden = true;
+        handlers.onChallenge(on ? null : dailyFor(dayKey(0)));
+      });
+      box.append(head, text, record, streak, button);
+      byId('daily').appendChild(box);
+      Object.assign(dailyCard, { box: box, head: head.firstChild, grade: grade, text: text, record: record, streak: streak, button: button });
+    }
+    dailyCard.head.textContent = dayWords(today.day);
+    dailyCard.grade.textContent = mine ? mine.grade : '';
+    dailyCard.text.textContent = today.text + ' With your own build and race.';
+    dailyCard.record.textContent = mine ? 'Your best today: ' + mine.pct + '% of the sim, ' + whole(mine.dps) + ' DPS' : 'Not played yet today';
+    dailyCard.streak.textContent = st.now ? st.now + (st.now === 1 ? ' day' : ' days') + ' in a row' + (st.today ? '' : ': play today to keep it going') + (st.longest > st.now ? ' (your longest: ' + st.longest + ')' : '')
+      : st.longest ? 'Your longest run: ' + st.longest + (st.longest === 1 ? ' day' : ' days') : 'Play it every day for a streak';
+    dailyCard.button.textContent = running ? 'End' : mine ? 'Play again' : 'Start';
+    dailyCard.box.classList.toggle('on', running);
+  }
+  challengeButton.addEventListener('click', function () { challengeButton.blur(); fillDrills(); fillDaily(); challengeWindow.hidden = !challengeWindow.hidden; });
+
+  // ---------- lessons ----------
+  // A short series per build (js/lessons.js). Passing a lesson's test opens the next one; kept per build.
+  const lessonWindow = byId('lessons'), lessonList = byId('lessonList');
+  function lessonDone() { return (getSetting('lessons') || {})[character.lessonKey] || {}; }
+  function asLesson(l) {
+    return { lesson: l, id: 'lesson:' + l.id, name: 'Lesson ' + l.number + ': ' + l.title, text: l.test.text, targets: l.test.targets,
+             fight: Object.assign({}, l.test.fight), executePct: l.test.executePct, share: 'lesson:' + l.id };
+  }
+  function fillLessons() {
+    if (!character) return;
+    const list = lessonsFor(WL, character.build), done = lessonDone(), passed = list.filter(function (l) { return done[l.id]; }).length;
+    lessonList.textContent = '';
+    byId('lessonsHead').textContent = character.build.name + ': ' + passed + ' of ' + list.length + ' passed';
+    let open = true;
+    list.forEach(function (l) {
+      const ok = !!done[l.id], locked = !open, running = !!challenge && challenge.lesson && challenge.lesson.id === l.id;
+      const box = el('div', null, 'card lesson' + (ok ? ' passed' : '') + (locked ? ' locked' : '') + (running ? ' on' : '')), head = el('h4');
+      head.append(el('span', l.number + '. ' + l.title), el('b', ok ? 'Passed' : locked ? 'Locked' : 'Open'));
+      box.appendChild(head);
+      l.text.forEach(function (p) { box.appendChild(el('p', p)); });
+      const test = el('div', null, 'lesson-test');
+      test.appendChild(el('b', 'Test: '));
+      test.appendChild(document.createTextNode(l.test.text));
+      const checks = el('ul');
+      l.test.checks.forEach(function (c) { checks.appendChild(el('li', c.label)); });
+      test.appendChild(checks);
+      box.appendChild(test);
+      const button = el('button', running ? 'End' : locked ? 'Pass the lesson before it first' : ok ? 'Take the test again' : 'Take the test');
+      button.type = 'button';
+      button.disabled = locked;
+      button.addEventListener('click', function () { button.blur(); lessonWindow.hidden = true; handlers.onChallenge(running ? null : asLesson(l)); });
+      box.appendChild(button);
+      lessonList.appendChild(box);
+      if (!ok) open = false;                              // the lessons after the first one not passed stay locked
+    });
+  }
+  byId('btnLessons').addEventListener('click', function () { byId('btnLessons').blur(); fillLessons(); lessonWindow.hidden = !lessonWindow.hidden; });
+  byId('lessonsClose').addEventListener('click', function () { lessonWindow.hidden = true; });
+
+  // ---------- progress ----------
+  const progressWindow = byId('progressWin');
+  let progressPick = null;
+  function fillProgress() { drawProgress(byId('progressBody'), character ? character.lessonKey : null, progressPick, function (k) { progressPick = k; fillProgress(); }); }
+  byId('btnProgress').addEventListener('click', function () { byId('btnProgress').blur(); progressPick = null; fillProgress(); progressWindow.hidden = !progressWindow.hidden; });
+  byId('progressClose').addEventListener('click', function () { progressWindow.hidden = true; });
   byId('challengesClose').addEventListener('click', function () { challengeWindow.hidden = true; });
   const seedBox = byId('seed'), today = new Date();
   seedBox.value = String(today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate());   // today's date: everyone who keeps it plays the same fight
@@ -471,6 +620,9 @@ export function createExtras(WL, handlers) {
       character = c; config = cfg; leftOut = left || []; challenge = ch || null;
       fillRotation();
       fillDrills();
+      fillDaily();
+      byId('btnLessons').classList.toggle('on', !!(challenge && challenge.lesson));
+      if (!lessonWindow.hidden) fillLessons();
       const tag = byId('challengeTag');
       tag.hidden = !challenge;
       if (challenge) byId('challengeText').textContent = (challenge.encounter ? 'Encounter: ' : challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
@@ -502,14 +654,43 @@ export function createExtras(WL, handlers) {
     play: function (spec) {
       const cut = String(spec).indexOf(':'), kind = String(spec).slice(0, cut), id = String(spec).slice(cut + 1);
       const found = kind === 'seed' ? (id ? seeded(id.slice(0, 24)) : null)
+        : kind === 'daily' ? (/^\d{4}-\d{2}-\d{2}$/.test(id) ? dailyFor(id) : null)
+        : kind === 'lesson' ? lessonsFor(WL, character.build).filter(function (l) { return l.id === id; }).map(asLesson)[0]
         : (kind === 'drill' ? DRILLS : kind === 'encounter' ? ENCOUNTERS : []).filter(function (d) { return d.id === id; }).map(asChallenge)[0];
       if (!found) return false;
       if (found.seeded) seedBox.value = found.word;
       handlers.onChallenge(found);
       return true;
     },
-    sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden; },
-    closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; },
+    sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden || !lessonWindow.hidden || !progressWindow.hidden; },
+    closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; lessonWindow.hidden = true; progressWindow.hidden = true; },
+    // Lessons, for main.js and the review's buttons.
+    startLesson: function (ch) { handlers.onChallenge(ch); },
+    openLessons: function () { fillLessons(); lessonWindow.hidden = false; },
+    lessonPassed: function (ch) {
+      const all = Object.assign({}, getSetting('lessons')), mine = Object.assign({}, all[character.lessonKey]);
+      if (!mine[ch.lesson.id]) mine[ch.lesson.id] = Date.now();
+      all[character.lessonKey] = mine;
+      setSetting('lessons', all);
+      if (!lessonWindow.hidden) fillLessons();
+    },
+    nextLesson: function (ch) {
+      const list = lessonsFor(WL, character.build), i = list.map(function (l) { return l.id; }).indexOf(ch.lesson.id);
+      return i >= 0 && i + 1 < list.length ? asLesson(list[i + 1]) : null;
+    },
+    // Today's fight is over: keep your best of that day. Returns the line the review shows (with your streak).
+    recordDaily: function (ch, out) {
+      const all = Object.assign({ days: {} }, getSetting('daily')), days = Object.assign({}, all.days), old = days[ch.day];
+      if (!old || out.pct > old.pct) days[ch.day] = { grade: out.grade, pct: out.pct, dps: Math.round(out.dps) };
+      const keys = Object.keys(days).sort();
+      if (keys.length > 400) keys.slice(0, keys.length - 400).forEach(function (k) { delete days[k]; });
+      all.days = days;
+      setSetting('daily', all);
+      fillDaily();
+      const st = streaks(days);
+      return 'Today\'s fight is done' + (ch.day === dayKey(0) ? '' : ' (for ' + dayWords(ch.day) + ')') + '. ' +
+        (st.now > 1 ? st.now + ' days in a row' + (st.now >= st.longest ? ': your longest run.' : '; your longest: ' + st.longest + '.') : 'Come back tomorrow for the next one and start a streak.');
+    },
     copy: copyText
   };
 }

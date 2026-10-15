@@ -213,6 +213,13 @@ const SOUNDS = {
     k.tone('sine', 1319, 1319, 0.5, 0.02, 0.06, 0.03);
     k.air({ type: 'highpass', from: 3200, seconds: 0.5, volume: 0.1, attack: 0.2 });
   },
+  // A proc alert (a switch): brighter than a proc, two quick bells rising, so it is heard over the fight.
+  alert: function (k) {
+    k.tone('sine', 988, 988, 0.35, 0.07, 0, 0.01);
+    k.tone('sine', 1480, 1480, 0.55, 0.06, 0.09, 0.01);
+    k.tone('sine', 1976, 1976, 0.45, 0.025, 0.09, 0.01);
+    k.air({ type: 'highpass', from: 4200, seconds: 0.35, volume: 0.12, attack: 0.05 });
+  },
   // A cast that was stopped fizzles out.
   fizzle: function (k) {
     k.air({ from: 2800, to: 500, seconds: 0.32, volume: 0.55, q: 1, flutter: 28, depth: 0.8 });
@@ -232,7 +239,7 @@ const SOUNDS = {
   best: function (k) { [523, 659, 784, 1047].forEach(function (f, i) { k.tone('sine', f, f, 0.3, 0.12, i * 0.11); }); k.tone('sine', 2093, 2093, 0.5, 0.03, 0.33); }
 };
 // These always sound the same; the others are played a touch higher or lower each time, as no two hits are alike.
-const STEADY = { proc: 1, error: 1, move: 1, warn: 1, fightEnd: 1, best: 1 };
+const STEADY = { proc: 1, alert: 1, error: 1, move: 1, warn: 1, fightEnd: 1, best: 1 };
 
 export function createSound(startOn, startVolume) {
   let on = startOn, volume = startVolume == null ? 0.6 : startVolume, audio = null, master = null, tools = null, hum = null;

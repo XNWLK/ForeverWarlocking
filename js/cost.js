@@ -13,7 +13,7 @@ function whole(n) { return Math.round(n).toLocaleString('en-US'); }
 
 // d: what the review gets (js/panels.js), plus table (the spell table) and gcd (seconds).
 // Returns null when there is nothing to judge yet, else
-//   { rows: [{ what, detail, dps }], total, dps, gap (sim's DPS minus yours, or null), rate }
+//   { rows: [{ kind, what, detail, dps }], total, dps, gap (sim's DPS minus yours, or null), rate }
 export function costs(d) {
   const res = d.result, k = res.track, sim = d.sim, T = d.seconds, table = d.table || {}, gcd = d.gcd > 0 ? d.gcd : 1.5;
   if (!(T > 1) || !(res.total > 0)) return null;
@@ -21,21 +21,22 @@ export function costs(d) {
   let petDmg = 0;
   Object.keys(res.bySpell).forEach(function (key) { if (key.replace(/^x\d:/, '').indexOf('pet:') === 0) petDmg += res.bySpell[key].dmg || 0; });
   const rate = k.busy > 1 ? (res.total - petDmg) / k.busy : 0;          // your own damage per second of casting
-  function add(what, detail, lost) { if (lost > 0) rows.push({ what: what, detail: detail, dps: lost / T }); }
+  // kind: which sort of mistake it is (the Progress window adds them up by it, js/progress.js).
+  function add(kind, what, detail, lost) { if (lost > 0) rows.push({ kind: kind, what: what, detail: detail, dps: lost / T }); }
   function where(i) { return d.targets > 1 ? ' on ' + d.dummyName(i) : ''; }
   function name(key) { return d.spells[key] ? d.spells[key].name : key; }
 
   // Time without a cast or a global cooldown, beyond what the sim has in the same fight.
   const idle = Math.max(0, T - k.busy), simIdle = sim && sim.seconds > 0 ? sim.idle * T / sim.seconds : 0, extra = idle - simIdle;
   if (extra > 0.3) {
-    add('Time not casting', idle.toFixed(1) + ' s with no cast and no global cooldown running' + (sim ? '; the sim: ' + simIdle.toFixed(1) + ' s' : '') +
+    add('idle', 'Time not casting', idle.toFixed(1) + ' s with no cast and no global cooldown running' + (sim ? '; the sim: ' + simIdle.toFixed(1) + ' s' : '') +
       (k.noMana ? '. ' + (k.noMana === 1 ? 'One press' : k.noMana + ' presses') + ' failed for lack of mana' : ''), extra * rate);
   }
 
   // Cast bars you stopped yourself: the casting up to that moment was for nothing.
   const stopped = ((d.record && d.record.casts) || []).filter(function (c) { return c.kind === 'cast' && (c.stopped === 'moving' || c.stopped === 'cancelled') && c.t >= 0; });
   const thrown = stopped.reduce(function (sum, c) { return sum + c.len; }, 0);
-  if (thrown > 0.3) add('Casts you stopped', (stopped.length === 1 ? 'One cast' : stopped.length + ' casts') + ' stopped by moving or by hand, after ' + thrown.toFixed(1) + ' s of casting in all', thrown * rate);
+  if (thrown > 0.3) add('stopped', 'Casts you stopped', (stopped.length === 1 ? 'One cast' : stopped.length + ' casts') + ' stopped by moving or by hand, after ' + thrown.toFixed(1) + ' s of casting in all', thrown * rate);
 
   // DoTs and Curse of the Elements that were on a dummy for less time than the sim keeps them there.
   for (let i = 1; i <= d.targets; i++) {
@@ -52,7 +53,7 @@ export function costs(d) {
       const mine = (k.uptime[i + ':baneOfAgony'] || 0) + (k.uptime[i + ':baneOfDoom'] || 0), missing = simPct / 100 * T - mine;
       if (missing >= 1 && simPct - 100 * mine / T >= 2) {
         const span = d.spells.baneOfAgony.duration || 1, perSecond = table.baneOfAgony.tickDmg * table.baneOfAgony.ticks / span;
-        add('No Bane' + where(i), 'a Bane was on for ' + Math.round(100 * mine / T) + '% of the fight; the sim: ' + Math.round(simPct) + '%', missing * (perSecond - rate * gcd / span));
+        add('dots', 'No Bane' + where(i), 'a Bane was on for ' + Math.round(100 * mine / T) + '% of the fight; the sim: ' + Math.round(simPct) + '%', missing * (perSecond - rate * gcd / span));
       }
     }
     Object.keys(seen).forEach(function (key) {
@@ -66,10 +67,10 @@ export function costs(d) {
       const said = 'on for ' + Math.round(100 * mine / T) + '% of the fight; the sim: ' + Math.round(simPct) + '%';
       if (curse) {
         const pct = (d.spells.curseOfElements && d.spells.curseOfElements.dmgTakenPct) || 0;
-        add('Curse of the Elements down' + where(i), said + '. At least this much: the curse also takes away the dummy\'s resistance', missing * (res.byTarget[i] / T) * pct / 100);
+        add('dots', 'Curse of the Elements down' + where(i), said + '. At least this much: the curse also takes away the dummy\'s resistance', missing * (res.byTarget[i] / T) * pct / 100);
       } else {
         const span = d.spells[key].duration || 1, perSecond = table[key].tickDmg * table[key].ticks / span;
-        add(name(key) + ' down' + where(i), said, missing * (perSecond - rate * Math.max(gcd, table[key].cast || 0) / span));
+        add('dots', name(key) + ' down' + where(i), said, missing * (perSecond - rate * Math.max(gcd, table[key].cast || 0) / span));
       }
     });
   }
@@ -83,18 +84,18 @@ export function costs(d) {
   });
   Object.keys(cut).forEach(function (key) {
     const g = cut[key], row = res.bySpell[key], tick = table[key] && table[key].tickDmg ? table[key].tickDmg : row && row.ticks ? row.dmg / row.ticks : 0;
-    add(name(key) + ' cast again too early', (g.times === 1 ? 'Once' : g.times + ' times') + ', cutting off ' + (g.ticks === 1 ? '1 tick' : g.ticks + ' ticks') + ' that were still to come', g.ticks * tick);
+    add('early', name(key) + ' cast again too early', (g.times === 1 ? 'Once' : g.times + ' times') + ', cutting off ' + (g.ticks === 1 ? '1 tick' : g.ticks + ' ticks') + ' that were still to come', g.ticks * tick);
   });
 
   // Life Taps whose mana was still there at the end: each cost a global cooldown. Only taps beyond the sim's own
   // count (it taps to feed the pet too, and that mana is not what is left over).
   const m = d.mana, simTaps = sim && sim.seconds > 0 ? (sim.lifeTaps || 0) * T / sim.seconds : 0;
   const spare = d.over && m && m.gain > 0 ? Math.min(Math.floor(k.lifeTaps - simTaps), Math.floor(m.end / m.gain)) : 0;
-  if (spare >= 1) add('Life Taps you did not need', 'You ended with ' + whole(m.end) + ' mana: about ' + (spare === 1 ? 'one tap' : spare + ' taps') + ' too many, a global cooldown each', spare * gcd * rate);
+  if (spare >= 1) add('taps', 'Life Taps you did not need', 'You ended with ' + whole(m.end) + ' mana: about ' + (spare === 1 ? 'one tap' : spare + ' taps') + ' too many, a global cooldown each', spare * gcd * rate);
 
   // The pet standing about.
   if (d.hasPet && k.petActive > 1 && T - k.petActive > 1) {
-    add(d.petName + ' not attacking', 'It attacked for ' + Math.round(100 * k.petActive / T) + '% of the fight (it has to reach the dummy first, and stops when its dummy dies or you call it back)',
+    add('pet', d.petName + ' not attacking', 'It attacked for ' + Math.round(100 * k.petActive / T) + '% of the fight (it has to reach the dummy first, and stops when its dummy dies or you call it back)',
         (T - k.petActive) * petDmg / k.petActive);
   }
 
