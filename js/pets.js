@@ -243,9 +243,12 @@ function makeSuccubus() {
 }
 
 // One pet in the scene. `kind` is 'imp', 'succubus' or null (no pet out).
-export function createPet(scene) {
-  const models = { imp: makeImp(), succubus: makeSuccubus() };
-  Object.keys(models).forEach(function (k) { models[k].root.visible = false; scene.add(models[k].root); });
+// opts (the ghost's demon, js/ghost.js): paint(root) to change how the models look; side: how far to the left it
+// follows (yards; negative = to the right).
+export function createPet(scene, opts) {
+  opts = opts || {};
+  const models = { imp: makeImp(), succubus: makeSuccubus() }, left = opts.side != null ? opts.side : FOLLOW_LEFT;
+  Object.keys(models).forEach(function (k) { models[k].root.visible = false; if (opts.paint) opts.paint(models[k].root); scene.add(models[k].root); });
   const pet = { kind: null, x: 0, z: 0, yaw: 0, moving: false, distance: 0 };
   let placed = false;
 
@@ -260,7 +263,7 @@ export function createPet(scene) {
   function update(dt, time, player, mode, range, cast, dead, target, colliders) {
     if (!pet.kind) return;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
-    const homeX = player.x + sin * FOLLOW_BACK - cos * FOLLOW_LEFT, homeZ = player.z + cos * FOLLOW_BACK + sin * FOLLOW_LEFT;
+    const homeX = player.x + sin * FOLLOW_BACK - cos * left, homeZ = player.z + cos * FOLLOW_BACK + sin * left;
     if (!placed) { pet.x = homeX; pet.z = homeZ; pet.yaw = player.yaw; placed = true; }
 
     let goalX = homeX, goalZ = homeZ, slack = pet.moving ? 0.15 : 1.0, faceDummy = false;

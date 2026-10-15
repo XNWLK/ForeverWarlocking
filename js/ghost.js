@@ -2,8 +2,11 @@
 // at the same second of the fight. Its casts are those of one of the sim's own fights (the worker's `casts`, the same
 // fight the review's timeline shows), so it is a guide to the order of things, not a copy of your dice - except in a
 // seeded fight, where the sim rolls the same dice as you.
+// Its demon comes along, see-through too, a little right of it: it attacks when the sim's fight begins, the Imp casts Firebolt
+// when the sim's Imp does, the Succubus uses Lash of Pain when the sim's does and swings at her own pace.
 // Looks only: it takes no part in the fight.
 import * as THREE from 'three';
+import { createPet } from './pets.js';
 
 const RIGHT = 2.6, BACK = 0.5;                             // where it stands, in yards from you (right of you, a little behind)
 const GHOST = new THREE.Color(0xcdb8ff);
@@ -15,9 +18,9 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
   const warlock = makeWarlock('human');
   const solid = new THREE.MeshLambertMaterial({ color: GHOST, emissive: 0x5a3d96, emissiveIntensity: 0.55, transparent: true, opacity: 0.3, depthWrite: false, flatShading: true });
   let race = null;
-  // Makes whatever the model is built of see-through and pale; its own glows fainter. Done again after every rebuild.
-  function paint() {
-    warlock.root.traverse(function (part) {
+  // Makes whatever a model is built of see-through and pale; its own glows fainter. Done again after every rebuild.
+  function paint(root) {
+    root.traverse(function (part) {
       if (part.isSprite) { part.material.opacity = 0.25; return; }
       if (!part.isMesh) return;
       part.castShadow = false; part.receiveShadow = false;
@@ -28,6 +31,8 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
   }
   scene.add(warlock.root);
   warlock.root.visible = false;
+  const pet = createPet(scene, { paint: paint, side: -0.8 })   // just right of the ghost and behind it, not out at the edge;
+  let petKind = null, petNext = 0, swingAt = -1;
 
   // Its name over its head, with what it casts.
   const tag = el('div', 'ghost-tag'), pic = el('img'), word = el('span'), bar = el('i');
@@ -49,9 +54,10 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
   function update(dt, time, o) {
     const on = !!o.show;
     warlock.root.visible = on;
-    if (!on) { tag.hidden = true; return; }
-    if (o.race !== race) { race = o.race; warlock.setRace(race); paint(); }
-    if (o.casts !== list || o.t == null || o.t < lastT - 0.01) { list = o.casts; next = 0; pending = []; said = null; }   // a new fight, or the sim's numbers changed
+    if (!on) { tag.hidden = true; if (petKind) { petKind = null; pet.setKind(null); } return; }
+    if (o.race !== race) { race = o.race; warlock.setRace(race); paint(warlock.root); }
+    if (o.petKind !== petKind) { petKind = o.petKind; pet.setKind(petKind); }
+    if (o.casts !== list || o.t == null || o.t < lastT - 0.01) { list = o.casts; next = 0; pending = []; said = null; petNext = 0; swingAt = -1; }   // a new fight, or the sim's numbers changed
     const t = o.t == null ? -1 : o.t;
     lastT = t;
 
@@ -97,6 +103,7 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
     warlock.root.rotation.y = at.yaw;
     const s = current ? spell(current.k) : null;
     warlock.update(dt, time, moving, 0, current ? (s && s.school === 'fire' ? 'fire' : 'shadow') : null);
+    if (petKind) demon(dt, time, o, t, target);
 
     // The tag over its head.
     head.set(at.x, 2.55 * warlock.size, at.z).project(o.camera);
@@ -114,9 +121,30 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
     bar.hidden = !current;
   }
 
+  // The ghost's demon: follows the ghost until the sim's fight begins, then attacks as the sim's demon does.
+  const petFrom = new THREE.Vector3();
+  function demon(dt, time, o, t, target) {
+    const hits = o.petHits || [], fighting = !!list && t >= 0 && !o.over, spot = o.spot(target), P = pet.state;
+    let cast = 0;
+    if (fighting) {
+      while (petNext < hits.length && hits[petNext].t <= t) {
+        pet.strike();
+        if (petKind === 'imp' && o.chest) effects.streak(petFrom.set(P.x, 0.65, P.z), o.chest(target), 0xffc89a);
+        petNext++;
+      }
+      const coming = petNext < hits.length ? hits[petNext] : null;
+      if (petKind === 'imp' && coming && coming.k === 'pet:firebolt' && coming.t - t < 2) cast = Math.max(0, 1 - (coming.t - t) / 2);   // Firebolt: a 2 s cast
+      if (petKind === 'succubus' && P.distance <= (o.petRange || 5) + 0.5) {             // her swings are not in the sim's log: her own pace
+        if (swingAt < 0) swingAt = t;
+        if (t >= swingAt) { pet.strike(); swingAt = t + (o.swing || 2); }
+      }
+    }
+    pet.update(dt, time, { x: at.x, z: at.z, yaw: at.yaw }, fighting ? 'attack' : 'follow', o.petRange || 30, cast, !fighting && t >= 0, spot, []);
+  }
+
   return {
     update: update,
-    hide: function () { warlock.root.visible = false; tag.hidden = true; },
-    place: function () { at.placed = false; }               // stand next to you at once (a new fight, a replay)
+    hide: function () { warlock.root.visible = false; tag.hidden = true; pet.setKind(null); petKind = null; },
+    place: function () { at.placed = false; pet.sendHome(); }   // stand next to you at once (a new fight, a replay)
   };
 }

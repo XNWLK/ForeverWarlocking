@@ -44,7 +44,7 @@ self.onmessage = function (e) {
   // its fights (each with other dice).
   // The review's timeline also shows what the sim cast in the first of those fights (job.seed: a seeded fight plays
   // it with the same dice as you).
-  var curve = null, casts = null, mana = null, opener = null;
+  var curve = null, casts = null, petHits = null, mana = null, opener = null;
   var cut = job.cut > 0 ? Math.min(job.cut, seconds) : 0, part = null;   // part: the fight up to the cut, summed over the logged fights
   try {
     var count = Math.max(1, Math.ceil(seconds)), sums = new Array(count + 1).fill(0), RUNS = 40;
@@ -60,6 +60,10 @@ self.onmessage = function (e) {
       var first = cast.slice(0, 8).map(function (line) { return line.spell.replace(/^x\d:/, ''); }).join(' ');   // the spell, whichever dummy it went to
       starts[first] = (starts[first] || 0) + 1;
       if (n === 0) casts = cast.map(function (line) { return { t: line.t, k: line.spell, d: line.channel || line.castTime || 0, ch: line.channel ? 1 : 0 }; });
+      // The pet's spells in that same fight (Firebolt, Lash of Pain; landed or missed), for the ghost's demon. Plain melee
+      // swings are not in the log: the ghost's Succubus swings at her own pace.
+      if (n === 0) petHits = (one.log || []).filter(function (line) { return (line.type === 'pet' || line.type === 'miss') && /^pet:(firebolt|lashOfPain)$/.test(line.spell); })
+        .map(function (line) { return { t: line.t, k: line.spell }; });
       if (part) {
         var busyUntil = 0, lastMana = null, lowest = Infinity;
         (one.log || []).forEach(function (line) {
@@ -122,10 +126,10 @@ self.onmessage = function (e) {
     Object.keys(part.up).forEach(function (k) { up[k] = 100 * part.up[k] / RUNS / cut; });
     self.postMessage({ id: job.id, precast: job.precast || '', dps: done / cut, max: result.dpsMax, seconds: cut, fights: RUNS, bySpell: cutRows, uptime: up, cut: true,
                        idle: part.idle / RUNS, spirit: result.mana.spiritRegenAvg * share, health: result.health, tps: result.tps, lifeTaps: part.taps / RUNS, pushbackTime: result.pushback.time * share,
-                       curve: cutCurve, top: null, casts: (casts || []).filter(function (c) { return c.t < cut; }),
+                       curve: cutCurve, top: null, casts: (casts || []).filter(function (c) { return c.t < cut; }), petHits: (petHits || []).filter(function (c) { return c.t < cut; }),
                        mana: { taps: part.taps / RUNS, tapMana: part.tapMana / RUNS, end: part.end / RUNS, min: part.min / RUNS, movingTaps: part.movingTaps / RUNS }, opener: opener });
     return;
   }
   self.postMessage({ id: job.id, precast: job.precast || '', dps: result.dps, max: result.dpsMax, seconds: seconds, fights: result.iterations, bySpell: rows, uptime: result.uptimePct,
-                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, top: top, casts: casts, mana: mana, opener: opener });
+                     idle: result.mana.idleSecAvg, spirit: result.mana.spiritRegenAvg, health: result.health, tps: result.tps, lifeTaps: result.lifeTaps, pushbackTime: result.pushback.time, curve: curve, top: top, casts: casts, petHits: petHits, mana: mana, opener: opener });
 };

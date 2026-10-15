@@ -15,7 +15,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **Today's fight**, at the top of the Challenges window: a new fight every day, the same dice for everyone, with your
   own build. Play it every day for a streak.
 - **The sim as a ghost** (a switch, on at first): a see-through Warlock a little to your right casts what the sim
-  casts at the same second, with the spell over its head.
+  casts at the same second, with the spell over its head. Its demon comes along, see-through too: the Imp casts
+  Firebolt when the sim's Imp does, the Succubus runs in and uses Lash of Pain when the sim's does.
 - **Proc alerts** (a switch, on at first): when Shadow Trance or Decimation comes up, a word at the top of the screen,
   a chime and a strong glow on the button to press.
 - **Watch it again**: the review plays a finished fight back in the room - you, your demon and the dummies as they

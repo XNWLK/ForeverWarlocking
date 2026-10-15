@@ -1220,7 +1220,10 @@ renderer.setAnimationLoop(frame);
 
 // What the ghost needs to know: where you stand, the second of the fight (null before it begins), the sim's casts.
 function ghostView(player, t) {
+  const P = combat.pet, pc = config.pets[character.build.pet], swing = pc && pc.melee ? pc.melee.swing : 2;
   return { show: extras.show().ghost, race: character.raceKey, player: player, t: t, casts: simResult && simResult.casts, targets: targets, camera: camera,
+           petKind: P ? (character.build.pet === 'imp' ? 'imp' : 'succubus') : null, petHits: simResult && simResult.petHits, petRange: P ? P.range : 0, swing: swing,
+           over: replay.state.active ? false : combat.state.over,
            spot: function (i) { return SPOTS[i]; }, chest: function (i) { return dummies[i].chestAt; } };
 }
 
