@@ -23,6 +23,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   Affliction, pink for Destruction.
 - The **Addon** button at the top left opens Xn's Warlock Sim on CurseForge, where you get the addon. The README
   links there too, with the addon's GitHub page beside it.
+- The GitHub buttons at the top left show GitHub's logo in place of the word, and the addon has its own GitHub button
+  next to its Addon button.
 
 ### 2026-10-15
 - **Lessons** (a new button at the top left): a short series for the build you play, made from its rotation - never

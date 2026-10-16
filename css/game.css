@@ -69,6 +69,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .label { font-size: 11px; color: var(--ink-dim); margin-right: 4px; }
 /* Top left: buttons that open this project's code and the Warlock SIM. */
 #links { position: absolute; left: 14px; top: 12px; z-index: 2; }
+#links button:has(svg.gh) { padding: 4px 6px; }
+#links svg.gh { display: block; width: 14px; height: 14px; margin: 1px 0; }   /* GitHub's mark in place of the word */
 #links .logo { display: block; width: 30px; height: 30px; border-radius: 7px; margin: -4px 6px -4px -3px; }   /* the logo stands for this page */
 #challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
 #buildLabel { max-width: 220px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
