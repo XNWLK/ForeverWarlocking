@@ -155,7 +155,7 @@ function buildConfig() {
   Object.keys(cfg.buffs).forEach(function (k) {
     const b = cfg.buffs[k];
     if (b.on && (b.tide || b.innervate || b.spellDmgPct)) { b.on = false; leftOut.push(b.name); }
-    // Buffs that cannot be up together share a tag (Windfury, Flametongue and Grace of Air Totem; the air totems): the
+    // Buffs that cannot be up together share a tag (none do since the patch of 2026-10-16; the Shaman totems did): the
     // first listed one counts, as in the sim. One switched off here blocks nothing.
     if (b.on) {
       const tags = WL.buffExcl(b);
@@ -186,7 +186,7 @@ function readCustomBuild() {
   if (!code) return [];
   try {
     const b = WL.decodeBuild(code), problems = WL.validateBuild(b);
-    if (problems.length) return problems;
+    if (problems.length) return (b.migrated || []).concat(problems);   // a removed talent's points left unspent can break the tree
     b.key = 'custom'; b.custom = true; b.name = b.short;
     b.rotation = b.rotation.filter(function (a) { return a !== 'swapToImp' && a !== 'swapToSuccubus'; });   // no pet swap here
     delete b.timeline;
@@ -458,7 +458,11 @@ const panels = createPanels({
       bad = true;
       setSetting('buildCode', before);
       readCustomBuild();
-    } else if (buildCode) { lines.push('Build imported: ' + customBuild.short + '.'); setSetting('build', 'custom'); }
+    } else if (buildCode) {
+      lines.push('Build imported: ' + customBuild.short + '.');
+      if (customBuild.migrated) lines.push(customBuild.migrated.join('; ') + '.');   // a talent a Forever patch removed (Malediction)
+      setSetting('build', 'custom');
+    }
     else if (getSetting('build') === 'custom') setSetting('build', null);
     setSetting('settingsCode', settingsCode);
     newCharacter();
@@ -528,7 +532,7 @@ function fightWords() {
   return (targets === 1 ? '1 dummy' : targets + ' dummies') + '  \u00b7  ' + (f.endless ? 'infinite health' + (f.endless === 'execute' ? ', execute range' : '') : f.timed ? f.seconds + ' s' : character.dummyHealth.toLocaleString('en-US') + ' health' + (targets > 1 ? ' each' : '')) +
     (f.moveEvery > 0 && f.moveDuration > 0 ? '  \u00b7  moving ' + f.moveDuration + ' s every ' + f.moveEvery + ' s' : '') + (f.hitEvery > 0 ? '  \u00b7  a hit every ' + f.hitEvery + ' s' : '');
 }
-const CARD_NAMES = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Pet melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem',
+const CARD_NAMES = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'Pet melee',
                      'pet:brand': 'Demonic Brand', touchOfTheGrave: 'Touch of the Grave' };
 const CARD_ICONS = { 'pet:firebolt': 'firebolt', 'pet:lashOfPain': 'lashOfPain', 'pet:brand': 'searingPain' };
 // The result of the fight as a picture: how = 'copy' (onto the clipboard) or 'save' (as a file). The button says how it went.
@@ -720,7 +724,7 @@ function procAlert(name) {
 function showLooks(e, again) {
   const ti = e.target || (again ? 1 : combat.state.target), dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
-  const rides = e.key === 'pet:brand' || e.key === 'pet:flametongue';   // extra damage that comes with the pet's own hit: no second strike, no second sound
+  const rides = e.key === 'pet:brand';   // extra damage that comes with the pet's own hit: no second strike, no second sound
   if (e.pet && lands && !rides) pet.strike();
 
   // Sounds.

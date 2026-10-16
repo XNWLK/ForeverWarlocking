@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "f9abe0d",
-    "subject":  "Gear builder (under construction): character window, items add up into the stats",
+    "commit":  "6867f8c",
+    "subject":  "Builds after the patch: Aff Pact Shadow Bolt 8/31/12, Wrack Succubus 33/0/18",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-15 00:03",
+    "synced":  "2026-10-16 17:43",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

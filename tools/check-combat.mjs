@@ -6,9 +6,8 @@
 //
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
-// two seconds (pushback), movement phases, Windfury Totem (extra pet melee attacks), Flametongue Totem (a Fire
-// hit with every pet swing that lands) alone and switched on together with Windfury Totem (they do not stack: only
-// Windfury counts), and both threat buffs at once.
+// two seconds (pushback), movement phases, and Salvation (threat). The Shaman totems' scenes went with the patch of
+// 2026-10-16 (Windfury and Flametongue Totem only affect players since, Tranquil Air Totem is gone).
 //
 // Precast scenes: the engine starts the fight with a spell that completes at 0 s (fight.precast). Here the same
 // spell is started before the fight as a player would, in a timed fight of the game itself (not the check's own
@@ -30,10 +29,7 @@ const SCENES = [
   { name: '2 targets, Hellfire', targets: 2, seeds: [7], filler: 'hellfire' },
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
-  { name: 'Windfury Totem', targets: 1, seeds: [10], buffs: ['windfuryTotem'] },
-  { name: 'Flametongue Totem', targets: 1, seeds: [17], buffs: ['flametongueTotem'] },
-  { name: 'Flametongue and Windfury Totem (only Windfury counts)', targets: 1, seeds: [18], buffs: ['flametongueTotem', 'windfuryTotem'] },
-  { name: 'Blessing of Salvation and Tranquil Air Totem', targets: 1, seeds: [11], buffs: ['blessingOfSalvation', 'tranquilAir'] },
+  { name: 'Salvation', targets: 1, seeds: [11], buffs: ['blessingOfSalvation'] },
   { name: 'precast Shadow Bolt', targets: 1, seeds: [12], precast: 'shadowBolt' },
   { name: 'precast Immolate', targets: 1, seeds: [13], precast: 'immolate' },
   { name: 'precast Soul Fire', targets: 1, seeds: [14], precast: 'soulFire' },

@@ -5,6 +5,19 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-16
+- Follows the Forever patch of 2026-10-16, as the Warlock SIM does:
+  - **Eureka!** (Gnome) is an 8-second buff with no charges: every damaging spell that finishes while it is up does
+    10% more damage and costs 10% less mana. Damage over time gets nothing from it.
+  - **Touch of the Grave** (Undead): a 30% chance, then 25 seconds before it can come again; its damage is 5% of your
+    maximum health, and nothing raises it.
+  - **Ruthless** (Human, +2% crit) and **Savage** (Orc, +1% crit) for your spells and for the Succubus's melee.
+    Blood Fury's cooldown is 3 minutes.
+  - **Shadow Mastery** gives 2 to 10% Shadow damage. **Malediction** is gone; **Grim Reach** stands in its place.
+    An old build code with Malediction still imports: its points move to Grim Reach as far as they fit.
+  - Windfury and Flametongue Totem no longer help your demon, and Tranquil Air Totem is gone.
+  - New talents for four ready builds; the build list's ranking is updated.
+
 ### 2026-10-15
 - **Lessons** (a new button at the top left): a short series for the build you play, made from its rotation - never
   stop casting, damage over time, curses and Banes, Demonic Brand, procs, cooldowns, mana and Life Tap, the whole

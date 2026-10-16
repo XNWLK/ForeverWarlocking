@@ -54,7 +54,7 @@ function span(seconds) {
   return s >= 60 ? (Math.round(s / 6) / 10) + ' min' : s + ' sec';
 }
 const PET_KIND = { imp: 'Imp', succubus: 'Succubus', felhunter: 'Felhunter', voidwalker: 'Voidwalker' };
-const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:windfury': 'Windfury attack', 'pet:flametongue': 'Flametongue Totem', 'pet:brand': 'Demonic Brand' };
+const PET_ATTACK = { 'pet:firebolt': 'Firebolt', 'pet:lashOfPain': 'Lash of Pain', 'pet:melee': 'melee', 'pet:brand': 'Demonic Brand' };
 export const RACIAL_ICON = { 'Blood Fury': 'racial_bloodFury', 'Berserking': 'racial_berserking', 'Eureka!': 'racial_eureka' };
 
 export function createHud(WL, handlers) {
@@ -582,10 +582,9 @@ export function createHud(WL, handlers) {
     const buffs = (c.standing || []).map(function (b) {
       return { key: b.key, icon: b.icon, name: b.name, text: '', desc: b.id ? spellText(b.id) : '', notes: [b.desc, b.from ? 'From: ' + b.from : ''] };
     });
-    ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'snfShadow', 'snfFire'].forEach(function (k) {
+    ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'eureka', 'snfShadow', 'snfFire'].forEach(function (k) {
       if (combat.buff(k)) buffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) });
     });
-    if (combat.eurekaUp()) buffs.push({ key: 'eureka', icon: AURA_INFO.eureka.icon, name: AURA_INFO.eureka.name, text: 'x' + S.eurekaCharges });
     auraList(el.buffs, 'buffs', buffs);
 
     // The pet: what it is doing, and its mana.
@@ -639,7 +638,7 @@ export function createHud(WL, handlers) {
       setClass(slot.button, 'queued', combat.queuedKey === key);
       setClass(slot.button, 'proc', (key === 'shadowBolt' && combat.buff('shadowTrance')) || (key === 'soulFire' && combat.buff('decimation')));
       // Soul Shards are shown only when they can run out (they do not, since the sim made them unlimited).
-      setText(slot.count, c.spells[key] && c.spells[key].shards && isFinite(S.shards) ? String(S.shards) : key === 'racial' && S.eurekaCharges ? String(S.eurekaCharges) : '');
+      setText(slot.count, c.spells[key] && c.spells[key].shards && isFinite(S.shards) ? String(S.shards) : '');
     }
 
     // Damage meter, a few times a second.
@@ -684,7 +683,6 @@ export function createHud(WL, handlers) {
   function label(key) {
     if (key === 'touchOfTheGrave') return 'Touch of the Grave';
     if (key === 'pet:brand') return 'Demonic Brand';
-    if (key === 'pet:flametongue') return 'Flametongue Totem';
     if (PET_ATTACK[key]) return getName(character.build.pet) + ': ' + PET_ATTACK[key].charAt(0).toUpperCase() + PET_ATTACK[key].slice(1);
     return key;
   }
@@ -761,7 +759,7 @@ export function createHud(WL, handlers) {
     const name = e.key && c.spells[e.key] ? c.spells[e.key].name : e.key === 'touchOfTheGrave' ? 'Touch of the Grave' : e.key === 'isb' ? 'Improved Shadow Bolt' : e.name || '';
     if (e.pet && (e.type === 'hit' || e.type === 'miss')) {
       const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
-      const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:flametongue' ? 'Flametongue Totem' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
+      const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
       if (e.type === 'miss') {
         log(e.dodge ? dummy + ' dodges ' + petName + '.' : who + ' misses ' + dummy + '.', 'miss');
       } else {

@@ -7,7 +7,9 @@ window.WL = window.WL || {};
 WL.SETTINGS_CODE_PREFIX = 'WFS1:';
 // Settings that no longer exist: old codes may still carry them; they are dropped without a notice.
 WL.RETIRED_SETTINGS = ['options.eurekaPolicy',    // round 88: Eureka! follows the cooldown setting
-  'fight.startingShards'];                        // round 118: soul shards are unlimited
+  'fight.startingShards',                         // round 118: soul shards are unlimited
+  'gear.weaponIsSword',                           // round 149 (patch 2026-10-16): Ruthless needs no sword
+  'buffs.windfuryTotem', 'buffs.flametongueTotem', 'buffs.tranquilAir'];   // round 149: removed (they no longer help your demon)
 
 WL.settingsSnapshot = function (c) {
   var on = function (o) { return Object.keys(o || {}).filter(function (k) { return o[k].on; }); };
@@ -22,7 +24,7 @@ WL.settingsSnapshot = function (c) {
   // Round 147: the gear builder's items and your own additions, only while the builder is on (its numbers are in gear
   // anyway; this lets a code or link bring the builder back as it was). Off = not part of the settings.
   var gb = c.gearBuilder;
-  if (gb && gb.on) snap.gb = { slots: gb.slots || {}, manual: gb.manual || {} };
+  if (gb && gb.on) snap.gb = { slots: gb.slots || {}, manual: gb.manual || {}, enchants: gb.enchants || {} };   // enchants: round 148
   return snap;
 };
 
@@ -50,7 +52,7 @@ WL.applySettings = function (c, o) {
   [['buffs', 'buffs'], ['debuffs', 'debuffs'], ['cons', 'consumables']].forEach(function (p) {
     var list = o[p[0]] || [], tgt = c[p[1]] || {};
     Object.keys(tgt).forEach(function (k) { tgt[k].on = list.indexOf(k) >= 0; });
-    list.forEach(function (k) { if (!tgt[k]) unknown.push(p[0] + '.' + k); });
+    list.forEach(function (k) { if (!tgt[k] && WL.RETIRED_SETTINGS.indexOf(p[0] + '.' + k) < 0) unknown.push(p[0] + '.' + k); });
   });
   c.professions = c.professions || {};
   Object.keys(c.professions).forEach(function (k) { c.professions[k] = !!(o.prof || {})[k]; });
@@ -64,7 +66,7 @@ WL.applySettings = function (c, o) {
   if (typeof o.levelResist === 'boolean' && c.combat.levelResist) c.combat.levelResist.on = o.levelResist;
   // Gear builder (round 147): a code with it switches it on with its items; a code without it switches it off and keeps
   // the items you had (they no longer count).
-  if (o.gb && typeof o.gb === 'object') c.gearBuilder = { on: true, slots: o.gb.slots || {}, manual: o.gb.manual || {} };
+  if (o.gb && typeof o.gb === 'object') c.gearBuilder = { on: true, slots: o.gb.slots || {}, manual: o.gb.manual || {}, enchants: o.gb.enchants || {} };
   else if (c.gearBuilder) c.gearBuilder.on = false;
   return unknown;
 };

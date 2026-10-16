@@ -75,8 +75,6 @@ export function createCombat(opts) {
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
   const armorRed = WL.armorReduction(cfg);
-  const WF = (WL.activeBuffs(cfg).filter(function (b) { return b.windfury; })[0] || {}).windfury || null;   // Windfury Totem, for pet melee
-  const FT = (WL.activeBuffs(cfg).filter(function (b) { return b.flametongue; })[0] || {}).flametongue || null;   // Flametongue Totem, for pet melee
   const petMeleeRange = opts.petMeleeRange || 5;
   const havocPct = table.baneOfHavoc ? SPELLS.baneOfHavoc.havocPct / 100 : 0;
   // The 5-second rule (Xn, 2026-10-06; as in the engine): Spirit gives mana back only while you have spent none for
@@ -101,10 +99,12 @@ export function createCombat(opts) {
     return tvCache[id];
   }
   function racialOf(effect) { return race.racials.filter(function (r) { return r.effect === effect; })[0] || null; }
+  const EUREKA = (function () { const c = racialOf('cooldown'); return c && c.dmgPct ? c : null; })();   // Gnome
+  const TOG = racialOf('proc');                                                                           // Undead
   // Threat (Xn, 2026-10-07; as in the engine): 1 damage = 1 threat, Searing Pain twice that (less with Demonic Brand),
-  // all of it reduced by Suppression and by Blessing of Salvation / Tranquil Air Totem. Your pet's damage is the pet's
-  // threat, not yours. It changes nothing in the fight; it is counted so you can see it.
-  // Threat buffs of one group do not stack (Blessing of Salvation and Tranquil Air Totem; Xn, 2026-10-07): the biggest counts.
+  // all of it reduced by Suppression and by Salvation. Your pet's damage is the pet's threat, not yours. It changes
+  // nothing in the fight; it is counted so you can see it. Threat buffs of one group do not stack (the biggest counts);
+  // none share a group since Tranquil Air Totem left with the patch of 2026-10-16.
   const THREAT_BUFFS = (function () {
     let m = 1;
     const best = {};
@@ -129,15 +129,14 @@ export function createCombat(opts) {
     const seed0 = seed != null ? seed : (opts.seed != null ? opts.seed : Math.floor(Math.random() * 4294967296));
     // One random stream per kind of roll, with the engine's own constants.
     R = { hit: WL.makeRng(seed0 ^ 0x1B873593), crit: WL.makeRng(seed0 ^ 0x85EBCA6B), proc: WL.makeRng(seed0 ^ 0xC2B2AE35),
-          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372), wf: WL.makeRng(seed0 ^ 0x9E3779B9),
-          ft: WL.makeRng(seed0 ^ 0x7F4A7C15),
+          vuln: WL.makeRng(seed0 ^ 0x27D4EB2F), jow: WL.makeRng(seed0 ^ 0x3C6EF372),
           pet: WL.makeRng(seed0 ^ 0x165667B1), push: WL.makeRng(seed0 ^ 0x61C88647) };
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
       shards: Infinity,                                   // Soul Shards never run out (Xn, 2026-10-07)
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
-      cds: {}, buffs: {}, eurekaCharges: 0, eurekaPending: 0, petSent: false,
+      cds: {}, buffs: {}, togReady: -Infinity, petSent: false,
       target: 1, havoc: null,
       fightStart: null, fightEnd: null, over: false, presses: [],
       precastKey: null                                    // the spell you were already casting when the fight began (the sim average then precasts it too)
@@ -177,7 +176,7 @@ export function createCombat(opts) {
   function gcd() { return Math.max(cb.minGcd, cb.gcd / hasteFactor()); }
   function effectiveCost(key) {
     let c = table[key].cost;
-    if (S.eurekaCharges > 0 && SPELLS[key].kind !== 'utility') c *= 1 - racialOf('cooldown').costRedPct / 100;
+    if (eurekaAt(key, finishesAt(key))) c *= 1 - EUREKA.costRedPct / 100;   // Eureka!: when the spell will finish inside it
     return c;
   }
   // A precast gets no such room: mana does not regenerate into it before the fight (Xn, 2026-10-07; as in the engine).
@@ -256,20 +255,23 @@ export function createCombat(opts) {
   }
 
   // ---------- damage ----------
-  function eurekaUp() { return S.eurekaCharges > 0 || S.eurekaPending > 0; }
-  function eurekaRelease() { if (S.eurekaPending > 0) S.eurekaPending--; }
+  // Eureka! (Gnome; patch of 2026-10-16, as in the engine): an 8 s buff (S.buffs.eureka = when it ends). A damaging
+  // spell that FINISHES while it is up gets +10% damage and -10% mana: a cast bar when it completes, an instant when it
+  // is cast. A channel: its cost when it starts inside, each tick while the buff is up. DoTs (Corruption, the Banes,
+  // Siphon Life) and curses get nothing; Immolate's direct hit does. The +10% adds to the spell's modifier group.
+  function eurekaAt(key, t) { const k = SPELLS[key].kind; return !!EUREKA && k !== 'utility' && k !== 'dot' && S.buffs.eureka != null && S.buffs.eureka > t + EPS; }
+  function eurekaUp() { return !!EUREKA && buff('eureka'); }
   function eurekaMult(key, periodic) {
-    const cd = racialOf('cooldown');
-    if (!(cd && cd.charges && eurekaUp())) return 1;
-    if (periodic && SPELLS[key].kind !== 'channel') return 1;        // DoT ticks get nothing
     const e = table[key], g = e ? (periodic ? e.op22 : e.op0) || 0 : 0;
-    return (1 + g + cd.dmgPct / 100) / (1 + g);
+    return (1 + g + EUREKA.dmgPct / 100) / (1 + g);
   }
+  function eurekaTick(key, periodic) { return periodic && SPELLS[key].kind === 'channel' && eurekaAt(key, S.t) ? eurekaMult(key, true) : 1; }
+  function finishesAt(key) { return S.t + (SPELLS[key].kind === 'channel' ? 0 : castTime(key)); }   // a channel counts from its start
   function addOp0(key, pct) { const g = (table[key] && table[key].op0) || 0; return (1 + g + pct / 100) / (1 + g); }
   // What changes a spell's damage at this moment on this target: your buffs, and that target's own debuffs.
   function liveMult(key, periodic, ti) {
     const s = SPELLS[key];
-    let m = eurekaMult(key, periodic);
+    let m = eurekaTick(key, periodic);
     if (debuff(ti, 'coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
     if (s.school === 'shadow' && debuff(ti, 'isb')) m *= 1 + tv('improvedShadowBolt', 'debuffPct') / 100;
     if (s.school === 'shadow' && buff('snfShadow')) m *= 1 + tv('shadowAndFlame', 'schoolPct') / 100;
@@ -349,7 +351,7 @@ export function createCombat(opts) {
     }
     if (!next) {
       S.over = true; S.fightEnd = S.t;
-      S.cast = null; S.channel = null; events.length = 0; queued = null; S.eurekaPending = 0;
+      S.cast = null; S.channel = null; events.length = 0; queued = null;
       if (P) { P.active = false; P.gen++; P.casting = null; }
     }
     const seconds = Math.max(S.t - (S.fightStart === null ? S.t : S.fightStart), 0);
@@ -365,21 +367,13 @@ export function createCombat(opts) {
     S.mana = Math.min(stats.maxMana, S.mana + JOW.mana);
     emit({ type: 'mana', source: 'Judgement of Wisdom', amount: S.mana - before });
   }
-  // Touch of the Grave (Undead): 5% of your maximum health - so it grows with Stamina - times every Shadow damage %:
-  // your Shadow auras (Demonic Sacrifice, Master Demonologist, Soul Link), Curse of the Elements and Improved Shadow
-  // Bolt on the target it hits, and Shadow and Flame while it is up. No spell power, none of the talents that name
-  // their own spells, no crit, no resist roll (Xn, 2026-10-06; as in the engine).
-  function togMult(ti) {
-    let m = (stats.mult.shadow || 1) * stats.mult.all;
-    if (debuff(ti, 'coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
-    if (debuff(ti, 'isb')) m *= 1 + tv('improvedShadowBolt', 'debuffPct') / 100;
-    if (buff('snfShadow')) m *= 1 + tv('shadowAndFlame', 'schoolPct') / 100;
-    return m;
-  }
+  // Touch of the Grave (Undead; patch of 2026-10-16, as in the engine): a 30% chance, then 25 s before it can come
+  // again (no roll meanwhile). 5% of your maximum health - so it grows with Stamina - and nothing multiplies it: no
+  // auras, no Curse of the Elements, no Improved Shadow Bolt, no Shadow and Flame. No spell power, no crit, no resist.
   function touchOfTheGrave(ti) {
-    const tog = racialOf('proc');
-    if (tog && R.proc() * 100 < tog.chancePct) {
-      const amount = stats.maxHealth * tog.maxHealthPct / 100 * togMult(ti);
+    if (TOG && !(S.togReady > S.t + EPS) && R.proc() * 100 < TOG.chancePct) {
+      S.togReady = S.t + (TOG.icd || 0);
+      const amount = stats.maxHealth * TOG.maxHealthPct / 100;
       row('touchOfTheGrave').casts++;
       if (alive(ti)) deal('touchOfTheGrave', amount, false, false, ti);   // on the target the spell landed on
     }
@@ -431,7 +425,7 @@ export function createCombat(opts) {
   }
 
   // A finished or instant cast arrives at its target. Returns true when it hit.
-  function land(key, baseMult, ti) {
+  function land(key, baseMult, ti, eureka) {   // eureka: the cast finished inside Eureka!
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
     r.landed++;
@@ -447,7 +441,7 @@ export function createCombat(opts) {
       if (ti === 1 && !S.over) jowProc();
       return true;
     }
-    let amount = (s.base + s.coef * spNow(e)) * e.directMult * liveMult(key, false, ti);
+    let amount = (s.base + s.coef * spNow(e)) * e.directMult * liveMult(key, false, ti) * (eureka ? eurekaMult(key, false) : 1);
     if (key === 'incinerate' && dotLeft('immolate', ti) > 0) amount *= 1 + s.immolateBonusPct / 100;
     if ((isSB(key) || key === 'searingPain') && executePhase(ti) && tv('decimation')) {
       amount *= addOp0(key, tv('decimation', 'dmgPct'));
@@ -545,21 +539,16 @@ export function createCombat(opts) {
       if (!S.over && P.gen === gen) petEvent(P.lashReady || S.t + 1.5, 2, 'petAct');
     }
   }
-  // The pet's melee. Windfury Totem (Xn, 2026-10-07): a swing that lands has a chance of one extra attack at once, with
-  // extra attack power, on the same attack table. The extra attack counts as a pet attack (it uses a Demonic Brand
-  // charge) and cannot cause another one. Its dice are rolled even when the swing ended the fight, to stay in step
-  // with the engine.
+  // The pet's melee. Windfury Totem (extra attacks) and Flametongue Totem (a Fire hit per swing) were here until the
+  // patch of 2026-10-16; since then they only affect players.
   function petSwing() {
     if (S.t >= endAt() - EPS) return;
     const m = P.c.melee, ti = P.target, gen = P.gen;
     P.swingReady = S.t + m.swing;
-    if (petMeleeAttack('pet:melee', R.pet() * 100, 0, ti) && WF && R.wf() * 100 < WF.procPct) {
-      const roll = R.wf() * 100;
-      if (!S.over && P.gen === gen && alive(ti)) petMeleeAttack('pet:windfury', roll, WF.ap, ti);
-    }
+    petMeleeAttack('pet:melee', R.pet() * 100, ti);
     if (!S.over && P.gen === gen) petEvent(S.t + m.swing, 0, 'petSwing');
   }
-  function petMeleeAttack(key, roll, extraAp, ti) {   // one roll decides miss, dodge, glancing, crit or hit; true if it landed
+  function petMeleeAttack(key, roll, ti) {   // one roll decides miss, dodge, glancing, crit or hit; true if it landed
     const m = P.c.melee, r = row(rowKey(ti, key)), tb = cb.petMelee;
     r.casts++;
     const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
@@ -568,7 +557,7 @@ export function createCombat(opts) {
     if (roll >= miss + tb.dodgePct) {
       r.landed++;
       if (ti === 1) jowProc(true);
-      const dps = m.baseDps + (m.apPerSp * warlockSpNow() + extraAp) / m.apPerDps;
+      const dps = m.baseDps + m.apPerSp * warlockSpNow() / m.apPerDps;
       let amount = dps * m.swing * (1 - armorRed) * petMult('physical');
       const glance = roll < miss + tb.dodgePct + tb.glancePct;
       const crit = !glance && roll < miss + tb.dodgePct + tb.glancePct + critChance;
@@ -576,27 +565,11 @@ export function createCombat(opts) {
       if (crit) amount *= 2;
       deal(key, amount, crit, false, ti, { pet: true, school: 'physical', glance: glance });
       if (!S.over && alive(ti)) brandProc(ti);
-      if (FT && !S.over && alive(ti)) flametongueHit(ti);
       return true;
     }
     r.misses++;
     emit({ type: 'miss', key: key, target: ti, pet: true, dodge: roll >= miss });
     return false;
-  }
-  // Flametongue Totem (Xn in the sim's chat, 2026-10-08; as in the engine): every pet swing that lands - a glancing
-  // blow and Windfury's extra attack too - adds a Fire hit of per100 x swing time / 100 (27 for a 2 s swing), without
-  // spell power. It stacks with Windfury Totem. The engine treats it as a spell of the pet: it can miss (your hit
-  // chance) and crit (your crit), and takes the pet's damage bonuses and Curse of the Elements. It is not an attack:
-  // no Demonic Brand charge, no Judgement of Wisdom. Its own dice (R.ft): first whether it lands, then whether it crits.
-  function flametongueHit(ti) {
-    const key = 'pet:flametongue', r = row(rowKey(ti, key));
-    r.casts++;
-    if (R.ft() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, pet: true }); return; }
-    r.landed++;
-    let amount = FT.per100 * P.c.melee.swing / 100 * petMult('fire');
-    const crit = R.ft() * 100 < stats.critPct;
-    if (crit) amount *= cb.critMultiplier;
-    deal(key, amount, crit, false, ti, { pet: true, school: 'fire' });
   }
   // The pet attacks while it is told to and stands in range of its target. ctx.petDistance = that distance in yards.
   function syncPet(ctx) {
@@ -632,8 +605,7 @@ export function createCombat(opts) {
     res.track.spent += paid;
     if (S.mana < res.track.minMana) res.track.minMana = S.mana;
     if (res.track.first === null && S.fightStart !== null) res.track.first = S.t - S.fightStart;
-    let eurekaUsed = false, baseMult = 1;
-    if (S.eurekaCharges > 0 && s.kind !== 'utility') { S.eurekaCharges--; S.eurekaPending++; eurekaUsed = true; }
+    let baseMult = 1;
     // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): +50% to the base value.
     if (key === 'baneOfAgony' && tv('amplifyCurse') && ready('amplifyCurse')) {
       baseMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
@@ -643,7 +615,7 @@ export function createCombat(opts) {
     const free = key === 'soulFire' && (startedWithDecimation || buff('decimation'));
     if (s.shards && !free) S.shards -= s.shards;
     if (key === 'soulFire' && buff('decimation')) delete S.buffs.decimation;
-    return { eurekaUsed: eurekaUsed, baseMult: baseMult };
+    return { baseMult: baseMult };
   }
 
   function startCast(key, ti) {
@@ -681,7 +653,6 @@ export function createCombat(opts) {
       const spent = commit(key), r = row(rowKey(ti, key));
       if (e.cd) S.cds[key] = S.t + e.cd;
       if (!s.aoe && R.hit() * 100 >= stats.hitPct) {       // area channels always start; their ticks roll per target
-        if (spent.eurekaUsed) eurekaRelease();
         r.misses++; emit({ type: 'miss', key: key, target: ti });
         S.decideSeq = order++;
         return;
@@ -691,7 +662,7 @@ export function createCombat(opts) {
       if (!S.over) {
         if (ti === 1 || s.aoe) jowProc();
         const id = ++inst;
-        S.channel = { key: key, inst: id, target: ti, snap: { baseMult: 1 }, start: S.t, end: S.t + s.duration, eurekaHeld: spent.eurekaUsed };
+        S.channel = { key: key, inst: id, target: ti, snap: { baseMult: 1 }, start: S.t, end: S.t + s.duration };
         for (let i = 1; i <= e.ticks; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
       }
     } else if (castT > EPS) {
@@ -703,11 +674,11 @@ export function createCombat(opts) {
       S.cast = { key: key, inst: id, target: ti, start: S.t, end: S.t + castT, full: castT, hits: 0, cost: effectiveCost(key), decimation: key === 'soulFire' && buff('decimation'), precast: precast };
       push({ t: S.t + castT, o: 1, type: 'castEnd', inst: id });
     } else {
+      const price = effectiveCost(key);                    // before Shadow Trance is used up: it makes the cast instant (Eureka! asks when it finishes)
       if (trance) delete S.buffs.shadowTrance;
       if (e.cd) S.cds[key] = S.t + e.cd;
-      const spent = commit(key);
-      land(key, spent.baseMult, ti);
-      if (spent.eurekaUsed) eurekaRelease();
+      const spent = commit(key, undefined, price);
+      land(key, spent.baseMult, ti, eurekaAt(key, S.t));
     }
     S.decideSeq = order++;
   }
@@ -753,7 +724,6 @@ export function createCombat(opts) {
       emit({ type: 'interrupt', key: key, reason: reason });
     } else if (S.channel) {
       const key = S.channel.key;
-      if (S.channel.eurekaHeld) eurekaRelease();
       S.channel = null;
       emit({ type: 'interrupt', key: key, reason: reason, channel: true });
     }
@@ -766,10 +736,7 @@ export function createCombat(opts) {
     S.cds.racial = S.t + cd.cd;
     if (cd.spPct) S.buffs.bloodFury = S.t + cd.duration;
     if (cd.hastePct) S.buffs.berserking = S.t + cd.duration;
-    if (cd.charges) {
-      S.eurekaCharges = cd.charges; S.eurekaPending = 0;
-      if (cd.duration) push({ t: S.t + cd.duration, o: 0, type: 'eurekaEnd', pop: S.cds.racial });
-    }
+    if (cd === EUREKA) S.buffs.eureka = S.t + cd.duration;          // 8 s (patch of 2026-10-16)
     S.presses.push({ t: S.t, k: 'racial' });
     emit({ type: 'used', name: cd.name });
     return { ok: true };
@@ -908,7 +875,7 @@ export function createCombat(opts) {
   // A timed fight is over: the clock stops, everything stops.
   function timeUp() {
     S.over = true; S.fightEnd = S.t;
-    S.cast = null; S.channel = null; events.length = 0; queued = null; S.eurekaPending = 0;
+    S.cast = null; S.channel = null; events.length = 0; queued = null;
     if (P) { P.active = false; P.gen++; P.casting = null; }
     emit({ type: 'death', target: S.target, last: true, timed: true, seconds: linear, total: res.total, dps: res.total / linear });
   }
@@ -918,7 +885,7 @@ export function createCombat(opts) {
     if (S.over || S.fightStart === null) return false;
     const seconds = S.t - S.fightStart;
     S.over = true; S.fightEnd = S.t;
-    S.cast = null; S.channel = null; events.length = 0; queued = null; S.eurekaPending = 0;
+    S.cast = null; S.channel = null; events.length = 0; queued = null;
     if (P) { P.active = false; P.gen++; P.casting = null; }
     emit({ type: 'death', target: S.target, last: true, timed: true, stopped: true, seconds: seconds, total: res.total, dps: seconds > 0 ? res.total / seconds : 0 });
     return true;
@@ -936,8 +903,7 @@ export function createCombat(opts) {
         syncPet(lastCtx);
       }
       const spent = commit(c.key, c.decimation, c.cost);
-      land(c.key, spent.baseMult, c.target);
-      if (spent.eurekaUsed) eurekaRelease();
+      land(c.key, spent.baseMult, c.target, eurekaAt(c.key, S.t));   // finished now: inside Eureka! or not
     } else if (ev.type === 'dotTick') {
       const d = T[ev.target].dots[ev.key];
       if (!d || d.inst !== ev.inst) return;              // refreshed, consumed, or the target is dead
@@ -949,16 +915,14 @@ export function createCombat(opts) {
     } else if (ev.type === 'chanEnd') {                  // a channel shortened by a hit ends early
       const c = S.channel;
       if (!c || c.inst !== ev.inst || c.end > S.t + EPS) return;
-      if (c.eurekaHeld) eurekaRelease();
       S.channel = null;
     } else if (ev.type === 'chanTick') {
       const c = S.channel;
       if (!c || c.inst !== ev.inst) return;              // stopped
       if (ev.t > c.end + EPS) return;                    // cut off by a hit; the channel's end closes it
       if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target);
-      if (!S.over && S.channel === c && ev.i === table[ev.key].ticks - 1) { if (c.eurekaHeld) eurekaRelease(); S.channel = null; }
+      if (!S.over && S.channel === c && ev.i === table[ev.key].ticks - 1) S.channel = null;
       else if (!S.over && S.channel === c && SPELLS[ev.key].selfDamage && S.health <= selfTick(ev.key)) {   // the next tick would kill you
-        if (c.eurekaHeld) eurekaRelease();
         S.channel = null;
         emit({ type: 'interrupt', key: ev.key, reason: 'health', channel: true });
         S.decideSeq = order++;
@@ -977,8 +941,6 @@ export function createCombat(opts) {
       if (P && P.active && ev.gen === P.gen) petSpellHit(P.c.spell);
     } else if (ev.type === 'petSwing') {
       if (P && P.active && ev.gen === P.gen) petSwing();
-    } else if (ev.type === 'eurekaEnd') {
-      if (ev.pop === S.cds.racial && eurekaUp()) { S.eurekaCharges = 0; S.eurekaPending = 0; emit({ type: 'expire', name: 'eureka' }); }
     }
   }
 
