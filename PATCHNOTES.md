@@ -17,6 +17,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
     An old build code with Malediction still imports: its points move to Grim Reach as far as they fit.
   - Windfury and Flametongue Totem no longer help your demon, and Tranquil Air Totem is gone.
   - New talents for four ready builds; the build list's ranking is updated.
+  - **Range talents:** Destructive Reach lengthens only Destruction spells and Grim Reach only Affliction spells
+    (Corruption is Affliction). Drain Life no longer gains range from Destructive Reach.
+- When your Affliction and Destruction spells reach different distances, the ground shows a ring for each: violet for
+  Affliction, pink for Destruction.
 
 ### 2026-10-15
 - **Lessons** (a new button at the top left): a short series for the build you play, made from its rotation - never

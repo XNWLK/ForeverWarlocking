@@ -861,10 +861,20 @@ function newCharacter() {
   // The dummies in the room (what you cannot walk through is set with every new fight: setColliders).
   for (let i = 1; i <= 3; i++) dummies[i].root.visible = i <= targets;
 
-  // Range rings around your target: your spell range (Destructive Reach included), Drain Life, the Succubus.
+  // Range rings around your target: your spell range, Drain Life, the Succubus. Destructive Reach lengthens only
+  // Destruction spells and Grim Reach only Affliction spells (Xn, 2026-10-16), so when the two trees reach different
+  // distances each gets its own ring (Xn: "add a second ring"): Affliction violet, Destruction pink.
   if (rings) scene.remove(rings);
-  const list = [{ yards: character.maxRange, color: 0xb9a8ff }];
-  if (combat.table.drainLife && combat.table.drainLife.range !== character.maxRange) list.push({ yards: combat.table.drainLife.range, color: 0x58e0a8 });
+  const list = [], reach = {};
+  bar.forEach(function (k) {
+    const e = combat.table[k], tree = WL.SPELLS[k] && WL.SPELLS[k].tree;
+    if (!e || !(e.range > 0) || k === 'drainLife' || (tree !== 'affliction' && tree !== 'destruction')) return;
+    reach[tree] = Math.max(reach[tree] || 0, e.range);
+  });
+  if (reach.affliction && reach.destruction && reach.affliction !== reach.destruction) {
+    list.push({ yards: reach.affliction, color: 0xb9a8ff }, { yards: reach.destruction, color: 0xff8fc8 });
+  } else list.push({ yards: character.maxRange, color: 0xb9a8ff });
+  if (combat.table.drainLife && list.every(function (r) { return r.yards !== combat.table.drainLife.range; })) list.push({ yards: combat.table.drainLife.range, color: 0x58e0a8 });
   if (build.pet === 'succubus') list.push({ yards: petMeleeRange(config, build.pet), color: 0xff9d7a });
   rings = makeRangeRings(list);
   rings.visible = getSetting('rings');

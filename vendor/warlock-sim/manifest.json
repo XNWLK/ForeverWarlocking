@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "6867f8c",
-    "subject":  "Builds after the patch: Aff Pact Shadow Bolt 8/31/12, Wrack Succubus 33/0/18",
+    "commit":  "e696b14",
+    "subject":  "Range talents: Destructive Reach for Destruction spells, Grim Reach for Affliction spells",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-16 17:43",
+    "synced":  "2026-10-16 18:01",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
