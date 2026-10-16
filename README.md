@@ -30,8 +30,8 @@ It uses the same spell values, talents and mechanics as
 times and ranks them ([its repository](https://github.com/XNWLK/WarlockSIM)); a copy of that sim's data and engine
 lives in [`vendor/warlock-sim/`](vendor/warlock-sim/README.md).
 
-The simulator also exists inside the game: **[Xn's Warlock Sim](https://github.com/XNWLK/WarlockSIMAddon)** is an
-addon for WoW Forever that reads your own character (talents, race, demon and the numbers on your character sheet)
+The simulator also exists inside the game: **[Xn's Warlock Sim](https://www.curseforge.com/wow/addons/xns-warlock-sim)** is an
+addon for WoW Forever ([its repository](https://github.com/XNWLK/WarlockSIMAddon)) that reads your own character (talents, race, demon and the numbers on your character sheet)
 and sims it. The build and settings codes it makes can be imported here, so you can practise the build you just
 simmed.
 
