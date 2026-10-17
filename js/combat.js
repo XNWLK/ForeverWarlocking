@@ -392,7 +392,7 @@ export function createCombat(opts) {
 
   function periodicTick(key, snap, i, ti) {
     const s = SPELLS[key], e = table[key];
-    let amount = (s.tickBase * (snap.baseMult || 1) + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
+    let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
     amount *= vulnMult(s.school, ti);
     const crit = R.crit() * 100 < e.critPct;
@@ -425,7 +425,7 @@ export function createCombat(opts) {
   }
 
   // A finished or instant cast arrives at its target. Returns true when it hit.
-  function land(key, baseMult, ti, eureka) {   // eureka: the cast finished inside Eureka!
+  function land(key, castMult, ti, eureka) {   // eureka: the cast finished inside Eureka!
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
     r.landed++;
@@ -435,7 +435,7 @@ export function createCombat(opts) {
       return true;
     }
     if (s.kind === 'dot') {
-      applyDot(ti, key, { baseMult: baseMult || 1 });
+      applyDot(ti, key, { castMult: castMult || 1 });
       emit({ type: 'apply', key: key, target: ti });
       touchOfTheGrave(ti);
       if (ti === 1 && !S.over) jowProc();
@@ -468,7 +468,7 @@ export function createCombat(opts) {
       if (R.proc() * 100 < tv('shadowAndFlame', 'procPct')) { S.shards++; if (isFinite(S.shards)) emit({ type: 'refund', key: 'soulShard' }); }
     }
     if (S.over) return true;
-    if (s.kind === 'hybrid' && !t.dead) applyDot(ti, key, { baseMult: baseMult || 1 });
+    if (s.kind === 'hybrid' && !t.dead) applyDot(ti, key, { castMult: castMult || 1 });
     touchOfTheGrave(ti);
     if (ti === 1 && !S.over) jowProc();
     return true;
@@ -605,17 +605,18 @@ export function createCombat(opts) {
     res.track.spent += paid;
     if (S.mana < res.track.minMana) res.track.minMana = S.mana;
     if (res.track.first === null && S.fightStart !== null) res.track.first = S.t - S.fightStart;
-    let baseMult = 1;
-    // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): +50% to the base value.
+    let castMult = 1;
+    // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): that Bane's whole tick
+    // value, after everything else, times 1.5 (sim 2a33649; it was the base value only).
     if (key === 'baneOfAgony' && tv('amplifyCurse') && ready('amplifyCurse')) {
-      baseMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
+      castMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
       S.cds.amplifyCurse = S.t + 180;
       emit({ type: 'used', name: 'Amplify Curse' });
     }
     const free = key === 'soulFire' && (startedWithDecimation || buff('decimation'));
     if (s.shards && !free) S.shards -= s.shards;
     if (key === 'soulFire' && buff('decimation')) delete S.buffs.decimation;
-    return { baseMult: baseMult };
+    return { castMult: castMult };
   }
 
   function startCast(key, ti) {
@@ -662,7 +663,7 @@ export function createCombat(opts) {
       if (!S.over) {
         if (ti === 1 || s.aoe) jowProc();
         const id = ++inst;
-        S.channel = { key: key, inst: id, target: ti, snap: { baseMult: 1 }, start: S.t, end: S.t + s.duration };
+        S.channel = { key: key, inst: id, target: ti, snap: { castMult: 1 }, start: S.t, end: S.t + s.duration };
         for (let i = 1; i <= e.ticks; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
       }
     } else if (castT > EPS) {
@@ -678,7 +679,7 @@ export function createCombat(opts) {
       if (trance) delete S.buffs.shadowTrance;
       if (e.cd) S.cds[key] = S.t + e.cd;
       const spent = commit(key, undefined, price);
-      land(key, spent.baseMult, ti, eurekaAt(key, S.t));
+      land(key, spent.castMult, ti, eurekaAt(key, S.t));
     }
     S.decideSeq = order++;
   }
@@ -903,7 +904,7 @@ export function createCombat(opts) {
         syncPet(lastCtx);
       }
       const spent = commit(c.key, c.decimation, c.cost);
-      land(c.key, spent.baseMult, c.target, eurekaAt(c.key, S.t));   // finished now: inside Eureka! or not
+      land(c.key, spent.castMult, c.target, eurekaAt(c.key, S.t));   // finished now: inside Eureka! or not
     } else if (ev.type === 'dotTick') {
       const d = T[ev.target].dots[ev.key];
       if (!d || d.inst !== ev.inst) return;              // refreshed, consumed, or the target is dead

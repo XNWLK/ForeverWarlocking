@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "f0d0760",
-    "subject":  "Demons crit with your spell crit only; Agility removed (Grace of Air, Scroll of Agility, gear box)",
+    "commit":  "2a33649",
+    "subject":  "Amplify Curse multiplies the whole Bane of Agony by 1.5",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-17 02:35",
+    "synced":  "2026-10-17 15:15",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

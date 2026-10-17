@@ -9,6 +9,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - Your demon's attacks crit with your spell crit only, as the Warlock SIM now has it. Agility does nothing any more:
   Grace of Air Totem and Scroll of Agility are gone, and items no longer list Agility. Old settings codes with them
   still import.
+- **Amplify Curse** makes the whole Bane of Agony 50% stronger (it was only the spell's base damage). The build list's
+  ranking is updated.
 
 ### 2026-10-16
 - Follows the Forever patch of 2026-10-16, as the Warlock SIM does:
