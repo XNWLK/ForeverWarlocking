@@ -94,7 +94,7 @@ const SLOT_NAMES = { head: 'Head', neck: 'Neck', shoulder: 'Shoulder', back: 'Ba
                      hands: 'Hands', waist: 'Waist', legs: 'Legs', feet: 'Feet', finger1: 'Ring', finger2: 'Ring', trinket1: 'Trinket', trinket2: 'Trinket',
                      mainHand: 'Main Hand', offHand: 'Off Hand', ranged: 'Wand' };
 const GEAR_STATS = [['sp', ' spell power'], ['shadowSp', ' Shadow spell power'], ['fireSp', ' Fire spell power'], ['hitPct', '% hit'], ['critPct', '% crit'],
-                    ['hastePct', '% haste'], ['pierce', ' Spell Pierce'], ['int', ' Intellect'], ['spi', ' Spirit'], ['sta', ' Stamina'], ['agi', ' Agility'], ['mp5', ' mana every 5 s']];
+                    ['hastePct', '% haste'], ['pierce', ' Spell Pierce'], ['int', ' Intellect'], ['spi', ' Spirit'], ['sta', ' Stamina'], ['mp5', ' mana every 5 s']];
 function statText(stats) {
   return GEAR_STATS.filter(function (g) { return +(stats || {})[g[0]]; }).map(function (g) { const v = +stats[g[0]]; return (v > 0 ? '+' : '\u2212') + Math.abs(v) + g[1]; }).join(', ');
 }

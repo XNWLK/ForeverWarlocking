@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-17
+- Your demon's attacks crit with your spell crit only, as the Warlock SIM now has it. Agility does nothing any more:
+  Grace of Air Totem and Scroll of Agility are gone, and items no longer list Agility. Old settings codes with them
+  still import.
+
 ### 2026-10-16
 - Follows the Forever patch of 2026-10-16, as the Warlock SIM does:
   - **Eureka!** (Gnome) is an 8-second buff with no charges: every damaging spell that finishes while it is up does

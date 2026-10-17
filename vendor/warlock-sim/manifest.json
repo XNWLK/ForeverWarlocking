@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e696b14",
-    "subject":  "Range talents: Destructive Reach for Destruction spells, Grim Reach for Affliction spells",
+    "commit":  "f0d0760",
+    "subject":  "Demons crit with your spell crit only; Agility removed (Grace of Air, Scroll of Agility, gear box)",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-16 18:01",
+    "synced":  "2026-10-17 02:35",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

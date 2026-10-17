@@ -553,7 +553,7 @@ export function createCombat(opts) {
     r.casts++;
     const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
     const miss = Math.max(0, tb.missPct - hitBonus);
-    const critChance = Math.max(0, m.critPct + (m.inheritMeleeCrit ? stats.meleeCritPct : 0) - tb.critSuppressionPct);
+    const critChance = Math.max(0, (m.critPct || 0) + (m.inheritSpellCrit ? stats.critPct : 0) - tb.critSuppressionPct);   // your spell crit only (sim, 2026-10-17)
     if (roll >= miss + tb.dodgePct) {
       r.landed++;
       if (ti === 1) jowProc(true);
