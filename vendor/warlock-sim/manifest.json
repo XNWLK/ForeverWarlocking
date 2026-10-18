@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "0999c20",
-    "subject":  "Enchants: arcanums, armor kits, shoulder enchants and other item enhancements; neck and belt enchantable; collector waits and retries",
+    "commit":  "267e84f",
+    "subject":  "Rules, groups and variables of your own in the priority list; tests and notes for the ten ideas",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-18 05:00",
+    "synced":  "2026-10-18 18:04",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

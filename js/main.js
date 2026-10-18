@@ -188,7 +188,9 @@ function readCustomBuild() {
     const b = WL.decodeBuild(code), problems = WL.validateBuild(b);
     if (problems.length) return (b.migrated || []).concat(problems);   // a removed talent's points left unspent can break the tree
     b.key = 'custom'; b.custom = true; b.name = b.short;
-    b.rotation = b.rotation.filter(function (a) { return a !== 'swapToImp' && a !== 'swapToSuccubus'; });   // no pet swap here
+    const noSwap = function (a) { return a !== 'swapToImp' && a !== 'swapToSuccubus'; };                   // no pet swap here
+    b.rotation = b.rotation.filter(noSwap);
+    Object.keys(b.groups || {}).forEach(function (g) { b.groups[g] = b.groups[g].filter(noSwap); });   // nor inside a group
     delete b.timeline;
     customBuild = b;
     return [];
@@ -574,7 +576,7 @@ function reviewData() {
     table: combat.table, gcd: combat.gcd(), pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
     mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
             tapHealth: combat.spells.lifeTap.healthCost || 0,
-            rule: character.build.rotation.indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
+            rule: WL.expandGroups(character.build).indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
     timed: combat.timed || combat.endless, endless: character.endless, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   };
 }

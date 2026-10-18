@@ -453,7 +453,7 @@ export function createHud(WL, handlers) {
       const better = talentValue('improvedLifeTap', 'manaPct') || 0;
       notes.push({ text: 'For you: about ' + whole((s.manaBase + c.stats.spi) * (1 + better / 100)) + ' mana a tap.', yours: true });
       ['lifeTapBelow', 'lifeTapPet'].forEach(function (action) {
-        if (c.build.rotation.indexOf(action) >= 0 && WL.actionLabel) notes.push('This build in the sim: ' + WL.actionLabel(c.build, action) + '.');
+        if (WL.expandGroups(c.build).indexOf(action) >= 0 && WL.actionLabel) notes.push('This build in the sim: ' + WL.actionLabel(c.build, action) + '.');
       });
       notes.push('The sim also taps whenever mana is too low for the next spell.');
     }

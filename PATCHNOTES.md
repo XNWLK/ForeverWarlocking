@@ -8,6 +8,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ### 2026-10-18
 - **Spell Penetration** is its own stat, as in the Warlock SIM: it lowers a target's resistance, but not below 0.
   Spell Pierce still goes below 0. Settings codes with Spell Penetration on gear bring it along, and items list it.
+- Builds imported from the Warlock SIM can carry **rules, groups and variables of your own** in their priority list.
+  The sim's next-cast hint follows them (and names your rule's condition as the reason), the action bar gets their
+  spells, and the rotation panel shows them.
+- New buffs from imported settings: the Atiesh auras (Warlock, Mage, Druid) and another Warlock's Blood Pact.
 
 ### 2026-10-17
 - Your demon's attacks crit with your spell crit only, as the Warlock SIM now has it. Agility does nothing any more:

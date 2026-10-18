@@ -105,6 +105,10 @@ export function createAids(WL, handlers) {
     }
     if (a === 'wrackDots') return 'your DoTs have time left: room for a channel';
     if (FILLER[a]) return 'nothing else is due: the filler';
+    if (/^rule:/.test(a || '')) {                          // one of the build's own rules: its condition is the reason
+      const r = character.build.rules && character.build.rules[+a.slice(5)];
+      return r && r.when ? 'your rule: ' + WL.condText(r.when, character.build) : 'your rule: always';
+    }
     return '';
   }
   function showHint(combat, now, on, sim) {

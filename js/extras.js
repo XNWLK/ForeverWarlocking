@@ -7,7 +7,7 @@
 // The rules of the fight are not in here: this file only shows things and tells main.js what was chosen.
 import { getSetting, setSetting } from './settings.js';
 import { setTip } from './tooltip.js';
-import { ACTION_SPELLS } from './combat.js';
+import { actionSpells } from './combat.js';
 import { ENCOUNTERS, simFight } from './encounter.js';
 import { ROBES } from './warlock.js';
 import { lessonsFor } from './lessons.js';
@@ -162,7 +162,7 @@ export function createExtras(WL, handlers) {
     const list = byId('rotationList'), build = character.build;
     list.textContent = '';
     build.rotation.forEach(function (action) {
-      const li = document.createElement('li'), spell = (ACTION_SPELLS[action] || [])[0];
+      const li = document.createElement('li'), spell = actionSpells(build, action)[0];
       li.dataset.action = action;                          // the sim's next cast lights up its line
       const icon = spell && WL.ICONS[spell];
       if (icon) { const img = document.createElement('img'); img.src = icon; img.alt = ''; li.appendChild(img); }

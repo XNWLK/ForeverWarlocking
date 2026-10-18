@@ -83,7 +83,7 @@ function manaCheck() {
 
 // The lessons for this build. WL: the sim's data; build: the build (its rotation decides which lessons there are).
 export function lessonsFor(WL, build) {
-  const rot = build.rotation || [], has = function (a) { return rot.indexOf(a) >= 0; };
+  const rot = build.rotation ? WL.expandGroups(build) : [], has = function (a) { return rot.indexOf(a) >= 0; };   // groups put in place
   const name = function (k) { return (WL.SPELLS[k] && WL.SPELLS[k].name) || k; };
   const line = function (a) { return String((WL.actionLabel && WL.actionLabel(build, a)) || a).replace(/\s*\[A\d+\]/g, ''); };
   const filler = rot[rot.length - 1], fillerSpell = filler === 'searingPain' ? 'searingPain' : filler === 'incinerate' ? 'incinerate' : filler === 'wrack' ? 'wrack' : 'shadowBolt';

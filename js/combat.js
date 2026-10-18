@@ -1043,7 +1043,7 @@ export function createCombat(opts) {
     const list = WL.effectiveRotation(build, { fight: { multiDot: standing.length > 1, targets: standing.length } });
     let found = null;
     for (let i = 0; i < list.length && !found; i++) {
-      const a = WL.ACTIONS[list[i]];
+      const a = WL.actionOf(list[i], build);               // a built-in action or one of the build's own rules
       if (!a) continue;
       view.nextTarget = 0; view.actionIndex = i;
       const k = a.pick(view);
@@ -1129,6 +1129,16 @@ const HOME = {
   incinerate: [2], wrack: [2, 10], conflagrate: [1], shadowburn: [9, 7], siphonLife: [6, 7]
 };
 
+// The spells one line of a build's priority list can cast: a built-in action (the table above), one of the build's
+// own rules ('rule:N' casts build.rules[N].spell) or a group of lines ('group:Name', one level, as the sim has them).
+export function actionSpells(build, action) {
+  if (ACTION_SPELLS[action]) return ACTION_SPELLS[action];
+  const rule = /^rule:(\d+)$/.exec(action || ''), group = /^group:(.+)$/.exec(action || '');
+  if (rule) { const r = build.rules && build.rules[+rule[1]]; return r && r.spell ? [r.spell] : []; }
+  if (group) return [].concat.apply([], ((build.groups || {})[group[1]] || []).filter(function (a) { return !/^group:/.test(a); }).map(function (a) { return actionSpells(build, a); }));
+  return [];
+}
+
 // Returns one entry per slot: a spell key, 'racial', or null for an empty slot.
 // First the spells of the build's priority list (plus Life Tap and the race's cooldown) take their own keys; those
 // whose key is taken fill the free slots from the left; then whatever else the build can cast, if its key is free.
@@ -1139,7 +1149,7 @@ export function actionBarFor(build, table, race, slots, own) {
   const mine = own || {};
   const wanted = [];
   function want(key) { if (wanted.indexOf(key) < 0 && (key === 'racial' || table[key])) wanted.push(key); }
-  build.rotation.forEach(function (action) { (ACTION_SPELLS[action] || []).forEach(want); });
+  build.rotation.forEach(function (action) { actionSpells(build, action).forEach(want); });
   want('lifeTap');
   if (race.racials.some(function (r) { return r.effect === 'cooldown'; })) want('racial');
 
