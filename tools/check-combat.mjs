@@ -6,7 +6,8 @@
 //
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
-// two seconds (pushback), movement phases, and Salvation (threat). The Shaman totems' scenes went with the patch of
+// two seconds (pushback), movement phases, Salvation (threat), and a boss with resistances fought with Spell
+// Penetration and Spell Pierce. The Shaman totems' scenes went with the patch of
 // 2026-10-16 (Windfury and Flametongue Totem only affect players since, Tranquil Air Totem is gone).
 //
 // Precast scenes: the engine starts the fight with a spell that completes at 0 s (fight.precast). Here the same
@@ -30,6 +31,7 @@ const SCENES = [
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
   { name: 'Salvation', targets: 1, seeds: [11], buffs: ['blessingOfSalvation'] },
+  { name: 'resistances, Spell Penetration and Pierce', targets: 2, seeds: [17], gear: { spellPen: 30, pierce: 10 }, combat: { targetResist: { shadow: 75, fire: 40 } } },
   { name: 'precast Shadow Bolt', targets: 1, seeds: [12], precast: 'shadowBolt' },
   { name: 'precast Immolate', targets: 1, seeds: [13], precast: 'immolate' },
   { name: 'precast Soul Fire', targets: 1, seeds: [14], precast: 'soulFire' },
@@ -56,6 +58,8 @@ for (const scene of SCENES) {
         cfg.fight.multiDot = scene.targets > 1;
         Object.assign(cfg.fight, scene.fight || {});
         (scene.buffs || []).forEach(k => { cfg.buffs[k].on = true; });
+        Object.assign(cfg.gear, scene.gear || {});
+        Object.assign(cfg.combat, scene.combat || {});
         if (scene.precast) cfg.fight.precast = scene.precast;
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
         // The spell this build really precasts (null: it cannot, and the engine starts as usual).

@@ -290,7 +290,7 @@ export function createCombat(opts) {
   let resCache = {};
   function vulnMult(school, ti) {    // partial resists and Spell Pierce
     const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0');
-    const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe));
+    const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen));
     let m = pr.flat;
     if (pr.dist.length > 1) {
       const x = R.vuln();

@@ -5,6 +5,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-18
+- **Spell Penetration** is its own stat, as in the Warlock SIM: it lowers a target's resistance, but not below 0.
+  Spell Pierce still goes below 0. Settings codes with Spell Penetration on gear bring it along, and items list it.
+
 ### 2026-10-17
 - Your demon's attacks crit with your spell crit only, as the Warlock SIM now has it. Agility does nothing any more:
   Grace of Air Totem and Scroll of Agility are gone, and items no longer list Agility. Old settings codes with them
