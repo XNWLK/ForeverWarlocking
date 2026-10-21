@@ -7,7 +7,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ### 2026-10-21
 - Your demon's **melee hit** is now 8/17 of your spell hit above the base (it was all of it), as the Warlock SIM now
-  has it. Its spells still use your full hit chance. The build list's numbers moved a little for the Succubus builds.
+  has it, and none of it is lost any more (the first 1% used to not count): 17% spell hit means her melee never
+  misses. Its spells still use your full hit chance. The build list's numbers moved a little for the Succubus builds.
 
 ### 2026-10-18
 - **Spell Penetration** is its own stat, as in the Warlock SIM: it lowers a target's resistance, but not below 0.
