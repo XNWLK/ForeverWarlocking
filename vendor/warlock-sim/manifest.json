@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "267e84f",
-    "subject":  "Rules, groups and variables of your own in the priority list; tests and notes for the ten ideas",
+    "commit":  "f6d6c7e",
+    "subject":  "Demon melee hit = 8/17 of your spell hit (spells keep your full hit)",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-18 18:04",
+    "synced":  "2026-10-21 11:10",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

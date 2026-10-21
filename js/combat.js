@@ -551,7 +551,7 @@ export function createCombat(opts) {
   function petMeleeAttack(key, roll, ti) {   // one roll decides miss, dodge, glancing, crit or hit; true if it landed
     const m = P.c.melee, r = row(rowKey(ti, key)), tb = cb.petMelee;
     r.casts++;
-    const hitBonus = Math.max(0, stats.hitPct - cb.baseHitPct - tb.hitSuppressionPct);
+    const hitBonus = Math.max(0, WL.petMeleeHit(stats, cb) - tb.hitSuppressionPct);   // 8/17 of your spell hit above the base, not capped (sim, 2026-10-21)
     const miss = Math.max(0, tb.missPct - hitBonus);
     const critChance = Math.max(0, (m.critPct || 0) + (m.inheritSpellCrit ? stats.critPct : 0) - tb.critSuppressionPct);   // your spell crit only (sim, 2026-10-17)
     if (roll >= miss + tb.dodgePct) {
