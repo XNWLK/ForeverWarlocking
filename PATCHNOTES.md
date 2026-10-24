@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-24
+- The build list has six builds: **Aff Pact Shadow Bolt Succubus is gone** (the Warlock SIM retired it; Demo Pact
+  Shadow Bolt Succubus does the same job better). If it was your build, the page opens the top build instead.
+- "SM Ruin (classic)" is now just **SM Ruin**.
+
 ### 2026-10-21
 - Your demon's **melee hit** is now 8/17 of your spell hit above the base (it was all of it), as the Warlock SIM now
   has it, and none of it is lost any more (the first 1% used to not count): 17% spell hit means her melee never

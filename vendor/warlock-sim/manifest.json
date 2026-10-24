@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e094a7a",
-    "subject":  "Demon melee: no hit suppression, 17% spell hit means she never misses",
+    "commit":  "ba4bfa9",
+    "subject":  "Build list: Aff Pact Shadow Bolt Succubus retired, SM Ruin (classic) renamed SM Ruin",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-21 11:13",
+    "synced":  "2026-10-24 15:23",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
