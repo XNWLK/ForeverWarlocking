@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e71d3ba",
-    "subject":  "Racials from the patch notes: Ruthless 1%, The Human Spirit 10%, Orc Savage removed and Command (+5% demon damage) back",
+    "commit":  "b7d53d6",
+    "subject":  "Patch notes: 3-minute default fight",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-26 21:54",
+    "synced":  "2026-10-26 22:50",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

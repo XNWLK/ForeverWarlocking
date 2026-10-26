@@ -10,6 +10,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   - **Human:** Ruthless gives 1% crit (was 2%); The Human Spirit gives 10% more Spirit (was 5%).
   - **Orc:** Savage is gone; **Command** is back: your demon deals 5% more damage (its spells, its melee and Demonic
     Brand).
+- The build list's numbers now come from 3-minute fights (the Warlock SIM's default is back to 180 seconds), so
+  they are 1 to 2% lower. The order is the same.
 - The build list's numbers moved with them; Orc is now the best race for most builds.
 
 ### 2026-10-24
