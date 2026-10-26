@@ -101,6 +101,7 @@ export function createCombat(opts) {
   function racialOf(effect) { return race.racials.filter(function (r) { return r.effect === effect; })[0] || null; }
   const EUREKA = (function () { const c = racialOf('cooldown'); return c && c.dmgPct ? c : null; })();   // Gnome
   const TOG = racialOf('proc');                                                                           // Undead
+  const COMMAND = racialOf('petDmgPct');                                                                  // Orc: demon damage +5%
   // Threat (Xn, 2026-10-07; as in the engine): 1 damage = 1 threat, Searing Pain twice that (less with Demonic Brand),
   // all of it reduced by Suppression and by Salvation. Your pet's damage is the pet's threat, not yours. It changes
   // nothing in the fight; it is counted so you can see it. Threat buffs of one group do not stack (the biggest counts);
@@ -487,6 +488,7 @@ export function createCombat(opts) {
   function petSchool() { return build.pet === 'imp' ? 'fire' : 'shadow'; }
   function petMult(school) {
     let m = (1 + tv('unholyPower', 'petDmgPct') / 100) * stats.mult.all;
+    if (COMMAND) m *= 1 + COMMAND.value / 100;                                                          // Orc, patch of 2026-10-26
     if ((build.pet === 'succubus' && school === 'shadow') || (build.pet === 'imp' && school === 'fire')) m *= 1 + tv('masterDemonologist', 'schoolPct') / 100;
     if (school !== 'physical' && debuff(P.target, 'coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
     return m;

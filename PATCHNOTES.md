@@ -5,6 +5,13 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-26
+- Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:
+  - **Human:** Ruthless gives 1% crit (was 2%); The Human Spirit gives 10% more Spirit (was 5%).
+  - **Orc:** Savage is gone; **Command** is back: your demon deals 5% more damage (its spells, its melee and Demonic
+    Brand).
+- The build list's numbers moved with them; Orc is now the best race for most builds.
+
 ### 2026-10-24
 - The build list has six builds: **Aff Pact Shadow Bolt Succubus is gone** (the Warlock SIM retired it; Demo Pact
   Shadow Bolt Succubus does the same job better). If it was your build, the page opens the top build instead.

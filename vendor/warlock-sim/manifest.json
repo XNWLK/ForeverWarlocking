@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "ba4bfa9",
-    "subject":  "Build list: Aff Pact Shadow Bolt Succubus retired, SM Ruin (classic) renamed SM Ruin",
+    "commit":  "e71d3ba",
+    "subject":  "Racials from the patch notes: Ruthless 1%, The Human Spirit 10%, Orc Savage removed and Command (+5% demon damage) back",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-24 15:23",
+    "synced":  "2026-10-26 21:54",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
