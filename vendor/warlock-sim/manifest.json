@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "b7d53d6",
-    "subject":  "Patch notes: 3-minute default fight",
+    "commit":  "eb1018d",
+    "subject":  "Racials: Blood Fury 2 minute cooldown again, Touch of the Grave 15 s cooldown",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-26 22:50",
+    "synced":  "2026-10-27 16:50",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

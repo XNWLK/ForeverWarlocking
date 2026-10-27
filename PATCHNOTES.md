@@ -16,6 +16,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **Fight history:** a History button (next to Progress) lists your last 30 fights. Click one to open its review again,
   with everything it showed at the time. Each review now also has the fight's **combat log** at the end, to read or
   copy. The fights are kept in your browser.
+- From the Forever patch notes: **Blood Fury** (Orc) has a 2-minute cooldown (was 3), **Touch of the Grave** (Undead)
+  can come again after 15 seconds (was 25). The build list's numbers moved a little; Undead is now the best race for
+  four of the six builds.
 
 ### 2026-10-26
 - Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:

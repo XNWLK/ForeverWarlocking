@@ -368,7 +368,7 @@ export function createCombat(opts) {
     S.mana = Math.min(stats.maxMana, S.mana + JOW.mana);
     emit({ type: 'mana', source: 'Judgement of Wisdom', amount: S.mana - before });
   }
-  // Touch of the Grave (Undead; patch of 2026-10-16, as in the engine): a 30% chance, then 25 s before it can come
+  // Touch of the Grave (Undead; patch of 2026-10-16, as in the engine): a 30% chance, then its icd (15 s since 2026-10-27) before it can come
   // again (no roll meanwhile). 5% of your maximum health - so it grows with Stamina - and nothing multiplies it: no
   // auras, no Curse of the Elements, no Improved Shadow Bolt, no Shadow and Flame. No spell power, no crit, no resist.
   function touchOfTheGrave(ti) {
