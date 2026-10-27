@@ -77,6 +77,9 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #links button.twitch svg { display: block; width: 14px; height: 14px; margin: 1px 0; }
 #links .logo { display: block; width: 30px; height: 30px; border-radius: 7px; margin: -4px 6px -4px -3px; }   /* the logo stands for this page */
 #challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
+#bossBar { position: absolute; left: 14px; top: 98px; z-index: 2; }
+#bossBar button.soon { color: var(--ink-dim); font-style: italic; cursor: default; }
+#bossBar button.soon:hover { background: none; }
 #buildLabel { max-width: 190px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
@@ -123,7 +126,7 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .seed { display: flex; gap: 4px; }
 .seed input { flex: 1; min-width: 0; }
 
-.rotation { position: absolute; left: 14px; top: 98px; width: 270px; max-height: calc(100% - 98px - 232px); overflow: hidden; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
+.rotation { position: absolute; left: 14px; top: 142px; width: 270px; max-height: calc(100% - 142px - 232px); overflow: hidden; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
 .rotation ol { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 3px; counter-reset: step; }
 .rotation li { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.25; color: var(--ink); counter-increment: step; }
 .rotation li::before { content: counter(step); flex: none; width: 12px; text-align: right; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
@@ -625,7 +628,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 #touchMenu header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 #touchMenu h2 { margin: 0; font-size: 16px; font-weight: 600; }
 #touchMenuBody { display: grid; gap: 10px; }
-.touch #touchMenu #links, .touch #touchMenu #challengeBar, .touch #touchMenu #topBar, .touch #touchMenu #side { position: static; width: auto; max-height: none; overflow: visible; justify-items: stretch; }
+.touch #touchMenu #links, .touch #touchMenu #challengeBar, .touch #touchMenu #bossBar, .touch #touchMenu #topBar, .touch #touchMenu #side { position: static; width: auto; max-height: none; overflow: visible; justify-items: stretch; }
 .touch #touchMenu .toolbar { flex-wrap: wrap; row-gap: 6px; padding: 6px 2px; }
 .touch #touchMenu .toolbar .group { flex-wrap: wrap; row-gap: 6px; }
 .touch #touchMenu .toolbar .group + .group { border-left: 0; }

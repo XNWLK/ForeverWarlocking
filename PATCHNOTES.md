@@ -19,6 +19,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - From the Forever patch notes: **Blood Fury** (Orc) has a 2-minute cooldown (was 3), **Touch of the Grave** (Undead)
   can come again after 15 seconds (was 25). The build list's numbers moved a little; Undead is now the best race for
   four of the six builds.
+- A **"Bosses - Coming Soon"** button under Challenges: one day you will pick a real boss from the game there and
+  practise against it with its own mechanics. It does nothing yet.
 
 ### 2026-10-26
 - Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:

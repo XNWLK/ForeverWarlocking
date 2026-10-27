@@ -24,7 +24,7 @@ export function createTouch(handlers) {
 
   // ---------- the menu: the desktop's bars, moved into one sheet ----------
   const menu = byId('touchMenu'), body = byId('touchMenuBody');
-  ['challengeBar', 'topBar', 'side', 'links'].forEach(function (id) { body.appendChild(byId(id)); });
+  ['challengeBar', 'bossBar', 'topBar', 'side', 'links'].forEach(function (id) { body.appendChild(byId(id)); });
   byId('challengeBar').querySelector('.group').appendChild(byId('btnReview'));
   document.querySelectorAll('#side details').forEach(function (d) { d.open = true; });
   function closeMenu() { menu.hidden = true; }
