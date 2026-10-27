@@ -71,9 +71,13 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #links { position: absolute; left: 14px; top: 12px; z-index: 2; }
 #links button:has(svg.gh) { padding: 4px 6px; }
 #links svg.gh { display: block; width: 14px; height: 14px; margin: 1px 0; }   /* GitHub's mark in place of the word */
+#links .group { padding: 0 6px; }   /* a little tighter than the other bars, so the Twitch button fits */
+#links button.twitch { padding: 4px 6px; background: #772ce8; color: #fff; border-color: #772ce8; }   /* Xn's live stream, in Twitch's purple */
+#links button.twitch:hover { background: #6420c9; border-color: #6420c9; }
+#links button.twitch svg { display: block; width: 14px; height: 14px; margin: 1px 0; }
 #links .logo { display: block; width: 30px; height: 30px; border-radius: 7px; margin: -4px 6px -4px -3px; }   /* the logo stands for this page */
 #challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
-#buildLabel { max-width: 220px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#buildLabel { max-width: 190px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
 

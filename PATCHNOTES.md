@@ -5,6 +5,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-27
+- A **Twitch** button at the top left leads to Xn's live stream: come by with questions, or just to say hi.
+
 ### 2026-10-26
 - Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:
   - **Human:** Ruthless gives 1% crit (was 2%); The Human Spirit gives 10% more Spirit (was 5%).
