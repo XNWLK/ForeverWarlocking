@@ -171,7 +171,7 @@ function buildConfig() {
   return cfg;
 }
 function fightOptions() {
-  const none = { timed: false, seconds: 120, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 };
+  const none = { timed: false, seconds: 180, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 };
   const f = challenge ? Object.assign(none, challenge.fight) : Object.assign(none, getSetting('fight') || {});
   if (f.endless) { f.endless = f.endless === 'execute' ? 'execute' : 'full'; f.timed = false; }   // infinite health: '' | 'full' | 'execute'
   return f;

@@ -18,7 +18,7 @@ export const DRILLS = [
   { id: 'opener', name: 'Opener', text: '30 seconds on one dummy. The first casts decide it.', targets: 1, fight: { timed: true, seconds: 30 } },
   { id: 'execute', name: 'Execute phase', text: '45 seconds on a dummy that is in execute range from the first second.', targets: 1, fight: { timed: true, seconds: 45 }, executePct: 100 },
   { id: 'threeDummies', name: 'Three dummies', text: '90 seconds on three dummies: keep your DoTs on all of them.', targets: 3, fight: { timed: true, seconds: 90 } },
-  { id: 'movement', name: 'Movement', text: 'Two minutes. Every 20 seconds you have to move for 5.', targets: 1, fight: { timed: true, seconds: 120, moveEvery: 20, moveDuration: 5 } },
+  { id: 'movement', name: 'Movement', text: 'Three minutes. Every 20 seconds you have to move for 5.', targets: 1, fight: { timed: true, seconds: 180, moveEvery: 20, moveDuration: 5 } },
   { id: 'underFire', name: 'Under fire', text: '90 seconds while you take a hit every 2 seconds.', targets: 1, fight: { timed: true, seconds: 90, hitEvery: 2 } },
   { id: 'longHaul', name: 'Long haul', text: 'Five minutes on one dummy. Mana decides it.', targets: 1, fight: { timed: true, seconds: 300 } },
   { id: 'procs', name: 'Proc watch', text: 'Three minutes on three dummies in execute range: with DoTs on all of them Shadow Trance comes most often, and Decimation builds get theirs. The review says how fast you used each proc.',
@@ -27,11 +27,11 @@ export const DRILLS = [
 // Today's fight: one a day, the same for everyone (the dice are fixed by the date), with your own build. The kind of
 // fight changes from day to day in this order. A day is a day in UTC, so it changes at the same moment everywhere.
 const DAILY = [
-  { text: 'Two minutes on one dummy.', targets: 1, fight: { timed: true, seconds: 120 } },
+  { text: 'Three minutes on one dummy.', targets: 1, fight: { timed: true, seconds: 180 } },
   { text: 'Ninety seconds on three dummies.', targets: 3, fight: { timed: true, seconds: 90 } },
   { text: 'Two and a half minutes on one dummy; every 25 seconds you have to move for 4.', targets: 1, fight: { timed: true, seconds: 150, moveEvery: 25, moveDuration: 4 } },
-  { text: 'Two minutes on two dummies.', targets: 2, fight: { timed: true, seconds: 120 } },
-  { text: 'Two minutes on one dummy while you take a hit every 3 seconds.', targets: 1, fight: { timed: true, seconds: 120, hitEvery: 3 } },
+  { text: 'Three minutes on two dummies.', targets: 2, fight: { timed: true, seconds: 180 } },
+  { text: 'Three minutes on one dummy while you take a hit every 3 seconds.', targets: 1, fight: { timed: true, seconds: 180, hitEvery: 3 } },
   { text: 'One minute on a dummy that is in execute range from the first second.', targets: 1, fight: { timed: true, seconds: 60 }, executePct: 100 },
   { text: 'Three minutes on one dummy.', targets: 1, fight: { timed: true, seconds: 180 } }
 ];
@@ -58,10 +58,10 @@ function streaks(days) {
 
 // Presets: one click for a common fight. These do change your saved fight settings.
 export const PRESETS = [
-  { name: '1 dummy, 50,000 health', dummies: 1, health: 50000, fight: { timed: false, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 } },
+  { name: '1 dummy, 50,000 health', dummies: 1, health: 50000, fight: { timed: false, seconds: 180, moveEvery: 0, moveDuration: 0, hitEvery: 0 } },
   { name: '1 dummy, 3 minutes', dummies: 1, fight: { timed: true, seconds: 180, moveEvery: 0, moveDuration: 0, hitEvery: 0 } },
-  { name: '2 dummies, 2 minutes, moving', dummies: 2, fight: { timed: true, seconds: 120, moveEvery: 30, moveDuration: 5, hitEvery: 0 } },
-  { name: '3 dummies, 2 minutes', dummies: 3, fight: { timed: true, seconds: 120, moveEvery: 0, moveDuration: 0, hitEvery: 0 } }
+  { name: '2 dummies, 3 minutes, moving', dummies: 2, fight: { timed: true, seconds: 180, moveEvery: 30, moveDuration: 5, hitEvery: 0 } },
+  { name: '3 dummies, 3 minutes', dummies: 3, fight: { timed: true, seconds: 180, moveEvery: 0, moveDuration: 0, hitEvery: 0 } }
 ];
 // How a drill is graded: your DPS as a share of what the sim reaches in the same fight.
 export function gradeFor(pct) { return pct >= 100 ? 'S' : pct >= 95 ? 'A' : pct >= 88 ? 'B' : pct >= 78 ? 'C' : 'D'; }
@@ -343,7 +343,7 @@ export function createExtras(WL, handlers) {
   }
   function seeded(word) {
     return { id: 'seed', seeded: true, name: 'Seeded fight "' + word + '"', word: word, seed: seedNumber(word), targets: 1, share: 'seed:' + word,
-             text: 'Two minutes on one dummy with the dice fixed by the seed.', fight: { timed: true, seconds: 120 } };
+             text: 'Three minutes on one dummy with the dice fixed by the seed.', fight: { timed: true, seconds: 180 } };
   }
   function fillDrills() {
     DRILLS.concat(ENCOUNTERS).forEach(function (d) {

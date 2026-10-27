@@ -120,7 +120,7 @@ export function lessonsFor(WL, build) {
       text: [has('curseOfElements') ? 'Curse of the Elements makes the dummy take 10% more damage from all your spells and takes away its resistance. It comes first: keep it up from the start to the end.' : '',
              has('bane') ? 'One Bane at a time: "' + line('bane') + '". Bane of Doom is one big hit after a minute; Bane of Agony ticks, slowly at first, then harder. When Doom is on cooldown or the fight is about to end, Agony fills in.'
                : has('baneOfAgony') ? 'Bane of Agony ticks slowly at first, then harder. Keep it up all fight: "' + line('baneOfAgony') + '".' : ''].filter(Boolean),
-      test: { text: 'Two minutes on one dummy. Keep your curse and your Bane up.', targets: 1, fight: { timed: true, seconds: 120 }, checks: checks }
+      test: { text: 'Three minutes on one dummy. Keep your curse and your Bane up.', targets: 1, fight: { timed: true, seconds: 180 }, checks: checks }
     });
   }
 
@@ -140,7 +140,7 @@ export function lessonsFor(WL, build) {
       text: ['Each tick of your Corruption' + (has('wrack') ? ' and ' + name('wrack') : '') + ' may give you Shadow Trance: your next ' + name('shadowBolt') + ' is instant. It shows on your buffs, and the ' + name('shadowBolt') + ' button lights up.',
              'Use it at once: "' + line('shadowTrance') + '". Another proc while it is up is wasted, and it runs out after 10 s. With Corruption on more dummies it comes more often.',
              'The proc alerts (Show, in the bar on the right) make it hard to miss.'],
-      test: { text: 'Two minutes on three dummies: Corruption on all three, and every Shadow Trance used at once.', targets: 3, fight: { timed: true, seconds: 120 },
+      test: { text: 'Three minutes on three dummies: Corruption on all three, and every Shadow Trance used at once.', targets: 3, fight: { timed: true, seconds: 180 },
               checks: [procCheck('Shadow Trance', 4, 2)] }
     });
   }
@@ -189,7 +189,7 @@ export function lessonsFor(WL, build) {
     id: 'whole', title: 'The whole rotation',
     text: ['Everything together, as the sim plays it: the first line of the rotation that applies is what you cast. Switch on "The sim as a ghost" or "The sim\'s next cast" (Show) while you learn it, and switch them off to test yourself.',
            'Pass this and you play the build about as well as the sim does.'],
-    test: { text: 'Two minutes on one dummy: reach 90% of the sim\'s DPS.', targets: 1, fight: { timed: true, seconds: 120 },
+    test: { text: 'Three minutes on one dummy: reach 90% of the sim\'s DPS.', targets: 1, fight: { timed: true, seconds: 180 },
             checks: [simShareCheck(90)] }
   });
 

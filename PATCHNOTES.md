@@ -7,6 +7,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ### 2026-10-27
 - A **Twitch** button at the top left leads to Xn's live stream: come by with questions, or just to say hi.
+- The two-minute fights are **three minutes** now, the same length the build list's numbers come from: the Movement
+  drill, Target calls, Fire dance and Barrage (with more calls, fire and barrages to fill the time), three of the
+  lesson tests, three of today's fights, the seeded fight, two presets, and a fight that ends after a set time.
 
 ### 2026-10-26
 - Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:

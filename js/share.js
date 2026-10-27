@@ -36,7 +36,7 @@ export function readLink() {
   if (dummies >= 1 && dummies <= 3) out.dummies = Math.round(dummies);
   const fight = p.get('fight') || '', amount = fight.slice(1), endless = fight === 'e' ? 'full' : fight === 'x' ? 'execute' : '';
   if (endless || ((fight.charAt(0) === 't' || fight.charAt(0) === 'h') && NUMBER.test(amount))) {
-    out.fight = { timed: fight.charAt(0) === 't', seconds: 120, endless: endless, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
+    out.fight = { timed: fight.charAt(0) === 't', seconds: 180, endless: endless, moveEvery: 0, moveDuration: 0, hitEvery: 0 };
     if (out.fight.timed) out.fight.seconds = Math.max(10, Math.min(1800, Math.round(Number(amount))));
     else if (!endless) out.health = Math.max(100, Math.min(100000000, Math.round(Number(amount))));
     const move = (p.get('move') || '').split('-');

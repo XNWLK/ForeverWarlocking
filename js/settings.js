@@ -3,7 +3,7 @@
 const STORE_KEY = 'forever-warlocking.settings';
 const DEFAULTS = {
   build: null, race: 'human', dummyHealth: 50000, rings: true, dummies: 1, sound: false,
-  fight: { timed: false, seconds: 120, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 },   // how the fight ends (endless: '' | 'full' | 'execute' = infinite health), movement, hits taken
+  fight: { timed: false, seconds: 180, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 },   // how the fight ends (endless: '' | 'full' | 'execute' = infinite health), movement, hits taken
   buildCode: '', settingsCode: '',     // imported from the DPS sim
   homes: {}, keys: null,               // your own places for spells on the bar, and your own keys for the slots
   binds: null,                         // your own keys for walking, jumping, targeting, the pet, stopping a cast

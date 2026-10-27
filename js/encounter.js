@@ -20,21 +20,21 @@ function every(first, step, until, make) {
 }
 
 // Which dummy is called when: never the one called before, and each about as often.
-const CALLS = [2, 3, 1, 3, 2, 1, 2, 3, 1, 2];
+const CALLS = [2, 3, 1, 3, 2, 1, 2, 3, 1, 2, 3, 1, 3, 2, 1];
 
 export const ENCOUNTERS = [
-  { id: 'targetCalls', name: 'Target calls', targets: 3, fight: { timed: true, seconds: 120 },
-    text: 'Two minutes on three dummies. Every 12 seconds another dummy is called out: switch to it (Tab or a click) as fast as you can. The review says how fast you were.',
+  { id: 'targetCalls', name: 'Target calls', targets: 3, fight: { timed: true, seconds: 180 },
+    text: 'Three minutes on three dummies. Every 12 seconds another dummy is called out: switch to it (Tab or a click) as fast as you can. The review says how fast you were.',
     script: CALLS.map(function (n, i) { return { at: 6 + i * 12, call: n }; }) },
-  { id: 'adds', name: 'Reinforcements', targets: 3, fight: { timed: false, seconds: 120 }, healths: [60000, 12000, 12000], absent: [2, 3], simTargets: 1, simHealth: 96000,
+  { id: 'adds', name: 'Reinforcements', targets: 3, fight: { timed: false, seconds: 180 }, healths: [60000, 12000, 12000], absent: [2, 3], simTargets: 1, simHealth: 96000,
     text: 'A boss with 60,000 health. After 15, 45 and 75 seconds an add with 12,000 health joins it. It ends when everything is dead. The sim cannot do adds: it is measured on one dummy with the same total health.',
     script: [{ at: 15, add: true }, { at: 45, add: true }, { at: 75, add: true }] },
-  { id: 'fireDance', name: 'Fire dance', targets: 1, fight: { timed: true, seconds: 120 },
-    text: 'Two minutes. Every 15 seconds fire lands where you stand: step out of it, or it pushes your casts back.',
-    script: every(10, 15, 100, function (at) { return { at: at, fire: true }; }) },
-  { id: 'barrage', name: 'Barrage', targets: 1, fight: { timed: true, seconds: 120 },
-    text: 'Two minutes. Every 30 seconds you are hit every 1.5 seconds for 10 seconds. A warning comes 3 seconds before.',
-    script: every(20, 30, 110, function (at) { return { at: at, hits: 10, every: 1.5 }; }) },
+  { id: 'fireDance', name: 'Fire dance', targets: 1, fight: { timed: true, seconds: 180 },
+    text: 'Three minutes. Every 15 seconds fire lands where you stand: step out of it, or it pushes your casts back.',
+    script: every(10, 15, 160, function (at) { return { at: at, fire: true }; }) },
+  { id: 'barrage', name: 'Barrage', targets: 1, fight: { timed: true, seconds: 180 },
+    text: 'Three minutes. Every 30 seconds you are hit every 1.5 seconds for 10 seconds. A warning comes 3 seconds before.',
+    script: every(20, 30, 170, function (at) { return { at: at, hits: 10, every: 1.5 }; }) },
   { id: 'gauntlet', name: 'The gauntlet', targets: 3, fight: { timed: true, seconds: 180 },
     text: 'Three minutes on three dummies with everything at once: fire, being made to run, and barrages.',
     script: [{ at: 15, fire: true }, { at: 30, move: 5 }, { at: 45, hits: 10, every: 1.5 }, { at: 65, fire: true }, { at: 80, move: 6 },
