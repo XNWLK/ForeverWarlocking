@@ -1,5 +1,6 @@
 // A key or mouse button, with the modifiers held, as one piece of text: 'KeyQ', 'Shift+Digit1', 'Ctrl+Alt+KeyE',
-// 'Mouse4', 'Shift+Mouse3', 'Ctrl+WheelUp'. This is what the Keybinds panel stores and what a press is compared with.
+// 'Mouse4', 'Shift+Mouse3', 'WheelUp', 'Ctrl+WheelDown', 'WheelLeft'. This is what the Keybinds panel stores and what
+// a press is compared with.
 // Keys are named by their place on the keyboard (e.code), so they are the same on every layout.
 
 const MODIFIER = /^(Shift|Control|Alt|Meta|OS)(Left|Right)?$/;
@@ -13,20 +14,26 @@ export function mouseCombo(e) {
   const name = e.button === 1 ? 'Mouse3' : e.button === 3 ? 'Mouse4' : e.button === 4 ? 'Mouse5' : null;
   return name ? held(e) + name : null;
 }
-// The wheel counts only with a modifier held; by itself it zooms. (With Shift some browsers report it sideways.)
+// The wheel, with or without a modifier; a wheel that tilts (or a sideways swipe) is WheelLeft / WheelRight. With
+// Shift held some browsers report the plain wheel as sideways, so with Shift sideways counts as up and down.
+// Whatever the plain wheel is not bound to, it zooms (js/controls.js).
 export function wheelCombo(e) {
-  const mods = held(e), turn = e.deltaY || e.deltaX;
-  return mods && turn ? mods + (turn < 0 ? 'WheelUp' : 'WheelDown') : null;
+  const mods = held(e);
+  if (e.deltaY) return mods + (e.deltaY < 0 ? 'WheelUp' : 'WheelDown');
+  if (!e.deltaX) return null;
+  if (e.shiftKey) return mods + (e.deltaX < 0 ? 'WheelUp' : 'WheelDown');
+  return mods + (e.deltaX < 0 ? 'WheelLeft' : 'WheelRight');
 }
+export function isWheel(combo) { return /^Wheel/.test(plainKey(combo)); }
 
 export function hasModifier(combo) { return !!combo && combo.indexOf('+') > 0; }
 export function plainKey(combo) { return combo ? combo.slice(combo.lastIndexOf('+') + 1) : ''; }
-export function isMouse(combo) { return /^(Mouse\d|Wheel(Up|Down))$/.test(plainKey(combo)); }
+export function isMouse(combo) { return /^(Mouse\d|Wheel(Up|Down|Left|Right))$/.test(plainKey(combo)); }
 
 const NAMED = { Space: 'Space', Escape: 'Esc', Tab: 'Tab', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Ctrl', ControlRight: 'Ctrl',
                 AltLeft: 'Alt', AltRight: 'Alt', CapsLock: 'Caps', Backspace: 'Back' };
-const MOUSE_LONG = { Mouse3: 'Middle mouse', Mouse4: 'Mouse 4', Mouse5: 'Mouse 5', WheelUp: 'Wheel up', WheelDown: 'Wheel down' };
-const MOUSE_SHORT = { Mouse3: 'M3', Mouse4: 'M4', Mouse5: 'M5', WheelUp: 'WU', WheelDown: 'WD' };
+const MOUSE_LONG = { Mouse3: 'Middle mouse', Mouse4: 'Mouse 4', Mouse5: 'Mouse 5', WheelUp: 'Wheel up', WheelDown: 'Wheel down', WheelLeft: 'Wheel left', WheelRight: 'Wheel right' };
+const MOUSE_SHORT = { Mouse3: 'M3', Mouse4: 'M4', Mouse5: 'M5', WheelUp: 'WU', WheelDown: 'WD', WheelLeft: 'WL', WheelRight: 'WR' };
 // What to print for a key when the browser cannot tell us the letter on the keyboard in use.
 function plainLabel(code) {
   const m = /^(?:Key|Digit)(.)$/.exec(code);

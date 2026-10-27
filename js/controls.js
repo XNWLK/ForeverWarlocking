@@ -57,6 +57,10 @@ export function createControls(canvas, camera, world) {
     if (isMoveKey(e.code)) { keys.add(e.code); e.preventDefault(); }
   });
   window.addEventListener('keyup', function (e) { keys.delete(e.code); });
+  // The middle and thumb buttons can walk or jump too (held like a key; always without a modifier).
+  function moveButton(e) { return e.button === 1 ? 'Mouse3' : e.button === 3 ? 'Mouse4' : e.button === 4 ? 'Mouse5' : null; }
+  window.addEventListener('mousedown', function (e) { const b = moveButton(e); if (b && isMoveKey(b)) { keys.add(b); e.preventDefault(); } });
+  window.addEventListener('mouseup', function (e) { const b = moveButton(e); if (b) keys.delete(b); });
   window.addEventListener('blur', function () { keys.clear(); mouse.left = mouse.right = false; showCursor(); });
 
   // --- Mouse ----------------------------------------------------------------
@@ -129,8 +133,9 @@ export function createControls(canvas, camera, world) {
   });
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
-    if (world.onWheel && world.onWheel(e)) return;        // the wheel with a modifier held may be bound to an action
-    zoom(e.deltaY > 0 ? 1 : -1);
+    if (world.onWheel && world.onWheel(e)) return;        // the wheel (plain, with a modifier, or tilted) may be bound to an action
+    const turn = e.deltaY || (e.shiftKey ? e.deltaX : 0);  // otherwise up and down zoom; a sideways turn does nothing
+    if (turn) zoom(turn > 0 ? 1 : -1);
   }, { passive: false });
   // One step closer (-1) or further away (1): the wheel, or the Zoom in / Zoom out keys.
   function zoom(direction) {

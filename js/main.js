@@ -12,7 +12,7 @@ import { createEffects, SPELL_FX } from './effects.js';
 import { createPanels } from './panels.js';
 import { createSound } from './sound.js';
 import { createExtras, gradeFor } from './extras.js';
-import { keyCombo, mouseCombo, wheelCombo, hasModifier, isMouse, plainKey } from './keys.js';
+import { keyCombo, mouseCombo, wheelCombo, hasModifier, isWheel, plainKey } from './keys.js';
 import { createRecorder } from './record.js';
 import { createEncounter } from './encounter.js';
 import { createAids } from './aids.js';
@@ -75,18 +75,31 @@ const ghost = createGhost(scene, makeWarlock, effects, window.WL, function (key)
 
 // Every key that is not a slot on the action bar. Yours are kept in the browser; '' = no key.
 const DEFAULT_BINDS = { forward: 'KeyW', back: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', strafeLeft: 'KeyQ', strafeRight: 'KeyE',
-                        jump: 'Space', nextTarget: 'Tab', cancel: 'Escape', petAttack: '', petFollow: '', reset: '', pull: '', zoomIn: '', zoomOut: '' };
+                        jump: 'Space', nextTarget: 'Tab', prevTarget: '', target1: '', target2: '', target3: '', cancel: 'Escape',
+                        petAttack: '', petFollow: '', reset: '', pull: '', review: '', zoomIn: '', zoomOut: '' };
 const binds = Object.assign({}, DEFAULT_BINDS, getSetting('binds') || {});
-// Walking and jumping are keys you hold: they take a plain key. Everything else also takes a key with Shift, Ctrl or
-// Alt held, a mouse button, or the wheel with a modifier (js/keys.js).
+// Walking and jumping are held: they take a plain key or a mouse button (middle, thumb). Everything else also takes a
+// key with Shift, Ctrl or Alt held, a mouse button with or without them, and the wheel: up, down, tilted left or right,
+// plain or with a modifier (js/keys.js). The plain wheel zooms while it is not bound.
 const MOVE_BINDS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'jump'];
-const ACTION_BINDS = ['nextTarget', 'cancel', 'petAttack', 'petFollow', 'reset', 'pull', 'zoomIn', 'zoomOut'];
+const ACTION_BINDS = ['nextTarget', 'prevTarget', 'target1', 'target2', 'target3', 'cancel', 'petAttack', 'petFollow', 'reset', 'pull', 'review', 'zoomIn', 'zoomOut'];
+// One turn of a trackpad sends many wheel events: an action bound to the wheel (other than zooming) fires at most this often.
+const WHEEL_GAP = 0.15;
+let wheelAt = { combo: '', t: 0 };
+function wheelAct(e) {
+  const combo = wheelCombo(e);
+  if (!combo || !bound(combo)) return false;
+  const now = performance.now() / 1000;
+  if (combo !== binds.zoomIn && combo !== binds.zoomOut && combo === wheelAt.combo && now - wheelAt.t < WHEEL_GAP) return true;
+  wheelAt = { combo: combo, t: now };
+  return act(combo);
+}
 
 const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
 const controls = createControls(canvas, camera, {
   half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds,
   claimed: function (e) { const combo = keyCombo(e); return combo !== e.code && bound(combo); },   // Shift+W is a spell's key: do not walk
-  onWheel: function (e) { const combo = wheelCombo(e); return !!combo && act(combo); }
+  onWheel: wheelAct
 });
 // Touch screens: the stick, the round buttons and the menu (nothing happens here on a desktop).
 const touch = createTouch({
@@ -227,7 +240,7 @@ const hud = createHud(WL, {
   // A new key for a slot (id = its number) or for another action (id = its name). A key that is in use trades places.
   onRebind: function (id, code) {
     if (MOVE_BINDS.indexOf(id) >= 0) {
-      if (isMouse(code)) { hud.showError('Walking and jumping take a plain key'); hud.setBinds(binds); return; }
+      if (isWheel(code)) { hud.showError('Walking and jumping take a key or a mouse button, not the wheel'); hud.setBinds(binds); return; }
       if (hasModifier(code)) code = plainKey(code);
     }
     if (/^Arrow/.test(code)) { hud.showError('The arrow keys always move you'); hud.setBinds(binds); return; }
@@ -941,10 +954,11 @@ function setTarget(ti) {
   combat.setTarget(ti);
 }
 
-// Tab: the next dummy that is still standing.
-function nextTarget() {
+// Tab: the next dummy that is still standing (direction -1: the one before).
+function nextTarget(direction) {
+  const dir = direction < 0 ? -1 : 1;
   for (let step = 1; step <= targets; step++) {
-    const ti = (combat.state.target - 1 + step) % targets + 1;
+    const ti = ((combat.state.target - 1 + dir * step) % targets + targets) % targets + 1;
     if (combat.alive(ti)) { combat.setTarget(ti); return; }
   }
 }
@@ -974,6 +988,13 @@ function act(combo) {
   }
   if (combo === binds.cancel) { combat.cancel(); return true; }
   if (combo === binds.nextTarget) { nextTarget(); return true; }
+  if (combo === binds.prevTarget) { nextTarget(-1); return true; }
+  if (combo === binds.target1 || combo === binds.target2 || combo === binds.target3) {
+    const n = combo === binds.target1 ? 1 : combo === binds.target2 ? 2 : 3;
+    if (n > targets) hud.showError('There ' + (targets === 1 ? 'is one dummy' : 'are ' + targets + ' dummies')); else setTarget(n);
+    return true;
+  }
+  if (combo === binds.review) { reviewOrEnd(); return true; }
   if (combo === binds.petAttack) { combat.update(fightClock, ctx); combat.petCommand('attack'); return true; }
   if (combo === binds.petFollow) { combat.update(fightClock, ctx); combat.petCommand('follow'); return true; }
   if (combo === binds.reset) { resetFight(); hud.log('Fight reset.'); return true; }
@@ -1009,7 +1030,7 @@ window.addEventListener('mousedown', function (e) {
   if (combo && !typing(e) && act(combo)) e.preventDefault();
 });
 ['mouseup', 'auxclick'].forEach(function (type) {
-  window.addEventListener(type, function (e) { if (e.button === 3 || e.button === 4 || (e.button === 1 && bound(mouseCombo(e)))) e.preventDefault(); });
+  window.addEventListener(type, function (e) { if (e.button === 3 || e.button === 4 || (e.button === 1 && (bound(mouseCombo(e)) || MOVE_BINDS.some(function (k) { return binds[k] === 'Mouse3'; })))) e.preventDefault(); });
 });
 
 function resize() {
