@@ -76,9 +76,15 @@ export function createPanels(handlers) {
 
   // d: { seconds, result (from the casting rules), sim (from the worker, or null), spells, petName, dummyName(i),
   //      targets, timed, hasPet }
+  let stored = false;                                        // the review shows a fight from the history, not the last one
   function showReview(d) {
     const res = d.result, k = res.track, sim = d.sim, dps = d.seconds > 0 ? res.total / d.seconds : 0;
     body.textContent = '';
+    stored = !!d.stored;
+    if (d.stored) {
+      const when = new Date(d.stored.at).toLocaleString('en-GB', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      body.appendChild(el('p', 'From your fight history: ' + when + ' - ' + d.stored.title + ', ' + d.stored.build + ', ' + d.stored.race + '.', 'stored-line'));
+    }
 
     // A drill or seeded fight: its grade, and a line to pass on.
     if (d.challenge) {
@@ -90,7 +96,7 @@ export function createPanels(handlers) {
         line.appendChild(el('b', c.lesson.passed ? 'Passed' : 'Not yet', c.lesson.passed ? 'pass' : 'fail'));
         line.appendChild(el('span', c.name + (c.lesson.passed ? (c.lesson.next ? ': passed. The next lesson is open.' : ': passed. That was the last lesson for this build.') : ': not passed yet.')));
         [[c.lesson.next ? 'Next lesson' : '', c.lesson.next], ['Try again', c.lesson.again], ['All lessons', c.lesson.list]].forEach(function (b) {
-          if (!b[0]) return;
+          if (!b[0] || !b[1]) return;                      // a fight from the history has no buttons to go on with
           const button = el('button', b[0]);
           button.type = 'button';
           button.addEventListener('click', function () { button.blur(); review.hidden = true; b[1](); });
@@ -396,12 +402,41 @@ export function createPanels(handlers) {
       : d.timed
       ? 'The sim fought for the same length of time with its priority list, many times over; its numbers are averages.'
       : 'The sim fought until it had dealt the same total health with its priority list, many times over; its numbers are averages. Its pet attacks from the first second.', 'hint'));
+    // The combat log of this fight, folded away.
+    if (d.log && d.log.length) {
+      const fold = document.createElement('details'), sum = document.createElement('summary'), list = el('ol', null, 'review-log');
+      fold.className = 'review-log-fold';
+      sum.textContent = 'Combat log (' + d.log.length.toLocaleString('en-US') + ' lines)';
+      fold.appendChild(sum);
+      const copyLog = el('button', 'Copy the log');
+      copyLog.type = 'button';
+      copyLog.addEventListener('click', function () {
+        copyLog.blur();
+        d.copy(d.log.map(function (l) { return '[' + l[0].toFixed(1).padStart(6) + '] ' + l[1]; }).join('\n'), copyLog);
+      });
+      fold.appendChild(copyLog);
+      fold.addEventListener('toggle', function () {           // drawn when opened: a long fight has thousands of lines
+        if (!fold.open || list.childNodes.length) return;
+        const frag = document.createDocumentFragment();
+        d.log.forEach(function (l) {
+          const li = document.createElement('li'), t = document.createElement('i');
+          t.textContent = l[0].toFixed(1) + ' ';
+          li.append(t, document.createTextNode(l[1]));
+          if (l[2]) li.className = l[2];
+          frag.appendChild(li);
+        });
+        list.appendChild(frag);
+      });
+      fold.appendChild(list);
+      body.appendChild(fold);
+    }
     review.hidden = false;
   }
 
   return {
     setFight: setFight, setImport: setImport, showReview: showReview, setReviewButton: setReviewButton,
     hideReview: function () { review.hidden = true; },
-    reviewOpen: function () { return !review.hidden; }
+    reviewOpen: function () { return !review.hidden; },
+    reviewStored: function () { return !review.hidden && stored; }
   };
 }

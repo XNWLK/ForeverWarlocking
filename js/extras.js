@@ -470,6 +470,47 @@ export function createExtras(WL, handlers) {
   function fillProgress() { drawProgress(byId('progressBody'), character ? character.lessonKey : null, progressPick, function (k) { progressPick = k; fillProgress(); }); }
   byId('btnProgress').addEventListener('click', function () { byId('btnProgress').blur(); progressPick = null; fillProgress(); progressWindow.hidden = !progressWindow.hidden; });
   byId('progressClose').addEventListener('click', function () { progressWindow.hidden = true; });
+
+  // Fight history: your last fights, kept in this browser (js/fights.js). A click opens one in the review window.
+  const historyWindow = byId('historyWin');
+  let clearArmed = false;
+  function fillHistory() {
+    const box = byId('historyBody'), f = handlers.fights;
+    clearArmed = false;
+    f.list().then(function (list) {
+      box.textContent = '';
+      box.appendChild(el('p', 'Your last ' + f.kept + ' fights that ran to their end, kept in this browser. Click one to open its review and combat log.', 'hint'));
+      if (!list.length) { box.appendChild(el('p', 'Nothing kept yet: finish a fight and it shows up here.', 'hint')); return; }
+      const rows = el('div', null, 'history-list');
+      list.forEach(function (fight) {
+        const row = el('div', null, 'history-row'), open = el('button', null, 'history-open'), del = el('button', '×', 'history-del');
+        open.type = del.type = 'button';
+        const when = new Date(fight.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        open.append(el('span', when, 'when'), el('span', fight.title, 'what'), el('span', fight.build + ' · ' + fight.race, 'who'),
+                    el('b', whole(fight.dps) + ' DPS'), el('span', fight.simDps ? Math.round(100 * fight.dps / fight.simDps) + '%' : '', 'pct'));
+        open.title = fight.seconds + ' s' + (fight.simDps ? ', the sim ' + whole(fight.simDps) + ' DPS' : '');
+        open.addEventListener('click', function () { open.blur(); historyWindow.hidden = true; f.open(fight); });
+        del.title = 'Remove this fight from the history';
+        del.addEventListener('click', function () { del.blur(); f.remove(fight.id).then(fillHistory, fillHistory); });
+        row.append(open, del);
+        rows.appendChild(row);
+      });
+      box.appendChild(rows);
+      const clear = el('button', 'Clear the history', 'wide');
+      clear.type = 'button';
+      clear.addEventListener('click', function () {
+        clear.blur();
+        if (!clearArmed) { clearArmed = true; clear.textContent = list.length === 1 ? 'Click again to remove it' : 'Click again to remove all ' + list.length + ' fights'; return; }
+        f.clear().then(fillHistory, fillHistory);
+      });
+      box.appendChild(clear);
+    }).catch(function () {
+      box.textContent = '';
+      box.appendChild(el('p', 'This browser does not let the page keep fights (a private window, or site data switched off), so there is no history here.', 'hint'));
+    });
+  }
+  byId('btnHistory').addEventListener('click', function () { byId('btnHistory').blur(); if (historyWindow.hidden) fillHistory(); historyWindow.hidden = !historyWindow.hidden; });
+  byId('historyClose').addEventListener('click', function () { historyWindow.hidden = true; });
   byId('challengesClose').addEventListener('click', function () { challengeWindow.hidden = true; });
   const seedBox = byId('seed'), today = new Date();
   seedBox.value = String(today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate());   // today's date: everyone who keeps it plays the same fight
@@ -662,8 +703,8 @@ export function createExtras(WL, handlers) {
       handlers.onChallenge(found);
       return true;
     },
-    sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden || !lessonWindow.hidden || !progressWindow.hidden; },
-    closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; lessonWindow.hidden = true; progressWindow.hidden = true; },
+    sheetOpen: function () { return !sheet.hidden || !challengeWindow.hidden || !lessonWindow.hidden || !progressWindow.hidden || !historyWindow.hidden; },
+    closeSheet: function () { sheet.hidden = true; challengeWindow.hidden = true; lessonWindow.hidden = true; progressWindow.hidden = true; historyWindow.hidden = true; },
     // Lessons, for main.js and the review's buttons.
     startLesson: function (ch) { handlers.onChallenge(ch); },
     openLessons: function () { fillLessons(); lessonWindow.hidden = false; },

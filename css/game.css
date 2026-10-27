@@ -460,6 +460,24 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 /* --- Lessons, Progress, today's fight, the ghost, proc alerts, watching a fight again ------------------------ */
 /* Lessons: one card a lesson, a row each; its test under the text. */
 .lesson-cards { grid-template-columns: 1fr; }
+/* Fight history: one row per kept fight; the review of a kept fight says so and has its combat log at the end */
+.history-list { display: grid; gap: 4px; margin: 6px 0 10px; }
+.history-row { display: flex; gap: 4px; }
+.history-open { flex: 1; display: grid; grid-template-columns: 96px 1fr auto 76px 40px; gap: 10px; align-items: baseline; text-align: left; padding: 6px 10px; }
+.history-open .when, .history-open .who { color: var(--ink-dim); font-size: 12px; }
+.history-open .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-open b, .history-open .pct { text-align: right; }
+.history-open .pct { color: var(--ink-dim); }
+.history-del { padding: 4px 10px; color: var(--ink-dim); }
+.stored-line { margin: 0 0 8px; padding: 6px 10px; font-size: 12px; color: var(--ink); background: rgba(185, 138, 255, 0.1); border-radius: 8px; }
+.review-log-fold { margin-top: 10px; }
+.review-log-fold summary { cursor: pointer; font-weight: 600; }
+.review-log-fold > button { margin: 6px 0; }
+.review-log { max-height: 320px; overflow: auto; margin: 0; padding: 6px 8px; list-style: none; font-size: 12px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; }
+.review-log li { color: var(--ink-dim); }
+.review-log li.note { color: var(--ink); } .review-log li.crit { color: var(--gold); } .review-log li.miss { color: #8f869f; }
+.review-log li.gain { color: #8fb2ff; } .review-log li.proc { color: #cfb0ff; }
+.review-log li i { display: inline-block; min-width: 44px; color: var(--ink-dim); font-style: normal; font-variant-numeric: tabular-nums; }
 .card.lesson h4 b { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
 .card.lesson.passed h4 b { color: #9fe0b4; }
 .card.lesson.passed h4 b::before { content: '\2713  '; }

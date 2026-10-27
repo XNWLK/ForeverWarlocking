@@ -7,6 +7,7 @@ import { createControls } from './controls.js';
 import { createHud, ACTION_CODES, RACIAL_ICON } from './hud.js';
 import { createCombat, actionBarFor } from './combat.js';
 import { getSetting, setSetting, getStore, saveStore } from './settings.js';
+import { saveFight, listFights, deleteFight, clearFights, KEEP as FIGHTS_KEPT } from './fights.js';
 import { createPet } from './pets.js';
 import { createEffects, SPELL_FX } from './effects.js';
 import { createPanels } from './panels.js';
@@ -134,6 +135,7 @@ let manaCurve = [], manaEnd = null;                        // your mana at the s
 let fightBest = null, challengeOut = null;                 // what this fight came to, worked out once when it is over
 let fightLogged = false;                                   // this fight is on the list of your results (once it has ended)
 let progressDue = false;                                   // this fight goes on the Progress page once the sim's number is in
+let historyDue = false;                                    // this fight goes into the fight history (js/fights.js) once the sim's number is in
 let raceBest = null;                                       // your best in this fight, for the race in the meter: its damage curve, or just its pace
 // Procs you got and what became of them (the "Proc watch" drill): open = the one that is up, list = the ones before.
 let procLog = { open: null, list: [] };
@@ -271,6 +273,7 @@ const hud = createHud(WL, {
 });
 
 const extras = createExtras(WL, {
+  fights: { list: listFights, remove: deleteFight, clear: clearFights, kept: FIGHTS_KEPT, open: function (f) { openStoredFight(f); } },
   // A drill, a seeded fight, or null to go back to your own fight settings.
   onChallenge: function (next) {
     touch.closeMenu();
@@ -600,7 +603,43 @@ function showReview() {
     picture: resultPicture, replay: combat.state.over && replay.has() ? startReplay : null,
     curve: myCurve, challenge: challengeResult(), copy: extras.copy, best: settleBest(),
     history: { list: (getStore('history')[resultKey()] || []).slice(), counted: fightLogged },
-    opener: aids.openerResult(simResult, d.record)
+    opener: aids.openerResult(simResult, d.record), log: hud.fightLog()
+  }));
+}
+
+// ---------- the fight history: your last fights, to open again later (js/fights.js) ----------
+// What the fight was, in a few words: a challenge by its name, your own fight by its dummies, length or health and options.
+function fightTitle() {
+  if (challenge) return challenge.name;
+  const f = fightOptions(), parts = [targets + (targets === 1 ? ' dummy' : ' dummies')];
+  parts.push(f.endless ? (f.endless === 'execute' ? 'infinite health in execute range' : 'infinite health')
+    : f.timed ? Math.round(f.seconds) + ' s' : Number(getSetting('dummyHealth') || 0).toLocaleString('en-US') + ' health');
+  if (f.moveEvery > 0) parts.push('moving ' + f.moveDuration + ' s every ' + f.moveEvery + ' s');
+  if (f.hitEvery > 0) parts.push('a hit every ' + f.hitEvery + ' s');
+  return parts.join(', ');
+}
+// Keeps the fight that just ended: once the sim's number is in, or without it when the fight is left before (force).
+function saveHistory(force) {
+  if (!historyDue || !combat || !combat.state.over || !(combat.fightSeconds() > 0)) return;
+  if (!simResult && !force) return;
+  historyDue = false;
+  const d = reviewData(), seconds = d.seconds, dps = combat.result.total / seconds, names = [1, 2, 3].map(function (i) { return hud.dummyName(i); });
+  const c = challengeResult();
+  const review = Object.assign({}, d, { curve: myCurve.slice(), opener: aids.openerResult(simResult, d.record), challenge: c ? Object.assign({}, c, { link: null, lesson: c.lesson ? { passed: c.lesson.passed, rows: c.lesson.rows } : null }) : null });
+  delete review.icon; delete review.dummyName;
+  let plain = null;
+  try { plain = JSON.parse(JSON.stringify(review)); } catch (e) { return; }   // functions and the like fall away
+  saveFight({ at: Date.now(), title: fightTitle(), build: character.build.short, race: WL.RACES[character.raceKey].name, racial: d.racialName,
+              dps: Math.round(dps), simDps: simResult ? Math.round(simResult.dps) : 0, seconds: Math.round(seconds * 10) / 10,
+              names: names, review: plain, log: hud.fightLog() }).catch(function () { /* this browser keeps nothing: the History window says so */ });
+}
+// Opens a kept fight in the review window, as it was (without the parts that only make sense right after it).
+function openStoredFight(f) {
+  const r = f.review;
+  panels.showReview(Object.assign({}, r, {
+    icon: function (key) { return key === 'racial' ? WL.ICONS[RACIAL_ICON[f.racial]] || '' : WL.ICONS[key] || ''; },
+    dummyName: function (i) { return f.names[i - 1] || 'Dummy ' + i; }, copy: extras.copy, picture: null, replay: null, best: null, history: null,
+    log: f.log, stored: { at: f.at, title: f.title, build: f.build, race: f.race }
   }));
 }
 
@@ -617,7 +656,8 @@ function useSimResult() {
   simResult = next;
   hud.setSimAverage(next);
   noteProgressNow();                                       // a fight that ended before the sim's number was in
-  if (panels.reviewOpen() && combat.fightSeconds() > 0) showReview();   // the review was waiting for these numbers
+  saveHistory(false);
+  if (panels.reviewOpen() && !panels.reviewStored() && combat.fightSeconds() > 0) showReview();   // the review was waiting for these numbers
 }
 // A fight with infinite health: while it runs, the sim's ten-minute fight on such dummies is what you are measured
 // against; ended (seconds = how long yours lasted), what the sim had done by that second of such a long fight (the
@@ -714,6 +754,8 @@ function onCombatEvent(e) {
     noteResult();
     progressDue = !combat.endless;
     noteProgressNow();
+    historyDue = true;
+    saveHistory(false);
     const fight = combat, mine = settleBest(), drill = challengeResult();
     const better = (mine && mine.record && mine.previous) || (drill && drill.record);
     window.setTimeout(function () { if (combat === fight && combat.state.over) sound.play(better ? 'best' : 'fightEnd'); }, 500);
@@ -838,6 +880,7 @@ function standingBuffs(build, stats) {
 
 // Builds the character from the chosen build and race, sets up the dummies and starts a fresh fight.
 function newCharacter() {
+  if (combat) saveHistory(true);                           // before this fight's numbers are replaced
   endReplay(true);
   simEnded = false;                                        // the sim is asked afresh at the end of this function
   const build = buildByKey(getSetting('build')) || startingBuild();
@@ -905,6 +948,8 @@ function setColliders() {
 }
 
 function resetFight() {
+  saveHistory(true);                                       // a finished fight whose sim number never came: kept without it
+  hud.newFightLog();
   endReplay(true);
   combat.reset();
   replay.reset();

@@ -13,6 +13,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **More keybinds:** the plain mouse wheel (up and down) and a tilting wheel (left and right) can be bound, with or
   without Shift, Ctrl or Alt; the wheel zooms only while it is not bound. Walking and jumping can go on the middle or a
   thumb mouse button. New things to bind: previous dummy, dummy 1, 2 and 3, and the fight review.
+- **Fight history:** a History button (next to Progress) lists your last 30 fights. Click one to open its review again,
+  with everything it showed at the time. Each review now also has the fight's **combat log** at the end, to read or
+  copy. The fights are kept in your browser.
 
 ### 2026-10-26
 - Racials from the Forever patch of 2026-10-26, as the Warlock SIM has them:

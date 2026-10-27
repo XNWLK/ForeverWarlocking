@@ -120,10 +120,12 @@ export function createHud(WL, handlers) {
 
   // ---------- combat log ----------
   const everything = [];                                    // every line since the page opened, with its fight time, for "Copy the whole log"
+  let fightLog = [];                                        // the lines of this fight only: [second, text, kind] (for the review and the fight history)
   function log(text, kind) {
     const at = lastCombat ? lastCombat.fightSeconds() : 0;
     everything.push('[' + (at > 0 ? at.toFixed(1).padStart(6) : '   0.0') + '] ' + text);
     if (everything.length > 20000) everything.splice(0, 5000);
+    if (fightLog.length < 8000) fightLog.push([Math.round(Math.max(0, at) * 10) / 10, text, kind || '']);
     const line = document.createElement('li');
     line.textContent = text;
     if (kind) line.className = kind;
@@ -827,6 +829,8 @@ export function createHud(WL, handlers) {
     // labels: what to press on a controller for each slot (an array), or null to show the keys again.
     setPadLabels: function (labels) { if (padLabels === labels) return; padLabels = labels; showKeyLabels(); },
     fullLog: function () { return everything.join('\n'); },
+    fightLog: function () { return fightLog.slice(); },
+    newFightLog: function () { fightLog = []; },
     setKeys: function (list) { codes = list.slice(); showKeyLabels(); if (character) showBinds(); },
     setBinds: function (map) { binds = map; if (character) showBinds(); },
     anyPanelOpen: function () { return Object.keys(panels).some(function (k) { return !panels[k].hidden; }); },
