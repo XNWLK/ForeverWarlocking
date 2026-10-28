@@ -7,7 +7,9 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const SIM = path.join(ROOT, '..', 'wow-forever-warlock-sim');
+// An optional folder (a clone of the sim at one commit) in place of the sim project, e.g. while the sim has
+// commits that are not on its GitHub yet: node tools/gen-build-order.js <folder>
+const SIM = process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, '..', 'wow-forever-warlock-sim');
 const source = path.join(SIM, 'data', 'default-results.js');
 if (!fs.existsSync(source)) { console.error('Not found: ' + source); process.exit(1); }
 

@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "eb1018d",
-    "subject":  "Racials: Blood Fury 2 minute cooldown again, Touch of the Grave 15 s cooldown",
+    "commit":  "0794478",
+    "subject":  "Berserking lasts 15 s (patch notes)",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-27 16:50",
+    "synced":  "2026-10-28 20:52",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

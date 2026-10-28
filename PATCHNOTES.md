@@ -9,6 +9,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **Demonic Brand** on the target shows its time left at the bottom of the icon, like the other debuffs, and its
   charges (x5, x4 ...) at the top.
 - A **Discord** button next to Twitch at the top left leads to Xn's Discord.
+- From the Forever patch notes: **Berserking** (Troll) lasts 15 seconds (was 10).
 
 ### 2026-10-27
 - A **Twitch** button at the top left leads to Xn's live stream: come by with questions, or just to say hi.
