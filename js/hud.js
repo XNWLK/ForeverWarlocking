@@ -484,7 +484,8 @@ export function createHud(WL, handlers) {
     return '';
   }
   function auraTip(a) {
-    const left = a.text ? (a.text.charAt(0) === 'x' ? a.text.slice(1) + ' left' : /m$/.test(a.text) ? a.text.replace('m', ' min left') : a.text + ' sec left') : '';
+    let left = a.text ? (a.text.charAt(0) === 'x' ? a.text.slice(1) + ' left' : /m$/.test(a.text) ? a.text.replace('m', ' min left') : a.text + ' sec left') : '';
+    if (a.stack) left = a.stack.slice(1) + ' charges' + (left ? ', ' + left : '');
     return { title: a.name, right: left, text: a.desc != null ? a.desc : auraText(a.key), notes: a.notes || [] };
   }
 
@@ -502,13 +503,14 @@ export function createHud(WL, handlers) {
         setTip(box, function () { const now = holder._list && holder._list[i]; return now ? auraTip(now) : null; });
         const img = document.createElement('img');
         img.src = WL.ICONS[a.icon] || ''; img.alt = a.name;
-        const b = document.createElement('b');
-        box.append(img, b);
+        const stack = document.createElement('i'), b = document.createElement('b');   // stacks or charges on top, time at the bottom
+        stack.className = 'stack';
+        box.append(img, stack, b);
         holder.appendChild(box);
       });
     }
     holder._list = list;
-    list.forEach(function (a, i) { setText(holder.children[i].lastChild, a.text); });
+    list.forEach(function (a, i) { const box = holder.children[i]; setText(box.lastChild, a.text); setText(box.children[1], a.stack || ''); });
   }
   function seconds(left) { return left === Infinity ? '' : left >= 60 ? Math.ceil(left / 60) + 'm' : left >= 9.5 ? String(Math.round(left)) : left.toFixed(1); }
 
@@ -519,7 +521,7 @@ export function createHud(WL, handlers) {
       return { key: k, icon: k, name: c.spells[k].name, text: seconds(combat.dotLeft(k, i)) };
     });
     ['coe', 'isb'].forEach(function (k) { if (combat.debuff(i, k)) list.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(t.deb[k] - S.t) }); });
-    if (combat.debuff(i, 'brand') && t.brandCharges > 0) list.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: 'x' + t.brandCharges });
+    if (combat.debuff(i, 'brand') && t.brandCharges > 0) list.push({ key: 'brand', icon: AURA_INFO.brand.icon, name: AURA_INFO.brand.name, text: seconds(t.deb.brand - S.t), stack: 'x' + t.brandCharges });
     if (combat.havocOn() === i) list.push({ key: 'havoc', icon: 'baneOfHavoc', name: 'Bane of Havoc', text: seconds(S.havoc.expires - S.t) });
     return list;
   }

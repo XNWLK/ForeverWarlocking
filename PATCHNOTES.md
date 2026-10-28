@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-28
+- **Demonic Brand** on the target shows its time left at the bottom of the icon, like the other debuffs, and its
+  charges (x5, x4 ...) at the top.
+- A **Discord** button next to Twitch at the top left leads to Xn's Discord.
+
 ### 2026-10-27
 - A **Twitch** button at the top left leads to Xn's live stream: come by with questions, or just to say hi.
 - The two-minute fights are **three minutes** now, the same length the build list's numbers come from: the Movement
