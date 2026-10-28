@@ -11,7 +11,7 @@ $dest = Join-Path $root 'vendor\warlock-sim'
 
 # Load order matters: data first, then the engine (the same order the sim's own loader uses).
 $files = @(
-  'data/consumables.js', 'data/config.js', 'data/talents.js', 'data/spells.js', 'data/races.js', 'data/builds.js',
+  'data/consumables.js', 'data/config.js', 'data/talents.js', 'data/spells.js', 'data/races.js', 'data/builds.js', 'data/trinkets.js',
   'engine/stats.js', 'engine/spelltable.js', 'engine/rng.js', 'engine/resist.js', 'engine/rotation.js', 'engine/sim.js',
   'engine/custom-builds.js', 'engine/settings-code.js',
   'data/icons.js', 'data/tooltips.js'

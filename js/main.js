@@ -592,7 +592,7 @@ function reviewData() {
     table: combat.table, gcd: combat.gcd(), pull: pullInfo, precast: combat.state.precastKey, over: combat.state.over,
     mana: { curve: manaCurve, max: character.stats.maxMana, end: manaEnd != null ? manaEnd : combat.state.mana, gain: combat.tapGain(),
             tapHealth: combat.spells.lifeTap.healthCost || 0,
-            rule: WL.expandGroups(character.build).indexOf('lifeTapBelow') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapBelow') : '' },
+            rule: WL.expandGroups(character.build).indexOf('lifeTapNeed') >= 0 && WL.actionLabel ? WL.actionLabel(character.build, 'lifeTapNeed') : '' },
     timed: combat.timed || combat.endless, endless: character.endless, hasPet: !!combat.pet, petName: hud.petName(), dummyName: hud.dummyName
   };
 }

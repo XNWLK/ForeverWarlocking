@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "0794478",
-    "subject":  "Berserking lasts 15 s (patch notes)",
+    "commit":  "30a99ee",
+    "subject":  "Round 170: By fight length shows -- for the reference and sits at the bottom",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-28 20:52",
+    "synced":  "2026-10-28 22:19",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
@@ -11,6 +11,7 @@
                   "data/spells.js",
                   "data/races.js",
                   "data/builds.js",
+                  "data/trinkets.js",
                   "engine/stats.js",
                   "engine/spelltable.js",
                   "engine/rng.js",

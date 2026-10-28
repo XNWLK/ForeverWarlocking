@@ -99,8 +99,9 @@ export function createAids(WL, handlers) {
     if (a === 'searingPainBrand') return 'Demonic Brand is not on ' + there;
     if (a === 'soulFire') return 'Decimation is up';
     if (a === 'lifeTapPet') return 'your pet is nearly out of mana';
-    if (a === 'lifeTapBelow') {
-      const p = character.build.params && character.build.params.lifeTapBelow;
+    if (a === 'lifeTapBelow' || a === 'lifeTapNeed') {
+      const p = character.build.params && character.build.params[a];
+      if (a === 'lifeTapNeed') return 'the rest of the fight needs more mana than you have' + (p ? ' (below ' + p.pct + '%)' : '');
       return p ? 'mana is below ' + p.pct + '% and the fight still lasts' : 'mana is low and the fight still lasts';
     }
     if (a === 'wrackDots') return 'your DoTs have time left: room for a channel';

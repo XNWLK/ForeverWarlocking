@@ -179,7 +179,7 @@ export function lessonsFor(WL, build) {
 
   list.push({
     id: 'mana', title: 'Mana and Life Tap',
-    text: ['Life Tap turns health into mana. Tap before you run dry, not after: "' + line('lifeTapBelow') + '". A press that fails for lack of mana is time lost.',
+    text: ['Life Tap turns health into mana. Tap before you run dry, not after: "' + line('lifeTapNeed') + '". A press that fails for lack of mana is time lost.',
            'Do not tap more than you need: each tap costs a global cooldown, and mana left at the end is wasted. While you have to move, a Life Tap is a good thing to do - it is instant.'],
     test: { text: 'Three minutes on one dummy. Mana decides it.', targets: 1, fight: { timed: true, seconds: 180 },
             checks: [manaCheck(), idleCheck(6)] }

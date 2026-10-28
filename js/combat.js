@@ -1024,7 +1024,11 @@ export function createCombat(opts) {
       canSwap: function () { return false; },
       tapGain: function () { return (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100); },
       petSpellCost: function () { return P && P.c.spell ? P.c.spell.cost : Infinity; },
-      petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : Infinity; }
+      petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : Infinity; },
+      // The sim's lifeTapNeed (2026-10-28): the mana the rest of the fight needs at the rate it went down so far (Life Tap's
+      // own mana left out); nothing in the first 6 s. No free mana here (no Innervate, Mana Tide, potions or trinkets).
+      manaNeedLeft: function () { const f = fightTime(at); if (f < 6) return Infinity; return Math.max(0, (stats.maxMana - mana + res.track.tapMana) / f) * view.remaining; },
+      freeManaLevel: function () { return 0; }
     };
     const made = forcedMove(at) || !!(lastCtx && lastCtx.forced), ft = fightTime(at);
     function fits(k) {                                     // made to move: only instants, and no cast that runs into the next phase
@@ -1115,7 +1119,7 @@ export const ACTION_SPELLS = {
   shadowburn: ['shadowburn'], shadowburnSnF: ['shadowburn'],
   soulFire: ['soulFire'], soulFireShards: ['soulFire'],
   shadowTrance: ['shadowBolt'], isbUpkeep: ['shadowBolt'], shadowBoltSpread: ['shadowBolt'], shadowBolt: ['shadowBolt'],
-  lifeTapPet: ['lifeTap'], lifeTapBelow: ['lifeTap'],
+  lifeTapPet: ['lifeTap'], lifeTapBelow: ['lifeTap'], lifeTapNeed: ['lifeTap'],
   wrack: ['wrack'], wrackDots: ['wrack'], incinerate: ['incinerate'], drainLife: ['drainLife'],
   hellfire: ['hellfire'], rainOfFire: ['rainOfFire']
 };
