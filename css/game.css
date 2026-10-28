@@ -213,11 +213,11 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #targetDebuffs { flex-wrap: wrap; justify-content: flex-end; }
 .aura { position: relative; width: 22px; height: 22px; border-radius: 5px; overflow: hidden; background: #1b1226; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 1px 3px rgba(0, 0, 0, 0.6); }
 .aura img { display: block; width: 100%; height: 100%; }
-.aura i.stack { position: absolute; left: 0; right: 0; top: -1px; text-align: center; font-style: normal; font-size: 10px; line-height: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }   /* stacks or charges (Demonic Brand); the time is at the bottom */
+.aura i.aura-stack { position: absolute; left: 0; right: 0; top: -1px; text-align: center; font-style: normal; font-size: 10px; line-height: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }   /* stacks or charges (Demonic Brand); the time is at the bottom */
 .aura b { position: absolute; left: 0; right: 0; bottom: -1px; text-align: center; font-size: 11px; line-height: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 1px #000; }
 .auras.large .aura { width: 30px; height: 30px; border-radius: 6px; }
 .auras.large .aura b { font-size: 12px; line-height: 13px; }
-.auras.large .aura i.stack { font-size: 11px; line-height: 12px; }
+.auras.large .aura i.aura-stack { font-size: 11px; line-height: 12px; }
 
 /* The frames: you, your pet, your target. */
 #frames { width: 100%; display: grid; grid-template-columns: 1fr 158px 1fr; gap: 6px; align-items: stretch; }
@@ -324,10 +324,10 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .plate .auras { justify-content: center; gap: 2px; margin-bottom: 2px; }
 .plate .aura { width: 26px; height: 26px; }
 .plate .aura b { font-size: 12px; line-height: 13px; }
-.plate .aura i.stack { font-size: 11px; line-height: 12px; }
+.plate .aura i.aura-stack { font-size: 11px; line-height: 12px; }
 .plate .tag { display: block; width: 110px; margin: 0 auto; padding: 2px 5px 4px; border-radius: 6px; background: rgba(20, 11, 30, 0.74); border: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; }
-.plate i { display: block; height: 5px; margin-top: 2px; border-radius: 3px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
-.plate i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
+.plate .tag i { display: block; height: 5px; margin-top: 2px; border-radius: 3px; background: rgba(0, 0, 0, 0.6); overflow: hidden; }
+.plate .tag i b { display: block; height: 100%; width: 100%; background: var(--hostile); }
 .plate.current { color: var(--gold); }
 .plate.current .tag { border-color: var(--gold); }
 .plate.called .tag { border-color: #ff6a5e; box-shadow: 0 0 9px 1px #ff6a5e; }       /* a scripted fight calls this dummy out */
@@ -580,7 +580,7 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .touch #playerBuffs { max-width: 48%; }
 .touch .aura { width: 18px; height: 18px; border-radius: 4px; }
 .touch .aura b { font-size: 9px; line-height: 10px; }
-.touch .aura i.stack { font-size: 8px; line-height: 9px; }
+.touch .aura i.aura-stack { font-size: 8px; line-height: 9px; }
 .touch .auras.large .aura { width: 26px; height: 26px; }
 .touch .auras.large .aura b { font-size: 11px; line-height: 12px; }
 .touch .dotbars { bottom: auto; top: 30px; width: 150px; flex-direction: column; }

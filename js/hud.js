@@ -504,7 +504,7 @@ export function createHud(WL, handlers) {
         const img = document.createElement('img');
         img.src = WL.ICONS[a.icon] || ''; img.alt = a.name;
         const stack = document.createElement('i'), b = document.createElement('b');   // stacks or charges on top, time at the bottom
-        stack.className = 'stack';
+        stack.className = 'aura-stack';   // not 'stack': that class name is a grid elsewhere
         box.append(img, stack, b);
         holder.appendChild(box);
       });
