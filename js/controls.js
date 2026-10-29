@@ -24,7 +24,10 @@ function wrapAngle(a) {
 // world: { half, wallHeight, colliders: [{ x, z, r }], onClick(x, y) (optional),
 //          binds: { forward, back, turnLeft, turnRight, strafeLeft, strafeRight, jump } - key codes, may change any time,
 //          claimed(keyEvent) -> true when that key with its modifiers is bound to an action (optional),
-//          onWheel(wheelEvent) -> true when the wheel was used for an action instead of zooming (optional) }
+//          onWheel(wheelEvent) -> true when the wheel was used for an action instead of zooming (optional),
+//          bound(player) - keeps the player inside a room of another shape (a boss's lair) in place of `half` (optional),
+//          inside(x, z) -> false where the camera must not go (with `bound`; optional) }
+// The room can change: `half`, `bound`, `inside` and `wallHeight` are read every frame, and setStart() moves the start.
 // The arrow keys always move you as well.
 export function createControls(canvas, camera, world) {
   const start = { x: 0, z: 24, yaw: 0 };
@@ -37,9 +40,14 @@ export function createControls(canvas, camera, world) {
   const stick = { x: 0, y: 0 };                           // the walking stick of a touch screen: x to the right, y forward
   const pad = { x: 0, y: 0 };                             // the left stick of a controller, the same way
   let pinch = 0, jumpAsked = false;
+  // Moved by something else: steer = you run that way and the keys do nothing (fear), shove = a push that dies away
+  // (a knockback). Both count as moving.
+  let steer = null;
+  const shove = { x: 0, z: 0 };
 
   function reset() {
     player.x = start.x; player.z = start.z; player.yaw = start.yaw; player.height = 0; player.fall = 0;
+    steer = null; shove.x = shove.z = 0;
     view.offset = 0; view.pitch = 0.3; view.distance = 11;
   }
 
@@ -118,7 +126,7 @@ export function createControls(canvas, camera, world) {
       f.x = e.clientX; f.y = e.clientY;
       if (fingers.size === 1) {
         player.yaw = wrapAngle(player.yaw - dx * TOUCH_TURN);
-        view.pitch = Math.min(1.45, Math.max(-0.12, view.pitch + dy * TOUCH_TURN));
+        view.pitch = Math.min(1.45, Math.max(world.minPitch != null ? world.minPitch : -0.12, view.pitch + dy * TOUCH_TURN));
       } else if (fingers.size === 2) {
         const both = Array.from(fingers.values()), apart = Math.hypot(both[0].x - both[1].x, both[0].y - both[1].y);
         if (pinch > 0 && apart > 0) view.distance = Math.min(30, Math.max(3, view.distance * pinch / apart));
@@ -129,7 +137,7 @@ export function createControls(canvas, camera, world) {
     if (!mouse.left && !mouse.right) return;
     if (mouse.right) player.yaw = wrapAngle(player.yaw - e.movementX * MOUSE_TURN);
     else view.offset = wrapAngle(view.offset - e.movementX * MOUSE_TURN);
-    view.pitch = Math.min(1.45, Math.max(-0.12, view.pitch + e.movementY * MOUSE_TURN));
+    view.pitch = Math.min(1.45, Math.max(world.minPitch != null ? world.minPitch : -0.12, view.pitch + e.movementY * MOUSE_TURN));
   });
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
@@ -146,9 +154,12 @@ export function createControls(canvas, camera, world) {
   function down(a, b) { return keys.has(a) || keys.has(b) ? 1 : 0; }
 
   function collide() {
-    const limit = world.half - PLAYER_RADIUS - 0.4;
-    player.x = Math.min(limit, Math.max(-limit, player.x));
-    player.z = Math.min(limit, Math.max(-limit, player.z));
+    if (world.bound) world.bound(player);
+    else {
+      const limit = world.half - PLAYER_RADIUS - 0.4;
+      player.x = Math.min(limit, Math.max(-limit, player.x));
+      player.z = Math.min(limit, Math.max(-limit, player.z));
+    }
     world.colliders.forEach(function (c) {
       const dx = player.x - c.x, dz = player.z - c.z, min = c.r + PLAYER_RADIUS;
       const d = Math.hypot(dx, dz);
@@ -172,8 +183,21 @@ export function createControls(canvas, camera, world) {
     forward = Math.max(-1, Math.min(1, forward));
     sideways = Math.max(-1, Math.min(1, sideways));
 
+    if (steer) { forward = 0; sideways = 0; }
     player.moving = forward !== 0 || sideways !== 0;
-    if (player.moving) {
+    if (steer) {
+      player.x += steer.x * dt; player.z += steer.z * dt;
+      player.yaw = Math.atan2(-steer.x, -steer.z);
+      player.moving = true;
+    }
+    if (shove.x || shove.z) {
+      player.x += shove.x * dt; player.z += shove.z * dt;
+      const fade = Math.exp(-5 * dt);
+      shove.x *= fade; shove.z *= fade;
+      if (Math.hypot(shove.x, shove.z) < 0.5) shove.x = shove.z = 0;
+      player.moving = true;
+    }
+    if (player.moving && !steer && (forward || sideways)) {
       const length = Math.hypot(forward, sideways), speed = forward / length < -0.5 ? BACK_SPEED : RUN_SPEED;   // mostly backward is slower
       const f = forward / length * speed * dt, s = sideways / length * speed * dt;
       const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
@@ -201,7 +225,12 @@ export function createControls(canvas, camera, world) {
     target.set(player.x, eyeHeight + player.height, player.z);
     dir.set(Math.sin(yaw) * flat, Math.sin(view.pitch), Math.cos(yaw) * flat);
     let distance = view.distance;
-    const edge = world.half - 0.6;
+    if (world.inside) {                                   // a room of another shape: step out until the wall
+      for (let d = 0.5; d < distance; d += 0.5) {
+        if (!world.inside(target.x + dir.x * d, target.z + dir.z * d)) { distance = Math.max(0.5, d - 0.6); break; }
+      }
+    }
+    const edge = world.inside ? Infinity : world.half - 0.6;
     if (dir.x > 0) distance = Math.min(distance, (edge - target.x) / dir.x);
     if (dir.x < 0) distance = Math.min(distance, (-edge - target.x) / dir.x);
     if (dir.z > 0) distance = Math.min(distance, (edge - target.z) / dir.z);
@@ -222,8 +251,13 @@ export function createControls(canvas, camera, world) {
       if (!yaw && !pitch) return;
       player.yaw = wrapAngle(player.yaw + view.offset - yaw);
       view.offset = 0;
-      view.pitch = Math.min(1.45, Math.max(-0.12, view.pitch + pitch));
+      view.pitch = Math.min(1.45, Math.max(world.minPitch != null ? world.minPitch : -0.12, view.pitch + pitch));
     },
-    jump: function () { jumpAsked = true; }
+    jump: function () { jumpAsked = true; },
+    setStart: function (x, z, yaw) { start.x = x; start.z = z; start.yaw = yaw; },
+    // Fear: run that way (yards a second) until steer(null). Knockback: a push of that speed that dies away, with a hop.
+    steer: function (vx, vz) { steer = vx == null ? null : { x: vx, z: vz }; },
+    shove: function (vx, vz, hop) { shove.x = vx; shove.z = vz; if (hop && player.height === 0) player.fall = hop; },
+    get steered() { return !!steer; }
   };
 }

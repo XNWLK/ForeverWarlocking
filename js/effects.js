@@ -443,15 +443,21 @@ export function createEffects(scene) {
   }
 
   // ---------- what hangs on a dummy while a DoT or curse is on it ----------
-  const marks = [null, {}, {}, {}];              // one set per dummy
-  function mark(name, build) {
-    for (let ti = 1; ti <= 3; ti++) {
+  // One set per target, made the first time that target needs one (a boss fight has up to 40 targets).
+  const marks = [null], makers = {};
+  function mark(name, build) { makers[name] = build; }
+  function marksOf(ti) {
+    while (marks.length <= ti) marks.push(null);
+    if (marks[ti]) return marks[ti];
+    const set = {};
+    Object.keys(makers).forEach(function (name) {
       const holder = new THREE.Group(), g = new THREE.Group();
       holder.visible = false;
       holder.add(g);
       scene.add(holder);
-      marks[ti][name] = { holder: holder, update: build(g) };
-    }
+      set[name] = { holder: holder, update: makers[name](g) };
+    });
+    return (marks[ti] = set);
   }
   mark('immolate', function (g) {                 // flames licking up the dummy
     const flames = [];
@@ -520,13 +526,19 @@ export function createEffects(scene) {
     return function (time) { ringMesh.material.opacity = 0.45 + Math.sin(time * 2.5) * 0.2; ringMesh.rotation.z = -time * 0.5; };
   });
 
-  // ti: which dummy (1-3); at: where it stands { x, z }; on: { immolate: true, corruption: false, ... }
-  function setMarks(ti, at, on, time) {
-    for (const name in marks[ti]) {
-      const m = marks[ti][name], show = !!on[name];
+  // ti: which target; at: where it stands { x, z, y (optional: off the ground) }; on: { immolate: true, ... };
+  // scale: how big the marks are against a dummy (a dragon wears bigger ones). Nothing on and none made: nothing to do.
+  function setMarks(ti, at, on, time, scale) {
+    let any = false;
+    for (const name in on) if (on[name]) { any = true; break; }
+    if (!any && !marks[ti]) return;
+    const set = marksOf(ti);
+    for (const name in set) {
+      const m = set[name], show = !!on[name];
       m.holder.visible = show;
       if (!show) continue;
-      m.holder.position.set(at.x, 0, at.z);
+      m.holder.position.set(at.x, at.y || 0, at.z);
+      m.holder.scale.setScalar(scale || 1);
       m.update(time);
     }
   }
@@ -550,11 +562,11 @@ export function createEffects(scene) {
     });
   }
   function clear() {
-    for (let ti = 1; ti <= 3; ti++) for (const name in marks[ti]) marks[ti][name].holder.visible = false;
+    for (let ti = 1; ti < marks.length; ti++) if (marks[ti]) for (const name in marks[ti]) marks[ti][name].holder.visible = false;
     live.forEach(remove);
     live.length = 0;
     flashes.forEach(function (f) { f.left = 0; f.lamp.intensity = 0; });
   }
 
-  return { streak: streak, play: play, bolt: bolt, meteor: meteor, ball: ball, ring: ring, casting: casting, setMarks: setMarks, update: update, clear: clear, count: function () { return live.length; } };
+  return { streak: streak, play: play, bolt: bolt, meteor: meteor, ball: ball, ring: ring, puff: puff, sparks: sparks, column: column, flash: flash, casting: casting, setMarks: setMarks, update: update, clear: clear, count: function () { return live.length; } };
 }

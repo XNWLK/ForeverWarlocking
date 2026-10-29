@@ -80,8 +80,14 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #links .logo { display: block; width: 30px; height: 30px; border-radius: 7px; margin: -4px 4px -4px -3px; }   /* the logo stands for this page */
 #challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
 #bossBar { position: absolute; left: 14px; top: 98px; z-index: 2; }
-#bossBar button.soon { color: var(--ink-dim); font-style: italic; cursor: default; }
-#bossBar button.soon:hover { background: none; }
+#bossBar button.on { color: var(--gold); border-color: rgba(240, 207, 122, 0.6); }
+.boss-cards { grid-template-columns: 1fr; }
+.boss-cards .card p { font-size: 13px; line-height: 1.45; }
+.boss-cards .card .where { color: var(--ink-dim); font-size: 12px; font-weight: 400; }
+#moveBanner.emote { background: rgba(90, 20, 10, 0.78); border-color: rgba(255, 120, 60, 0.7); color: #ffd2a8; font-size: 18px; }
+.plate.small .tag { width: 40px; padding: 2px 3px 3px; }
+.plate.small .tag span { display: none; }
+.plate.small .tag i { margin-top: 0; }
 #buildLabel { max-width: 186px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }

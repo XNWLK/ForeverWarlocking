@@ -6,6 +6,17 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-10-29
+- **The first boss: Onyxia.** The Bosses button now opens a list of bosses. Onyxia is fought in her own lair, built in
+  the shape of the real one: the egg-shaped cave with lava cracks, the two egg caves and the entrance tunnel.
+  - A ghost tank holds her the whole fight, ghost off-tanks hold the whelps and the Warder. She loses health at an
+    even pace, so the kill always takes 4 minutes: phase 2 at 65%, phase 3 at 40%.
+  - Phase 1: Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back (and knocks you away).
+  - Phase 2: she flies. Fireballs land on you and around the room, Deep Breath burns a lane across the cave after
+    the emote, 20 whelps come out of the egg caves, an Onyxian Warder walks in through the tunnel. Walking into an egg
+    cave hatches more whelps, and they come for you.
+  - Phase 3: she lands. Bellowing Roar fears you for 3 seconds, and the lava cracks erupt after each fear.
+  - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
+  - Your damage is counted in the meter and the review; the sim is measured in a 4-minute fight on one target.
 - **Fix:** Blood Fury, Berserking and Eureka! could be used in the middle of a cast. Now they say "Can't do that
   while casting". During a channel (Drain Life, Wrack, Hellfire, Rain of Fire) they cancel the channel.
 

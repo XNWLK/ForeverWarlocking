@@ -79,11 +79,17 @@ export function createHud(WL, handlers) {
   function showKeyLabels() { slots.forEach(function (slot, i) { slot.kbd.textContent = padLabels ? padLabels[i] || '' : slotLabel(codes[i]); }); }
 
   // With several dummies each gets a number after its name.
-  function dummyName(ti) { return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : ''); }
+  // A boss fight names its own targets (Onyxia, her whelps ...).
+  function dummyName(ti) {
+    if (character && character.targetName) return character.targetName(ti || currentTarget);
+    return getName('dummy') + (character && character.targets > 1 ? ' ' + (ti || currentTarget) : '');
+  }
 
   // A small plate above every dummy when there is more than one: name and health. Click it to target that dummy.
+  // Made when first needed: three for the dummies, up to 40 in a boss fight.
   const plates = [null];
-  for (let i = 1; i <= 3; i++) {
+  function plateOf(i) { while (plates.length <= i) makePlate(plates.length); return plates[i]; }
+  function makePlate(i) {
     const plate = document.createElement('div'), auras = document.createElement('span'), tag = document.createElement('span');
     const name = document.createElement('span'), bar = document.createElement('i'), fill = document.createElement('b');
     plate.className = 'plate';
@@ -97,6 +103,7 @@ export function createHud(WL, handlers) {
     byId('plates').appendChild(plate);
     plates.push({ box: plate, name: name, fill: fill, auras: auras });
   }
+  for (let i = 1; i <= 3; i++) makePlate(i);
 
   // Desktop only, but keep the frames from overlapping in a small window.
   // On a touch screen the layout is made for a phone held either way: it is scaled by the short side.
@@ -537,18 +544,21 @@ export function createHud(WL, handlers) {
 
     setText(el.distance, distance.toFixed(1) + ' yd');
     setClass(el.distance, 'far', distance > c.maxRange);
-    setText(el.targetSub, c.targets > 1 ? ti + ' of ' + c.targets : 'Boss');
+    setText(el.targetSub, c.targetSub ? c.targetSub(ti) : c.targets > 1 ? ti + ' of ' + c.targets : 'Boss');
     const nameButton = el.targetFrame.querySelector('button.name');
-    if (!nameButton.hidden) setText(nameButton, getName('dummy'));
+    if (!nameButton.hidden) setText(nameButton, c.targetName ? c.targetName(ti) : getName('dummy'));
 
-    for (let i = 1; i <= 3; i++) {
-      const plate = plates[i], a = anchors && anchors[i], show = i <= c.targets && !!a && a.visible && !S.targets[i].absent;
+    for (let i = 1; i <= Math.max(plates.length - 1, c.targets); i++) {   // every plate made so far: a boss fight's are hidden again after it
+      const a = anchors && anchors[i], show = i <= c.targets && !!a && a.visible && !S.targets[i].absent && !(c.boss && S.targets[i].dead);
+      if (!show && i >= plates.length) continue;
+      const plate = plateOf(i);
       if (plate.box.hidden !== !show) plate.box.hidden = !show;
       if (!show) continue;
       const t = S.targets[i], left = Math.round(a.x) + 'px', top = Math.round(a.y - 14) + 'px';
       if (plate.box._left !== left) { plate.box._left = left; plate.box.style.left = left; }
       if (plate.box._top !== top) { plate.box._top = top; plate.box.style.top = top; }
       setClass(plate.box, 'solo', c.targets === 1);
+      setClass(plate.box, 'small', !!(c.smallPlate && c.smallPlate(i)));
       auraList(plate.auras, 'plate', aurasOn(combat, i));
       setText(plate.name, dummyName(i));
       setWidth(plate.fill, 100 * t.health / t.maxHealth);
@@ -567,14 +577,14 @@ export function createHud(WL, handlers) {
     setClass(el.health.parentElement, 'low', health <= 2 * (c.spells.lifeTap.healthCost || 0));
     // A light edge on the mana bar while Spirit is giving mana back (no mana spent for 5 seconds).
     setClass(el.manaFill.parentElement, 'regen', !S.over && combat.spiritIn() === 0 && mana < c.stats.maxMana - 0.5);
-    if (combat.timed) {
+    if (combat.timed && !(c.boss && ti > 1)) {          // a boss fight's adds have health of their own
       const left = combat.timeLeft();
       setText(el.targetHealth, Math.ceil(cur.hpPct) + '%  ·  ' + Math.floor(left / 60) + ':' + String(Math.floor(left % 60)).padStart(2, '0') + ' left');
     } else if (combat.endless) setText(el.targetHealth, 'Infinite health' + (cur.hpPct < 100 ? '  ·  ' + Math.round(cur.hpPct) + '%' : ''));
     else setText(el.targetHealth, amount(Math.ceil(cur.health), cur.maxHealth));
     const phase = combat.movePhase(), banner = moveBanner;
-    if (ctx.banner) { banner.hidden = false; setClass(banner, 'soon', !!ctx.banner.soon); setText(banner, ctx.banner.text); }   // a scripted fight says what is happening
-    else if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
+    if (ctx.banner) { banner.hidden = false; setClass(banner, 'soon', !!ctx.banner.soon); setClass(banner, 'emote', !!ctx.banner.emote); setText(banner, ctx.banner.text); }   // a scripted fight says what is happening
+    else if (phase && phase.moving) { banner.hidden = false; setClass(banner, 'soon', false); setClass(banner, 'emote', false); setText(banner, 'Move!  ' + phase.left.toFixed(1)); }
     else if (phase && phase.next != null && phase.next <= 3) { banner.hidden = false; setClass(banner, 'soon', true); setText(banner, 'Move in ' + phase.next.toFixed(1)); }
     else if (!banner.hidden) banner.hidden = true;
     moveFloats(now);
@@ -676,7 +686,9 @@ export function createHud(WL, handlers) {
         setText(li.children[1], s ? s.name : label(k));
         setText(li.children[2], whole(dmg) + '  ' + Math.round(100 * dmg / res.total) + '%');
       });
-      if (c.targets > 1) {
+      if (c.targetGroups) {                               // a boss fight: the boss, then each kind of add together
+        setText(el.perDummy, c.targetGroups(res.byTarget).map(function (g) { return g.name + ' ' + whole(g.dmg); }).join(' · '));
+      } else if (c.targets > 1) {
         const parts = [];
         for (let i = 1; i <= c.targets; i++) parts.push(whole(res.byTarget[i]));
         setText(el.perDummy, parts.join(' · '));

@@ -27,6 +27,8 @@ import { createReplay } from './replay.js';
 import { judgeLesson } from './lessons.js';
 import { noteProgress } from './progress.js';
 import { costs } from './cost.js';
+import { buildLair, LAIR, keepInside, walkable } from './lair.js';
+import { createBossFight, bossChallenge, BOSSES } from './boss.js';
 
 const WL = window.WL;
 // A demon's melee reach in yards, from the Warlock data (the Succubus: 5). The data names none for the Felhunter and
@@ -54,7 +56,12 @@ renderer.toneMappingExposure = 1.1;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 
+// The fel chamber is the room of every fight but a boss fight; its parts are hidden while a boss's lair is shown.
+const chamberFrom = scene.children.length;
 const chamber = buildChamber(scene);
+const chamberParts = scene.children.slice(chamberFrom), chamberLook = { background: scene.background, fog: scene.fog };
+const lair = buildLair(scene);
+const lairLook = { background: new THREE.Color(0x0a0504), fog: new THREE.Fog(0x0e0605, 45, 150) };
 const dummies = [null];
 for (let i = 1; i <= 3; i++) {
   const d = makeDummy();
@@ -65,6 +72,8 @@ for (let i = 1; i <= 3; i++) {
   scene.add(d.root);
   dummies.push(d);
 }
+// In a boss fight `dummies` and SPOTS hold the boss and its adds instead (setRoom); these are the dummies to go back to.
+const dummySet = dummies.slice(), dummySpots = SPOTS.slice();
 const warlock = makeWarlock();
 scene.add(warlock.root);
 const beam = makeBeam();
@@ -96,12 +105,48 @@ function wheelAct(e) {
   return act(combo);
 }
 
-const colliders = chamber.colliders.slice(), fixedColliders = colliders.length;
-const controls = createControls(canvas, camera, {
+const colliders = chamber.colliders.slice();
+let fixedColliders = colliders.length;
+const world = {
   half: HALF, wallHeight: 20, colliders: colliders, onClick: clickScene, binds: binds,
   claimed: function (e) { const combo = keyCombo(e); return combo !== e.code && bound(combo); },   // Shift+W is a spell's key: do not walk
   onWheel: wheelAct
+};
+const controls = createControls(canvas, camera, world);
+// A boss fight (the Bosses button): its creatures, its script, its room.
+const bossFight = createBossFight(scene, {
+  effects: effects, lair: lair, controls: controls,
+  sound: { play: function (name) { sound.play(name); } },
+  log: function (text, kind) { hud.log(text, kind); }
 });
+let bossOn = false;
+// How many targets there can be: three dummies, or the boss and all its adds.
+function targetSlots() { return bossOn ? bossFight.count : 3; }
+// Into the boss's lair (true) or back to the fel chamber (false).
+function setRoom(boss) {
+  if (bossOn === boss) return;
+  bossOn = boss;
+  chamberParts.forEach(function (o) { o.visible = !boss; });
+  lair.group.visible = boss;
+  bossFight.show(boss);
+  scene.background = boss ? lairLook.background : chamberLook.background;
+  scene.fog = boss ? lairLook.fog : chamberLook.fog;
+  dummies.length = 1; SPOTS.length = 1;
+  (boss ? bossFight.bodies : dummySet).slice(1).forEach(function (d) { dummies.push(d); });
+  (boss ? bossFight.spots : dummySpots).slice(1).forEach(function (p) { SPOTS.push(p); });
+  dummySet.slice(1).forEach(function (d) { d.root.visible = false; });
+  world.bound = boss ? keepInside : null;
+  world.inside = boss ? walkable : null;
+  world.wallHeight = boss ? lair.wallHeight : 20;
+  world.minPitch = boss ? -0.55 : null;              // look up at her when she flies
+  colliders.length = 0;
+  if (!boss) chamber.colliders.forEach(function (c) { colliders.push(c); });
+  fixedColliders = colliders.length;
+  if (boss) controls.setStart(LAIR.start.x, LAIR.start.z, LAIR.start.yaw); else controls.setStart(0, 24, 0);
+  controls.reset();
+  while (anchors.length <= targetSlots()) anchors.push({ x: 0, y: 0, visible: false });
+  pet.sendHome();
+}
 // Touch screens: the stick, the round buttons and the menu (nothing happens here on a desktop).
 const touch = createTouch({
   stick: function (x, y) { controls.setStick(x, y); },
@@ -114,6 +159,7 @@ const touch = createTouch({
 });
 
 // ---------- the character and the fight ----------
+let ringList = [], ringEdge = 0;                          // the range rings' yards, and how far out they start (a boss's edge)
 let config = null, combat = null, character = null, rings = null, targets = 1, simResult = null;
 // The sim's numbers for this fight: without a precast ('') and with each spell you could precast. simResult is the
 // one that fits what you did; until a precast's own numbers are in, the plain ones stay on screen.
@@ -214,8 +260,9 @@ function readCustomBuild() {
 function allBuilds() { return (customBuild ? [customBuild] : []).concat(WL.BUILDS); }
 
 // What the casting rules need to know about where everyone stands.
-const ctx = { moving: false, distances: [0, 0, 0, 0], gaps: GAPS, petDistance: 0 };
+const ctx = { moving: false, distances: new Array(41).fill(0), gaps: GAPS, petDistance: 0 };
 const anchors = [null, { x: 0, y: 0, visible: false }, { x: 0, y: 0, visible: false }, { x: 0, y: 0, visible: false }];   // the dummies' heads on screen
+const bossGaps = [];                                      // target to target in a boss fight (they move)
 let fightClock = 0;                                       // seconds since the last reset
 
 const hud = createHud(WL, {
@@ -275,14 +322,7 @@ const hud = createHud(WL, {
 const extras = createExtras(WL, {
   fights: { list: listFights, remove: deleteFight, clear: clearFights, kept: FIGHTS_KEPT, open: function (f) { openStoredFight(f); } },
   // A drill, a seeded fight, or null to go back to your own fight settings.
-  onChallenge: function (next) {
-    touch.closeMenu();
-    challenge = next;
-    hud.closePanels();
-    newCharacter();
-    if (next) { hud.log((next.encounter ? 'Encounter: ' : next.drill ? 'Drill: ' : '') + next.name + '. ' + next.text, 'proc'); hud.log('It starts when your first spell takes effect. "End" at the top goes back to your own fight.'); }
-    else hud.log('Back to your own fight settings.');
-  },
+  onChallenge: function (next) { startChallenge(next); },
   onPreset: function (p) {
     touch.closeMenu();
     challenge = null;
@@ -697,7 +737,7 @@ function askSimAverage(seconds) {
 
 // What you see when something happens. A spell that flies is drawn as a bolt: its number and the dummy's flinch
 // wait until the bolt arrives (the damage itself is already counted, exactly as the rules say).
-const boltsAt = [0, 0, 0, 0], deathWaiting = [false, false, false, false];
+const boltsAt = new Array(41).fill(0), deathWaiting = new Array(41).fill(false);
 const spot = new THREE.Vector3(), staffAt = new THREE.Vector3();
 // Which sound a spell makes when it takes hold of the target (a DoT, a curse). Damage over time itself is silent.
 const APPLY_SOUND = { corruption: 'rot', siphonLife: 'rot', curseOfElements: 'curse', baneOfAgony: 'curse', baneOfDoom: 'curse', baneOfHavoc: 'curse' };
@@ -718,6 +758,9 @@ function onCombatEvent(e) {
     if (e.key) hud.log('Precast: ' + combat.spells[e.key].name + '. The sim is measured with the same precast.', 'proc');
     return;
   }
+  if (e.type === 'injured' || e.type === 'healed') { recorder.event(e, combat); return; }   // a boss fight hurts you; its healers heal you (js/boss.js logs it)
+  if (e.type === 'spawn' && bossOn) { boltsAt[e.target] = 0; deathWaiting[e.target] = false; return; }   // the boss's adds come in by themselves
+  if (e.type === 'death' && e.died) { hud.log('You died' + (e.what ? ' (' + e.what + ')' : '') + '.', 'miss'); sound.play('fizzle'); }
   if (e.type === 'spawn') {                                // an add joins the fight (a scripted fight)
     dummies[e.target].setDead(false);
     boltsAt[e.target] = 0; deathWaiting[e.target] = false;
@@ -843,6 +886,7 @@ function showLooks(e, again) {
     effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2 * warlock.size, controls.player.z) });
   } else if (e.type === 'death') {
     if (again) { if (!e.timed) effects.play('death', where); }
+    else if (!e.timed && bossOn && ti > 1) { dummy.setDead(true); effects.ring(spot.set(dummy.chestAt.x, 0.1, dummy.chestAt.z), 0xff8a5a, 0.3, 2.2, 0.5, false); }   // a whelp or the Warder falls
     else if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
   }
 }
@@ -888,14 +932,18 @@ function newCharacter() {
   warlock.setRace(raceKey);                                // the model takes the race's shape; the camera looks at its head
   controls.setEyeHeight(1.7 * warlock.size);
   const dummyHealth = getSetting('dummyHealth');
-  targets = Math.max(1, Math.min(3, Number(challenge ? challenge.targets : getSetting('dummies')) || 1));
+  const bossId = challenge && challenge.boss ? challenge.boss : null;
+  setRoom(!!bossId);
+  document.getElementById('btnBosses').classList.toggle('on', !!bossId);
+  targets = bossId ? challenge.targets : Math.max(1, Math.min(3, Number(challenge ? challenge.targets : getSetting('dummies')) || 1));
   config = buildConfig();
   const fight = fightOptions();
   combat = createCombat({ WL: WL, build: build, raceKey: raceKey, config: config, dummyHealth: dummyHealth, targets: targets,
                           timedDuration: fight.timed ? fight.seconds : 0, onEvent: onCombatEvent, petMeleeRange: petMeleeRange(config, build.pet),
                           endless: !!fight.endless, endlessPct: fight.endless === 'execute' ? (config.fight.executePct > 20 ? 20 : config.fight.executePct / 2) : 100,   // infinite health; "in execute range" = standing at 20%
                           healths: challenge && challenge.healths, absent: challenge && challenge.absent,   // a scripted fight with adds
-                          seed: challenge && challenge.seeded ? challenge.seed : undefined });   // a seeded fight rolls the same dice every time
+                          seed: challenge && challenge.seeded ? challenge.seed : undefined,   // a seeded fight rolls the same dice every time
+                          boss: !!bossId });
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
   panels.setFight(fight);
@@ -906,18 +954,21 @@ function newCharacter() {
     racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct, targets: targets,
     builds: allBuilds(), timed: fight.timed, endless: fight.endless,
     maxRange: Math.max.apply(null, ranges.concat([0])),
-    lessonKey: build.custom ? 'c' + hash(getSetting('buildCode')) : build.key   // lessons and progress are kept per build
+    lessonKey: build.custom ? 'c' + hash(getSetting('buildCode')) : build.key,  // lessons and progress are kept per build
+    // A boss fight names its targets and sums the adds in the meter.
+    boss: !!bossId, targetName: bossId ? bossFight.targetName : null, targetSub: bossId ? bossFight.targetSub : null,
+    smallPlate: bossId ? bossFight.smallPlate : null, targetGroups: bossId ? bossFight.groups : null
   };
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
   aids.setCharacter(character);
-  touch.setTargets(targets);
+  touch.setTargets(Math.min(3, targets));
   encounter.start(challenge && challenge.encounter ? challenge : null);
   showBest();
 
   // The dummies in the room (what you cannot walk through is set with every new fight: setColliders).
-  for (let i = 1; i <= 3; i++) dummies[i].root.visible = i <= targets;
+  if (!bossOn) for (let i = 1; i <= 3; i++) dummies[i].root.visible = i <= targets;   // a boss fight shows its own creatures
 
   // Range rings around your target: your spell range, Drain Life, the Succubus. Destructive Reach lengthens only
   // Destruction spells and Grim Reach only Affliction spells (Xn, 2026-10-16), so when the two trees reach different
@@ -934,6 +985,7 @@ function newCharacter() {
   } else list.push({ yards: character.maxRange, color: 0xb9a8ff });
   if (combat.table.drainLife && list.every(function (r) { return r.yards !== combat.table.drainLife.range; })) list.push({ yards: combat.table.drainLife.range, color: 0x58e0a8 });
   if (build.pet === 'succubus') list.push({ yards: petMeleeRange(config, build.pet), color: 0xff9d7a });
+  ringList = list; ringEdge = 0;
   rings = makeRangeRings(list);
   rings.visible = getSetting('rings');
   scene.add(rings);
@@ -944,6 +996,7 @@ function newCharacter() {
 // What you cannot walk through: the room's own things and every dummy that is there right now.
 function setColliders() {
   colliders.length = fixedColliders;
+  if (bossOn) return;                                      // Onyxia stands in the way while she is on the ground: set every frame
   for (let i = 1; i <= targets; i++) if (!combat.state.targets[i].absent) colliders.push({ x: SPOTS[i].x, z: SPOTS[i].z, r: dummies[i].radius });
 }
 
@@ -966,7 +1019,8 @@ function resetFight() {
   hud.setPull(false);
   if (simEnded) askSimAverage(); else useSimResult();      // back to the numbers without a precast (after a fight you ended: the sim's long fight again)
   if (character) showBest();
-  for (let i = 1; i <= 3; i++) { dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
+  for (let i = 1; i <= targetSlots(); i++) { if (!bossOn) dummies[i].setDead(false); boltsAt[i] = 0; deathWaiting[i] = false; }
+  if (bossOn) bossFight.reset();
   pet.sendHome();
   effects.clear();
 }
@@ -987,6 +1041,7 @@ function togglePull() {
 
 function press(key) {
   if (!key || replay.state.active) return;
+  if (bossOn && bossFight.feared()) { hud.showError('You are feared'); return; }
   const late = Math.max(0, Number(getSetting('latency')) || 0), fight = combat;
   if (late > 0) { window.setTimeout(function () { if (combat === fight) { combat.update(fightClock, ctx); combat.press(key, ctx); } }, late); return; }
   combat.update(fightClock, ctx);
@@ -995,7 +1050,7 @@ function press(key) {
 
 function setTarget(ti) {
   if (ti < 1 || ti > targets) return;
-  if (!combat.alive(ti) && !combat.state.over) { hud.showError('That dummy is down'); return; }
+  if (!combat.alive(ti) && !combat.state.over) { hud.showError(bossOn ? 'That target is dead' : 'That dummy is down'); return; }
   combat.setTarget(ti);
 }
 
@@ -1015,11 +1070,52 @@ function clickScene(x, y) {
   raycaster.setFromCamera(pointer, camera);
   let best = 0, bestDistance = Infinity;
   for (let i = 1; i <= targets; i++) {
+    if (combat.state.targets[i].absent || (bossOn && !combat.alive(i))) continue;   // not there (yet), or a fallen whelp
     const hit = raycaster.intersectObject(dummies[i].root, true)[0];
     if (hit && hit.distance < bestDistance) { best = i; bestDistance = hit.distance; }
   }
   if (best) setTarget(best);
 }
+
+// A drill, a seeded fight, a boss, or null to go back to your own fight settings.
+function startChallenge(next) {
+  touch.closeMenu();
+  challenge = next;
+  hud.closePanels();
+  newCharacter();
+  if (next) {
+    hud.log((next.boss ? 'Boss: ' : next.encounter ? 'Encounter: ' : next.drill ? 'Drill: ' : '') + next.name + '. ' + (next.long || next.text), 'proc');
+    hud.log(next.boss ? 'It starts when your first spell lands or the pull timer runs out. "End" at the top leaves the lair.' : 'It starts when your first spell takes effect. "End" at the top goes back to your own fight.');
+  } else hud.log('Back to your own fight settings.');
+}
+
+// ---------- the boss list (the Bosses button) ----------
+const bossWindow = document.getElementById('bossWin');
+function fillBosses() {
+  const list = document.getElementById('bossList');
+  list.textContent = '';
+  BOSSES.forEach(function (b) {
+    const running = !!(challenge && challenge.boss === b.id);
+    const card = document.createElement('div'), title = document.createElement('h4'), where = document.createElement('span'), text = document.createElement('p'), button = document.createElement('button');
+    card.className = 'card' + (running ? ' on' : '');
+    where.className = 'where';
+    where.textContent = b.where + ' · ' + Math.round(b.seconds / 60) + ' minutes';
+    title.append(b.name, where);
+    text.textContent = b.text;
+    button.type = 'button';
+    button.textContent = running ? 'Leave the lair' : 'Fight ' + b.name;
+    button.addEventListener('click', function () { bossWindow.hidden = true; startChallenge(running ? null : bossChallenge(b.id)); });
+    card.append(title, text, button);
+    list.appendChild(card);
+  });
+}
+document.getElementById('btnBosses').addEventListener('click', function (e) {
+  e.currentTarget.blur();
+  touch.closeMenu();
+  if (bossWindow.hidden) fillBosses();
+  bossWindow.hidden = !bossWindow.hidden;
+});
+document.getElementById('bossClose').addEventListener('click', function () { bossWindow.hidden = true; });
 
 // ---------- keys and mouse buttons ----------
 // Is this key, button or wheel turn (with its modifiers) bound to an action?
@@ -1062,6 +1158,7 @@ window.addEventListener('keydown', function (e) {
     if (bound(combo)) e.preventDefault();
     return;
   }
+  if (e.code === 'Escape' && !bossWindow.hidden) { bossWindow.hidden = true; return; }
   if (e.code === 'Escape' && extras.sheetOpen()) { extras.closeSheet(); return; }
   if (e.code === 'Escape' && (panels.reviewOpen() || hud.anyPanelOpen())) { if (panels.reviewOpen()) panels.hideReview(); else hud.closePanels(); return; }
   if (act(combo)) e.preventDefault();                      // also keeps the browser from acting on Ctrl+S, Alt+D and the like
@@ -1174,15 +1271,27 @@ function frame() {
   if (script.forced && !combat.state.over) combat.result.track.moved += Math.min(0.25, elapsed);
   const kind = script.banner ? script.banner.text.replace(/[\d.\s]+/g, '') : '';
   if (kind !== bannerKind) { bannerKind = kind; if (script.banner) sound.play(script.banner.soon ? 'warn' : 'move'); }
+  // A boss fight: the boss acts, the adds move, you may be feared or knocked away (before the distances are taken).
+  const bossOut = bossOn ? bossFight.update(dt, time, player, combat) : null;
+  if (bossOn) { colliders.length = fixedColliders; const c = bossFight.collider(); if (c) colliders.push(c); }
   ctx.moving = player.moving || player.height > 0 || script.forced;   // a jump counts as moving: it stops the spell you are casting
-  for (let i = 1; i <= 3; i++) ctx.distances[i] = Math.hypot(player.x - SPOTS[i].x, player.z - SPOTS[i].z);
+  // Distances: from you to each target; a boss and its adds are measured to their edge (a dragon is big).
+  for (let i = 1; i <= targetSlots(); i++) {
+    const d = Math.hypot(player.x - SPOTS[i].x, player.z - SPOTS[i].z);
+    ctx.distances[i] = bossOn ? Math.max(0, d - dummies[i].radius) : d;
+  }
+  if (bossOn) {
+    for (let a = 1; a <= targetSlots(); a++) { bossGaps[a] = bossGaps[a] || []; for (let b = 1; b <= targetSlots(); b++) bossGaps[a][b] = Math.hypot(SPOTS[a].x - SPOTS[b].x, SPOTS[a].z - SPOTS[b].z); }
+    ctx.gaps = bossGaps;
+  } else ctx.gaps = GAPS;
 
   // The pet walks first, so the casting rules know whether it is in range of its dummy.
   const P = combat.pet;
   if (P) {
     const petCast = P.casting ? Math.min(1, (combat.state.t - P.casting.start) / (P.casting.end - P.casting.start)) : 0;
     pet.update(dt, time, player, P.mode, P.range, petCast, combat.state.over || !combat.alive(P.target), SPOTS[P.target], colliders);
-    ctx.petDistance = pet.state.distance;
+    // In a boss fight the pet too is measured to the edge, and a demon that fights in melee cannot reach her in the air.
+    ctx.petDistance = !bossOn ? pet.state.distance : bossFight.flying(P.target) && P.range < 10 ? 99 : Math.max(0, pet.state.distance - dummies[P.target].radius);
   }
 
   // The fight's own clock stands still while the page is hidden (a long gap counts as a quarter second at most).
@@ -1214,6 +1323,7 @@ function frame() {
     if (fightClock < pullNote.until) ctx.banner = ctx.banner || { text: pullNote.text, soon: false };
     else pullNote = null;
   }
+  if (bossOut && bossOut.banner && !pull) ctx.banner = bossOut.banner;   // her yells and emotes
 
   if (combat.state.fightStart !== null && !combat.state.over) {
     const second = Math.floor(combat.fightSeconds());
@@ -1236,13 +1346,16 @@ function frame() {
   warlock.update(dt, time, player.moving, player.height, school);
   ghost.update(dt, time, ghostView(player, S.fightStart !== null ? combat.fightSeconds() : null));
   for (let i = 1; i <= targets; i++) {
+    if (bossOn) { dummies[i].setSelected(i === S.target); continue; }   // the boss fight moves and shows its creatures itself
     dummies[i].root.visible = !S.targets[i].absent;        // an add that has not joined yet
     dummies[i].update(dt, time);
     dummies[i].setSelected(i === S.target);
   }
+  const edge = bossOn ? dummies[S.target].radius : 0;
+  if (edge !== ringEdge) { scene.remove(rings); ringEdge = edge; rings = makeRangeRings(ringList, edge); scene.add(rings); }
   rings.position.set(SPOTS[S.target].x, 0, SPOTS[S.target].z);
   rings.visible = getSetting('rings');
-  chamber.update(time);
+  if (bossOn) lair.update(time); else chamber.update(time);
 
   // Spell looks: motes at the staff while casting, marks on the dummies for what is on them, bolts and bursts.
   warlock.root.updateMatrixWorld();
@@ -1250,12 +1363,13 @@ function frame() {
     const fx = SPELL_FX[casting.key];
     effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, S.cast ? (S.t - S.cast.start) / (S.cast.end - S.cast.start) : 0.6, time, player, dt);
   } else effects.casting(null, 0, 0, time, player, dt);
-  for (let i = 1; i <= 3; i++) {                           // all three, so a dummy that is no longer there loses its marks
-    effects.setMarks(i, SPOTS[i], i <= targets && combat.alive(i) ? {
+  for (let i = 1; i <= targetSlots(); i++) {               // all of them, so a dummy that is no longer there loses its marks
+    const at = bossOn ? { x: SPOTS[i].x, z: SPOTS[i].z, y: bossFight.lift(i) } : SPOTS[i];
+    effects.setMarks(i, at, i <= targets && combat.alive(i) ? {
       immolate: combat.dotLeft('immolate', i) > 0, corruption: combat.dotLeft('corruption', i) > 0, siphonLife: combat.dotLeft('siphonLife', i) > 0,
       baneOfAgony: combat.dotLeft('baneOfAgony', i) > 0, baneOfDoom: combat.dotLeft('baneOfDoom', i) > 0,
       coe: combat.debuff(i, 'coe'), havoc: combat.havocOn() === i
-    } : {}, time);
+    } : {}, time, bossOn ? bossFight.markScale(i) : 1);
   }
   effects.update(dt, camera.position);
 
@@ -1282,9 +1396,10 @@ function frame() {
     }
   } else areaPulse = 0;
 
+  if (bossOut && bossOut.shake) camera.position.add(spot.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4).multiplyScalar(bossOut.shake));   // Bellowing Roar shakes the cave
   renderer.render(scene, camera);
 
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= targetSlots(); i++) {
     const anchor = anchors[i];
     if (i > targets || S.targets[i].absent) { anchor.visible = false; continue; }  // a dummy that is gone (or not there yet) takes its damage numbers with it
     head.copy(dummies[i].headAt).project(camera);
@@ -1303,7 +1418,7 @@ renderer.setAnimationLoop(frame);
 // What the ghost needs to know: where you stand, the second of the fight (null before it begins), the sim's casts.
 function ghostView(player, t) {
   const P = combat.pet, pc = config.pets[character.build.pet], swing = pc && pc.melee ? pc.melee.swing : 2;
-  return { show: extras.show().ghost, race: character.raceKey, player: player, t: t, casts: simResult && simResult.casts, targets: targets, camera: camera,
+  return { show: extras.show().ghost && !bossOn, race: character.raceKey, player: player, t: t, casts: simResult && simResult.casts, targets: targets, camera: camera,
            petKind: P ? (character.build.pet === 'imp' ? 'imp' : 'succubus') : null, petHits: simResult && simResult.petHits, petRange: P ? P.range : 0, swing: swing,
            over: replay.state.active ? false : combat.state.over,
            spot: function (i) { return SPOTS[i]; }, chest: function (i) { return dummies[i].chestAt; } };
@@ -1330,6 +1445,7 @@ function sampleReplay(last) {
 let replayDead = [false, false, false, false], replayAuras = {}, replaySaved = null;
 function startReplay() {
   if (!replay.has() || !combat.state.over) { hud.showError('Nothing to watch yet: finish a fight first'); return; }
+  if (bossOn) { hud.showError('Watching it again does not work for boss fights yet'); return; }
   panels.hideReview(); touch.closeMenu(); hud.closePanels();
   const p = controls.player;
   replaySaved = { x: p.x, z: p.z, yaw: p.yaw, height: p.height };
@@ -1433,5 +1549,6 @@ window.FW = {
   pet: pet, ctx: ctx, effects: effects, dummies: dummies, panels: panels, sound: sound,
   get config() { return config; }, get simResult() { return simResult; },
   ghost: ghost, replay: replay, startReplay: startReplay, endReplay: endReplay, reviewData: reviewData, procSummary: procSummary,
-  get combat() { return combat; }, get character() { return character; }, get rings() { return rings; }
+  get combat() { return combat; }, get character() { return character; }, get rings() { return rings; },
+  bossFight: bossFight, lair: lair
 };

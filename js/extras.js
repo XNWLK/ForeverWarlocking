@@ -666,7 +666,7 @@ export function createExtras(WL, handlers) {
       if (!lessonWindow.hidden) fillLessons();
       const tag = byId('challengeTag');
       tag.hidden = !challenge;
-      if (challenge) byId('challengeText').textContent = (challenge.encounter ? 'Encounter: ' : challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
+      if (challenge) byId('challengeText').textContent = (challenge.boss ? 'Boss: ' : challenge.encounter ? 'Encounter: ' : challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
       latency.value = String(getSetting('latency') || 0);
       if (!sheet.hidden && openTab) showSheet(openTab);
       lastRace = '';

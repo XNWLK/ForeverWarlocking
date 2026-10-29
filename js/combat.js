@@ -37,7 +37,8 @@ export const FAIL_TEXT = {
   shards: 'No Soul Shards',
   health: 'Not enough health',
   immolate: 'Requires Immolate on the target',
-  noRacial: 'Your race has nothing to use'
+  noRacial: 'Your race has nothing to use',
+  feared: 'You are feared'
 };
 
 // The key a spell's damage is booked under: plain for the first target, x2: / x3: for the others (as in the engine).
@@ -54,6 +55,9 @@ export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + k
 //       endless: the dummies have infinite health - nothing takes it away, and the fight lasts until stop() is called;
 //       endlessPct: the health they stand at all the while (100, or a number under the execute threshold).
 //       The engine has no such fight, so the check never uses it.
+//       boss: a boss fight (js/boss.js): target 1 is the boss, whose health follows timedDuration as above; the other
+//       targets (up to 39 adds, `targets` counts them all) have health pools of their own (healths / absent / spawn)
+//       and can die. injure(), heal() and raidHurt() are for the boss and the ghost raid. The check never uses it.
 // From config.fight (as in the engine): moveEvery / moveDuration = every so many seconds you have to move for so
 //       long (only instants then); hitEvery = you take a hit every so many seconds, which pushes your casts back.
 // ctx (given to update, press and blocked): { moving, distances: [, d1, d2, d3] you to each target,
@@ -72,7 +76,10 @@ export function createCombat(opts) {
   const HIT = cfg.fight.hitEvery > 0 ? cfg.fight.hitEvery : 0;
   const AURA_PUSH = Object.keys(cfg.buffs || {}).reduce(function (a, k) { const b = cfg.buffs[k]; return a + (b.on && b.pushbackResistPct ? b.pushbackResistPct : 0); }, 0);
   const FEL_CONC = { drainLife: 1, drainSoul: 1, wrack: 1 };
-  const N = Math.max(1, Math.min(3, opts.targets || 1));
+  const BOSS = !check && !!opts.boss;
+  const N = Math.max(1, Math.min(BOSS ? 40 : 3, opts.targets || 1));
+  // Health that follows the clock (a timed fight; in a boss fight only the boss) rather than the damage taken.
+  function scheduled(ti) { return !!linear && (!BOSS || ti === 1); }
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
   const armorRed = WL.armorReduction(cfg);
@@ -151,7 +158,7 @@ export function createCombat(opts) {
       if (coeFromOthers && i === 1) T[i].deb.coe = Infinity;
     }
     S.targets = T;
-    res = { total: 0, threat: 0, bySpell: {}, byTarget: [0, 0, 0, 0],
+    res = { total: 0, threat: 0, bySpell: {}, byTarget: new Array(N + 1).fill(0),
             track: { busy: 0, uptime: {}, petActive: 0, wasted: 0, spirit: 0, moved: 0, interrupts: 0, pushbacks: 0, pushbackTime: 0, lifeTaps: 0,
                      // for the review: when your first spell took effect (seconds into the fight), your mana, and DoTs cast over
                      first: null, spent: 0, tapMana: 0, tapLost: 0, tapsMoving: 0, minMana: stats.maxMana, noMana: 0, clips: [] } };
@@ -307,7 +314,7 @@ export function createCombat(opts) {
 
   function hurt(ti, amount) {
     res.byTarget[ti] += amount;
-    if (linear || endless) return;
+    if (scheduled(ti) || endless) return;
     const t = T[ti];
     t.health = Math.max(0, t.health - amount);
     t.hpPct = 100 * t.health / t.maxHealth;
@@ -326,16 +333,16 @@ export function createCombat(opts) {
     // Bane of Havoc: a share of what you (not the pet) do to the other targets is also done to the one it sits on.
     const hav = havocOn();
     let copied = 0;
-    if (hav && havocPct && key.indexOf('pet:') !== 0 && ti !== hav && (linear || alive(hav))) {
+    if (hav && havocPct && key.indexOf('pet:') !== 0 && ti !== hav && (scheduled(hav) || alive(hav))) {
       const h = row('baneOfHavoc');
       copied = amount * havocPct;
       h.dmg += copied; h.hits++; res.total += copied;
       hurt(hav, copied);
       emit({ type: 'havoc', key: 'baneOfHavoc', target: hav, amount: copied, school: 'shadow' });
-      if (!linear && T[hav].health <= 0 && !T[hav].dead) kill(hav);
+      if (!scheduled(hav) && T[hav].health <= 0 && !T[hav].dead) kill(hav);
     }
     if (key.indexOf('pet:') !== 0) { const threat = (amount + copied) * threatMult(key); r.threat += threat; res.threat += threat; }   // the Havoc copy counts for the spell that caused it
-    if (!linear && T[ti].health <= 0 && !T[ti].dead) kill(ti);
+    if (!scheduled(ti) && T[ti].health <= 0 && !T[ti].dead) kill(ti);
   }
 
   // A target is down. The fight is over when the last one falls.
@@ -876,8 +883,41 @@ export function createCombat(opts) {
     S.t = to;
     if (linear) {
       const ft = fightTime(S.t), pct = ft < 0 ? 100 : Math.max(0, 100 * (1 - ft / linear));
-      for (let i = 1; i <= N; i++) { T[i].hpPct = pct; if (timed) T[i].health = T[i].maxHealth * pct / 100; }
+      for (let i = 1; i <= N; i++) { if (!scheduled(i)) continue; T[i].hpPct = pct; if (timed) T[i].health = T[i].maxHealth * pct / 100; }
     }
+  }
+
+  // ---------- a boss fight (js/boss.js); nothing else calls these ----------
+  // The boss or one of its adds hurts you. At 0 health you die and the fight is over.
+  function injure(amount, what) {
+    if (!BOSS || S.over || S.fightStart === null || !(amount > 0)) return 0;
+    loseHealth(amount);
+    emit({ type: 'injured', amount: amount, what: what || '' });
+    if (S.health <= 0) {
+      S.health = 0;
+      S.over = true; S.fightEnd = S.t;
+      if (S.cast || S.channel) interrupt('dead');
+      S.cast = null; S.channel = null; events.length = 0; queued = null;
+      if (P) { P.active = false; P.gen++; P.casting = null; }
+      const seconds = Math.max(S.t - S.fightStart, 0);
+      emit({ type: 'death', target: S.target, last: true, timed: true, died: true, what: what || '', seconds: seconds, total: res.total, dps: seconds > 0 ? res.total / seconds : 0 });
+    }
+    return amount;
+  }
+  // The raid's healers.
+  function heal(amount, what) {
+    if (!BOSS || S.over) return 0;
+    const got = gainHealth(amount);
+    if (got > 0.5) emit({ type: 'healed', amount: got, what: what || '' });
+    return got;
+  }
+  // The ghost raid damages an add (not counted as yours). It dies at 0.
+  function raidHurt(ti, amount) {
+    if (!BOSS || ti === 1 || !T[ti] || T[ti].dead || S.over) return;
+    const t = T[ti];
+    t.health = Math.max(0, t.health - amount);
+    t.hpPct = 100 * t.health / t.maxHealth;
+    if (t.health <= 0) kill(ti);
   }
 
   // A timed fight is over: the clock stops, everything stops.
@@ -994,7 +1034,7 @@ export function createCombat(opts) {
   function simWould(remaining) {
     if (S.over) return null;
     const standing = [];
-    for (let i = 1; i <= N; i++) if (!T[i].dead) standing.push(i);
+    for (let i = 1; i <= N; i++) if (!T[i].dead && (!BOSS || i === 1)) standing.push(i);   // a boss fight: the boss alone, as the sim fights it
     if (!standing.length) return null;
     const boss = standing[0], c = S.cast, at = Math.max(S.t, readyAt());
     const landing = c && table[c.key].ticks && SPELLS[c.key].kind !== 'channel' ? { key: c.key, target: c.target, left: SPELLS[c.key].duration } : null;
@@ -1089,7 +1129,7 @@ export function createCombat(opts) {
     cancel: function () { if (!S.over) interrupt('cancelled'); queued = null; },
     castTime: castTime, gcd: gcd, cost: effectiveCost, selfTick: selfTick, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
     alive: alive, havocOn: havocOn, eurekaUp: eurekaUp, executePhase: executePhase,
-    timed: timed, duration: linear, endless: endless, stop: stop,
+    timed: timed, duration: linear, endless: endless, stop: stop, boss: BOSS, injure: injure, heal: heal, raidHurt: raidHurt,
     // { moving, left } while you are made to move; { moving: false, next } = seconds until the next phase (null = none)
     movePhase: function () {
       if (!MOVE) return null;

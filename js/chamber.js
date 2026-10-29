@@ -296,12 +296,14 @@ export function buildChamber(scene) {
   };
 }
 
-// Rings on the ground around a target, one per range in yards, each with its label.
-export function makeRangeRings(ranges) {
-  const group = new THREE.Group();
+// Rings on the ground around a target, one per range in yards, each with its label. edge: how far the target's edge is
+// from its middle (a big boss: range counts from its edge, so the rings are that much wider).
+export function makeRangeRings(ranges, edge) {
+  const group = new THREE.Group(), out = edge || 0;
   ranges.forEach(function (ring) {
+    const r = ring.yards + out;
     const mesh = new THREE.Mesh(
-      new THREE.RingGeometry(ring.yards - 0.09, ring.yards + 0.09, 160),
+      new THREE.RingGeometry(r - 0.09, r + 0.09, 160),
       new THREE.MeshBasicMaterial({ color: ring.color, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide })
     );
     mesh.rotation.x = -Math.PI / 2;
@@ -309,7 +311,7 @@ export function makeRangeRings(ranges) {
     group.add(mesh);
     [-0.5, 0.5].forEach(function (angle) {            // a label to the left and right of the way in
       const label = labelSprite(ring.yards + ' yd', '#' + ring.color.toString(16).padStart(6, '0'));
-      label.position.set(Math.sin(angle) * ring.yards, 0.9, Math.cos(angle) * ring.yards);
+      label.position.set(Math.sin(angle) * r, 0.9, Math.cos(angle) * r);
       group.add(label);
     });
   });
