@@ -76,6 +76,35 @@ for (let i = 1; i <= 3; i++) {
 const dummySet = dummies.slice(), dummySpots = SPOTS.slice();
 const warlock = makeWarlock();
 scene.add(warlock.root);
+// Feared in a boss fight: a skull in a purple ring above your head (Xn).
+const fearMark = (function () {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.shadowColor = '#b36cff'; g.shadowBlur = 14;
+  g.strokeStyle = '#b36cff'; g.lineWidth = 9;
+  g.beginPath(); g.arc(64, 64, 52, 0, Math.PI * 2); g.stroke();
+  g.shadowBlur = 6; g.shadowColor = '#000';
+  g.fillStyle = '#efe6d6';
+  g.beginPath(); g.arc(64, 56, 27, 0, Math.PI * 2); g.fill();          // the skull
+  g.fillRect(49, 66, 30, 22);                                           // the jaw
+  g.shadowBlur = 0;
+  g.fillStyle = '#1a0f22';
+  g.beginPath(); g.arc(53, 56, 8, 0, Math.PI * 2); g.arc(75, 56, 8, 0, Math.PI * 2); g.fill();   // eyes
+  g.beginPath(); g.moveTo(64, 63); g.lineTo(59, 72); g.lineTo(69, 72); g.closePath(); g.fill();  // nose
+  g.fillRect(55, 79, 2.5, 9); g.fillRect(61, 79, 2.5, 9); g.fillRect(67, 79, 2.5, 9); g.fillRect(73, 79, 2.5, 9);   // teeth
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: map, transparent: true, depthWrite: false }));
+  sprite.scale.set(1.3, 1.3, 1);
+  sprite.visible = false;
+  return sprite;
+})();
+scene.add(fearMark);
+function showFear(on, x, z, height, time) {
+  fearMark.visible = on;
+  if (on) fearMark.position.set(x, 1.7 * warlock.size + 1.3 + height + Math.sin(time * 4) * 0.08, z);
+}
 const beam = makeBeam();
 scene.add(beam.mesh);
 const pet = createPet(scene);
@@ -145,6 +174,7 @@ function setRoom(boss) {
   if (!boss) chamber.colliders.forEach(function (c) { colliders.push(c); });
   fixedColliders = colliders.length;
   if (boss) controls.setStart(LAIR.start.x, LAIR.start.z, LAIR.start.yaw); else controls.setStart(0, 24, 0);
+  fearMark.visible = false;
   controls.reset();
   while (anchors.length <= targetSlots()) anchors.push({ x: 0, y: 0, visible: false });
   pet.sendHome();
@@ -950,7 +980,7 @@ function newCharacter() {
                           endless: !!fight.endless, endlessPct: fight.endless === 'execute' ? (config.fight.executePct > 20 ? 20 : config.fight.executePct / 2) : 100,   // infinite health; "in execute range" = standing at 20%
                           healths: challenge && challenge.healths, absent: challenge && challenge.absent,   // a scripted fight with adds
                           seed: challenge && challenge.seeded ? challenge.seed : undefined,   // a seeded fight rolls the same dice every time
-                          boss: !!bossId });
+                          boss: !!bossId, healthCurve: bossId ? challenge.curve : null, immune: bossId ? challenge.immune : null });
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
   panels.setFight(fight);
@@ -1297,7 +1327,9 @@ function frame() {
   const P = combat.pet;
   if (P) {
     const petCast = P.casting ? Math.min(1, (combat.state.t - P.casting.start) / (P.casting.end - P.casting.start)) : 0;
-    pet.update(dt, time, player, P.mode, P.range, petCast, combat.state.over || !combat.alive(P.target), SPOTS[P.target], colliders);
+    // A boss is big: the pet stops when its reach meets the edge, not the middle (or it would keep running on the spot).
+    const petEdge = bossOn ? Math.max(0, dummies[P.target].radius - 0.5) : 0;
+    pet.update(dt, time, player, P.mode, P.range + petEdge, petCast, combat.state.over || !combat.alive(P.target), SPOTS[P.target], colliders, petEdge);
     // In a boss fight the pet too is measured to the edge, and a demon that fights in melee cannot reach her in the air.
     ctx.petDistance = !bossOn ? pet.state.distance : bossFight.flying(P.target) && P.range < 10 ? 99 : Math.max(0, pet.state.distance - dummies[P.target].radius);
   }
@@ -1352,6 +1384,7 @@ function frame() {
   warlock.root.position.set(player.x, 0, player.z);
   warlock.root.rotation.y = player.yaw;
   warlock.update(dt, time, player.moving, player.height, school);
+  showFear(bossOn && bossFight.feared(), player.x, player.z, player.height, time);
   ghost.update(dt, time, ghostView(player, S.fightStart !== null ? combat.fightSeconds() : null));
   for (let i = 1; i <= targets; i++) {
     if (bossOn) { dummies[i].setSelected(i === S.target); continue; }   // the boss fight moves and shows its creatures itself
@@ -1497,6 +1530,7 @@ function replayFrame(dt, time) {
   warlock.root.position.set(s.x, 0, s.z);
   warlock.root.rotation.y = s.yaw;
   warlock.update(dt, time, s.mv, s.h, spell ? spell.school : null);
+  showFear(bossOn && !!(s.boss && s.boss.fr), s.x, s.z, s.h, time);
   if (combat.pet && s.pet) pet.place(s.pet.x, s.pet.z, s.pet.yaw, s.pet.mv, dt, time);
   if (bossOn) {                                            // the boss and its adds where the record says
     bossFight.applySnap(s.boss, dt, time);

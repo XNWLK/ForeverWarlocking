@@ -4,7 +4,7 @@
 // its floor, a curved egg cave on each long side and the entrance tunnel at the south end.
 // Yards; x to the east, z to the south (Onyxia sleeps at the north end, at -z). Built once, shown only in the fight.
 import * as THREE from 'three';
-import { flat, glow, halo, seeded } from './kit.js';
+import { flat, glow, seeded } from './kit.js';
 
 // The main cave, the two egg caves and the tunnel: where you can walk.
 const CHAMBER = [[0, -46], [18.75, -44], [32, -35], [37.5, -22], [38.6, -7], [37.5, 6], [35.6, 12], [30, 23], [22.5, 34.5], [13, 44],
@@ -14,6 +14,8 @@ const WEST_CAVE = EAST_CAVE.map(function (p) { return [-p[0], p[1]]; }).reverse(
 const TUNNEL = [[-7, 44], [7, 44], [7.5, 60], [8, 75], [7, 90], [-7, 90], [-8, 75], [-7.5, 60]];
 const AREAS = [CHAMBER, EAST_CAVE, WEST_CAVE, TUNNEL];
 const WALL_HEIGHT = 46;
+// How far from a lava crack its fire reaches when it bursts out (js/boss.js uses it too).
+export const ERUPT_REACH = 2.2;
 
 // Where things are (from the Classic fight's coordinates, turned into this room's yards).
 export const LAIR = {
@@ -27,8 +29,9 @@ export const LAIR = {
   flight: [{ x: 0, z: -45 }, { x: 32, z: -31 }, { x: 28.5, z: -6 }, { x: 24, z: 42 }, { x: 0, z: 45 }, { x: -27, z: 37 }, { x: -34.5, z: -4.3 }, { x: -35, z: -33 }],
   // The whelps come out of the egg caves and are held by an off-tank at each cave's mouth; the Warder walks in
   // through the tunnel and is held in it.
-  offtank: { east: { x: 29, z: 5 }, west: { x: -29, z: 5 }, warder: { x: 0, z: 58 } },
-  pack: { east: { x: 32, z: 8 }, west: { x: -32, z: 8 }, warder: { x: 0, z: 54 } },
+  // The Warder's off-tank: at the mouth of the tunnel, a little toward the middle (Xn: "a little closer to the middle").
+  offtank: { east: { x: 29, z: 5 }, west: { x: -29, z: 5 }, warder: { x: 0, z: 32 } },
+  pack: { east: { x: 32, z: 8 }, west: { x: -32, z: 8 }, warder: { x: 0, z: 35.5 } },
   caveDeep: { east: [{ x: 40, z: 40 }, { x: 42, z: 22 }, { x: 38, z: 6 }], west: [{ x: -40, z: 40 }, { x: -42, z: 22 }, { x: -38, z: 6 }] },
   tunnelEnd: { x: 0, z: 86 },
   start: { x: -22, z: -10, yaw: -0.91 }   // you start on her west flank, looking at her
@@ -90,25 +93,25 @@ export function buildLair(scene) {
   const g = canvas.getContext('2d');
   const px = function (x) { return (x - X0) / (X1 - X0) * W; }, pz = function (z) { return (z - Z0) / (Z1 - Z0) * H; }, yd = W / (X1 - X0);
   function path(poly) { g.beginPath(); poly.forEach(function (p, i) { if (i) g.lineTo(px(p[0]), pz(p[1])); else g.moveTo(px(p[0]), pz(p[1])); }); g.closePath(); }
-  g.fillStyle = '#17110f';
+  g.fillStyle = '#2a211b';
   g.fillRect(0, 0, W, H);
   for (let i = 0; i < 2600; i++) {                        // grit and stains on the rock
-    const v = 18 + Math.floor(rand() * 22), r = 0.4 + rand() * 3.5;
-    g.fillStyle = 'rgba(' + (v + 12) + ',' + (v + 2) + ',' + v + ',' + (0.25 + rand() * 0.35) + ')';
+    const v = 28 + Math.floor(rand() * 26), r = 0.4 + rand() * 3.5;
+    g.fillStyle = 'rgba(' + (v + 14) + ',' + (v + 4) + ',' + (v - 4) + ',' + (0.25 + rand() * 0.35) + ')';
     g.beginPath(); g.arc(rand() * W, rand() * H, r * yd * 0.35, 0, Math.PI * 2); g.fill();
   }
-  [EAST_CAVE, WEST_CAVE, TUNNEL].forEach(function (poly) { path(poly); g.fillStyle = 'rgba(48,36,30,0.55)'; g.fill(); });
-  // The main cave: warm scorched stone, lighter toward the middle, a web of glowing cracks (as on the game's map).
+  [EAST_CAVE, WEST_CAVE, TUNNEL].forEach(function (poly) { path(poly); g.fillStyle = 'rgba(70,56,44,0.5)'; g.fill(); });
+  // The main cave: muted brown stone, lighter toward the middle, a web of dark cracks (as on the game's map).
   g.save();
   path(CHAMBER);
   g.clip();
   const warm = g.createRadialGradient(px(0), pz(0), 4 * yd, px(0), pz(0), 50 * yd);
-  warm.addColorStop(0, '#3a2a22'); warm.addColorStop(0.7, '#2c221e'); warm.addColorStop(1, '#1e1714');
+  warm.addColorStop(0, '#5a4636'); warm.addColorStop(0.7, '#4a3a2e'); warm.addColorStop(1, '#382c23');
   g.fillStyle = warm;
   g.fillRect(0, 0, W, H);
   for (let i = 0; i < 900; i++) {
     const v = 40 + Math.floor(rand() * 30);
-    g.fillStyle = 'rgba(' + (v + 6) + ',' + (v - 4) + ',' + (v - 10) + ',' + (0.12 + rand() * 0.2) + ')';
+    g.fillStyle = 'rgba(' + (v + 30) + ',' + (v + 16) + ',' + (v + 4) + ',' + (0.1 + rand() * 0.18) + ')';
     g.beginPath(); g.arc(px(-40 + rand() * 80), pz(-48 + rand() * 98), (0.6 + rand() * 2.4) * yd, 0, Math.PI * 2); g.fill();
   }
   // Cells of cracks: from points on a jittered grid, a jagged line to each right and lower neighbour.
@@ -116,7 +119,7 @@ export function buildLair(scene) {
   for (let z = -50; z <= 52; z += step) for (let x = -42; x <= 42; x += step) cells.push([x + (rand() - 0.5) * 4.5, z + (rand() - 0.5) * 4.5]);
   const across = Math.round(84 / step) + 1;
   g.lineJoin = 'round';
-  [[7, 'rgba(255,90,20,0.06)'], [2.6, 'rgba(255,110,30,0.2)'], [1.1, 'rgba(255,170,80,0.42)']].forEach(function (pass) {
+  [[3.2, 'rgba(24,16,11,0.35)'], [1.3, 'rgba(18,11,7,0.55)']].forEach(function (pass) {
     g.lineWidth = pass[0];
     g.strokeStyle = pass[1];
     const keep = seeded(77);                              // the same cracks in every pass
@@ -237,9 +240,43 @@ export function buildLair(scene) {
   });
 
   // ---------- the lava cracks that erupt in phase 3 ----------
+  // A flat strip on the floor along a line of points (closed: back to the first), `width` yards wide.
+  function ribbon(pts, width, closed) {
+    const verts = [], n = closed ? pts.length : pts.length - 1, w = width / 2;
+    for (let k = 0; k < n; k++) {
+      const a = pts[k], b = pts[(k + 1) % pts.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / l * w, nz = (b[0] - a[0]) / l * w;
+      verts.push(a[0] + nx, 0.05, a[1] + nz, a[0] - nx, 0.05, a[1] - nz, b[0] + nx, 0.05, b[1] + nz, b[0] + nx, 0.05, b[1] + nz, a[0] - nx, 0.05, a[1] - nz, b[0] - nx, 0.05, b[1] - nz);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    return geo;
+  }
+  // The line around a crack at `r` yards: along one side, round the end, back along the other, round the start.
+  function outline(pts, r) {
+    const n = pts.length, normals = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      normals.push([-(b[1] - a[1]) / l, (b[0] - a[0]) / l]);
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) out.push([pts[i][0] + normals[i][0] * r, pts[i][1] + normals[i][1] * r]);
+    function cap(p, nrm, sign) {                          // half a circle round an end (sign 1: the far end, -1: the start)
+      const fx = nrm[1] * sign, fz = -nrm[0] * sign;
+      for (let k = 1; k < 10; k++) {
+        const th = k / 10 * Math.PI, c = Math.cos(th), sn = Math.sin(th);
+        out.push([p[0] + r * (nrm[0] * c * sign + fx * sn), p[1] + r * (nrm[1] * c * sign + fz * sn)]);
+      }
+    }
+    cap(pts[n - 1], normals[n - 1], 1);
+    for (let i = n - 1; i >= 0; i--) out.push([pts[i][0] - normals[i][0] * r, pts[i][1] - normals[i][1] * r]);
+    cap(pts[0], normals[0], -1);
+    return out;
+  }
   // Glowing fissures across the floor of the main cave; after each Bellowing Roar they erupt.
   const fissures = [];
-  const fissureMaterial = function () { return new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }); };
+  // (Both sides drawn: the strips are flat on the floor, whichever way their corners run.)
+  const fissureMaterial = function () { return new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); };
   let tries = 0;
   while (fissures.length < 18 && tries++ < 4000) {
     const cx = -32 + rand() * 64, cz = -36 + rand() * 76;
@@ -252,23 +289,16 @@ export function buildLair(scene) {
       pts.push([x, z]);
     }
     if (!pts.every(function (p) { return inChamber(p[0], p[1]); })) continue;
-    // A ribbon on the floor along the points.
-    const verts = [];
-    for (let k = 0; k < pts.length - 1; k++) {
-      const ax = pts[k][0], az = pts[k][1], bx = pts[k + 1][0], bz = pts[k + 1][1], l = Math.hypot(bx - ax, bz - az);
-      const nx = -(bz - az) / l * 0.45, nz = (bx - ax) / l * 0.45;
-      verts.push(ax + nx, 0.05, az + nz, ax - nx, 0.05, az - nz, bx + nx, 0.05, bz + nz, bx + nx, 0.05, bz + nz, ax - nx, 0.05, az - nz, bx - nx, 0.05, bz - nz);
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    const mat = fissureMaterial(), mesh = new THREE.Mesh(geo, mat);
-    const under = new THREE.Mesh(geo, glow(0x2a0a04));       // the dark of the crack itself
-    under.position.y = -0.01;
-    group.add(under, mesh);
-    const shine = halo(0xff5a14, len * 0.9, 0.18);
-    shine.position.set(cx, 0.6, cz);
-    group.add(shine);
-    fissures.push({ cx: cx, cz: cz, points: pts, material: mat, shine: shine });
+    // The crack itself: a dark ribbon along the points, with a dim glow inside.
+    const crack = ribbon(pts, 0.5, false), mat = fissureMaterial();
+    group.add(new THREE.Mesh(crack, glow(0x2a0a04, { side: THREE.DoubleSide })));
+    const core = new THREE.Mesh(ribbon(pts, 0.18, false), mat);
+    core.position.y = 0.005;
+    group.add(core);
+    // Its outline: where the fire reaches when it bursts out (Xn: "the outlines fiery red where the fire pops out").
+    const edge = new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    group.add(new THREE.Mesh(ribbon(outline(pts, ERUPT_REACH), 0.22, true), edge));
+    fissures.push({ cx: cx, cz: cz, points: pts, material: mat, edge: edge });
   }
   // How bright they are: 0 resting, 1 about to erupt / erupting.
   let fissureLevel = 0;
@@ -276,9 +306,9 @@ export function buildLair(scene) {
   animated.push(function (time) {
     fissures.forEach(function (f, i) {
       const flicker = 0.08 * Math.sin(time * 3 + i * 1.7);
-      f.material.opacity = 0.35 + fissureLevel * 0.6 + flicker;
+      f.material.opacity = 0.3 + fissureLevel * 0.6 + flicker;
       f.material.color.setHex(fissureLevel > 0.5 ? 0xffa040 : 0xff5a14);
-      f.shine.material.opacity = 0.14 + fissureLevel * 0.45 + flicker;
+      f.edge.opacity = 0.6 + fissureLevel * 0.4 + flicker;
     });
   });
   // How far a spot is from the nearest fissure, and which one.
@@ -305,10 +335,10 @@ export function buildLair(scene) {
   key.shadow.bias = -0.0006;
   group.add(hemi, ambient, key, key.target);
   [[0, -10], [-20, 18], [20, 18], [0, 30], [-22, -26], [22, -26]].forEach(function (p, i) {
-    const lamp = new THREE.PointLight(0xff6a2a, 60, 40, 1.4);
+    const lamp = new THREE.PointLight(0xffa070, 40, 40, 1.4);
     lamp.position.set(p[0], 2.5, p[1]);
     group.add(lamp);
-    animated.push(function (time) { lamp.intensity = 55 + fissureLevel * 160 + Math.sin(time * 2.1 + i * 2) * 8; });
+    animated.push(function (time) { lamp.intensity = 38 + fissureLevel * 30 + Math.sin(time * 2.1 + i * 2) * 5; });
   });
   const caveLamps = [];
   [[40, 38], [-40, 38], [0, 70]].forEach(function (p) {     // a faint purple in the egg caves, a dull red down the tunnel

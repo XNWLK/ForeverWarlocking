@@ -8,15 +8,22 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ### 2026-10-29
 - **The first boss: Onyxia.** The Bosses button now opens a list of bosses. Onyxia is fought in her own lair, built in
   the shape of the real one: the egg-shaped cave with lava cracks, the two egg caves and the entrance tunnel.
-  - A ghost tank holds her the whole fight, ghost off-tanks hold the whelps and the Warder. She loses health at an
-    even pace, so the kill always takes 4 minutes: phase 2 at 65%, phase 3 at 40%.
-  - Phase 1: Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back (and knocks you away).
+  - A ghost tank holds her the whole fight, ghost off-tanks hold the whelps and the Warder. She loses health on a fixed
+    schedule, so the kill always takes about 6 minutes: phase 2 at 65% (after 1:24), phase 3 at 40% (after 4:12).
+    Phase 2 is the long one, so there is time to practise it.
+  - She is immune to fire: Immolate, Searing Pain, Soul Fire, Conflagrate, Incinerate, Rain of Fire, Hellfire and the
+    Imp's Firebolt do nothing to her (the whelps and the Warder are not immune).
+  - Phase 1: Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back and throws you about 40 yards.
   - Phase 2: she flies. Fireballs land on you and around the room, Deep Breath burns a lane across the cave after
-    the emote, 20 whelps come out of the egg caves, an Onyxian Warder walks in through the tunnel. Walking into an egg
-    cave hatches more whelps, and they come for you.
-  - Phase 3: she lands. Bellowing Roar fears you for 3 seconds, and the lava cracks erupt after each fear.
+    the emote (at least twice every time), 20 whelps come out of the egg caves and more later, an Onyxian Warder walks
+    in and is held at the mouth of the tunnel. Walking into an egg cave hatches more whelps, and they come for you.
+  - Phase 3: she lands. Bellowing Roar fears you for 3 seconds (a skull in a purple ring over you while it lasts),
+    and the lava cracks erupt after each fear: the floor is a muted brown, and a fiery red line marks where the fire
+    bursts out.
   - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
-  - Your damage is counted in the meter and the review; the sim is measured in a 4-minute fight on one target.
+  - Your damage is counted in the meter and the review; the sim is measured in a fight of the same length on one
+    target (it knows nothing of her fire immunity, so fire builds fall short of it here).
+  - Your Succubus no longer runs on the spot when she fights a big target.
   - While she takes in a deep breath and crosses the cave, the egg caves are searing hot (about 1,000 a second):
     you cannot hide from Deep Breath in them.
   - In phase 3 a few whelps crawl out of the egg caves now and then.

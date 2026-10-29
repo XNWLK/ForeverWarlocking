@@ -260,7 +260,8 @@ export function createPet(scene, opts) {
 
   // player: { x, z, yaw }; mode: 'attack' or 'follow'; range: how close it must be to attack; cast: 0..1 while it is
   // casting; dead: nothing left to attack; target: { x, z } of the dummy it is sent at; colliders: [{ x, z, r }].
-  function update(dt, time, player, mode, range, cast, dead, target, colliders) {
+  // edge: how far the target's edge is from its middle (a boss is big; 0 for a dummy).
+  function update(dt, time, player, mode, range, cast, dead, target, colliders, edge) {
     if (!pet.kind) return;
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
     const homeX = player.x + sin * FOLLOW_BACK - cos * left, homeZ = player.z + cos * FOLLOW_BACK + sin * left;
@@ -271,7 +272,8 @@ export function createPet(scene, opts) {
     if (mode === 'attack' && !dead) {
       faceDummy = true;
       if (pet.kind === 'succubus') {            // runs up to the dummy and stays at arm's length
-        goalX = target.x + offX / fromDummy * MELEE_SPOT; goalZ = target.z + offZ / fromDummy * MELEE_SPOT; slack = 0.15;
+        const reach = MELEE_SPOT + (edge || 0);
+        goalX = target.x + offX / fromDummy * reach; goalZ = target.z + offZ / fromDummy * reach; slack = 0.15;
       } else if (fromDummy <= range - 1) {       // the Imp casts from where it stands
         goalX = pet.x; goalZ = pet.z;
       } else {                                   // too far: walk in until it is in range

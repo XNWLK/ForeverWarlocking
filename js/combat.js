@@ -38,7 +38,8 @@ export const FAIL_TEXT = {
   health: 'Not enough health',
   immolate: 'Requires Immolate on the target',
   noRacial: 'Your race has nothing to use',
-  feared: 'You are feared'
+  feared: 'You are feared',
+  immune: 'That target is immune to fire'
 };
 
 // The key a spell's damage is booked under: plain for the first target, x2: / x3: for the others (as in the engine).
@@ -58,6 +59,8 @@ export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + k
 //       boss: a boss fight (js/boss.js): target 1 is the boss, whose health follows timedDuration as above; the other
 //       targets (up to 39 adds, `targets` counts them all) have health pools of their own (healths / absent / spawn)
 //       and can die. injure(), heal() and raidHurt() are for the boss and the ghost raid. The check never uses it.
+//       healthCurve: [[seconds, health %], ...] - the boss's health on the clock, not evenly (a boss fight's longer air phase).
+//       immune: { target: { school: true } } - spells of that school cannot be cast at it and do nothing to it (Onyxia: fire).
 // From config.fight (as in the engine): moveEvery / moveDuration = every so many seconds you have to move for so
 //       long (only instants then); hitEvery = you take a hit every so many seconds, which pushes your casts back.
 // ctx (given to update, press and blocked): { moving, distances: [, d1, d2, d3] you to each target,
@@ -80,6 +83,18 @@ export function createCombat(opts) {
   const N = Math.max(1, Math.min(BOSS ? 40 : 3, opts.targets || 1));
   // Health that follows the clock (a timed fight; in a boss fight only the boss) rather than the damage taken.
   function scheduled(ti) { return !!linear && (!BOSS || ti === 1); }
+  const CURVE = BOSS && opts.healthCurve ? opts.healthCurve : null, IMM = BOSS && opts.immune ? opts.immune : null;
+  function immuneTo(ti, school) { return !!(IMM && IMM[ti] && IMM[ti][school]); }
+  // Health on the clock: even (100% to 0% over the fight), or along a boss's curve.
+  function scheduledPct(ft) {
+    if (ft < 0) return 100;
+    if (!CURVE) return Math.max(0, 100 * (1 - ft / linear));
+    for (let i = 1; i < CURVE.length; i++) {
+      const a = CURVE[i - 1], b = CURVE[i];
+      if (ft <= b[0]) return a[1] + (b[1] - a[1]) * (ft - a[0]) / (b[0] - a[0]);
+    }
+    return Math.max(0, CURVE[CURVE.length - 1][1]);
+  }
   const JOW = cfg.debuffs && cfg.debuffs.judgementOfWisdom && cfg.debuffs.judgementOfWisdom.on ? cfg.debuffs.judgementOfWisdom.jow : null;
   const coeFromOthers = !!(cfg.debuffs && cfg.debuffs.coeOther && cfg.debuffs.coeOther.on);
   const armorRed = WL.armorReduction(cfg);
@@ -420,7 +435,7 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     for (let ti = 1; ti <= N; ti++) {
       if (S.over) return;
-      if (!alive(ti)) continue;
+      if (!alive(ti) || immuneTo(ti, s.school)) continue;     // a boss immune to fire takes nothing from Rain of Fire or Hellfire
       if (!check && (s.range ? gap(aimed, ti) : distanceTo(ti)) > e.radius + EPS) continue;
       const r = row(rowKey(ti, key));
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
@@ -508,6 +523,7 @@ export function createCombat(opts) {
     const key = 'pet:' + sp.key, ti = P.target, r = row(rowKey(ti, key));
     P.casting = null;
     r.casts++;
+    if (immuneTo(ti, sp.school)) { emit({ type: 'miss', key: key, target: ti, pet: true, immune: true }); return; }   // the Imp's Firebolt at Onyxia
     if (R.pet() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, pet: true }); return; }
     r.landed++;
     if (ti === 1) jowProc(true);
@@ -794,6 +810,7 @@ export function createCombat(opts) {
     if (key === 'lifeTap' && TAP_HP && !canTap()) return 'health';
     if (s.selfDamage && S.health <= selfTick(key)) return 'health';           // its first tick would kill you
     if (needsTarget(key) && !alive(ti)) return 'dead';
+    if (needsTarget(key) && immuneTo(ti, s.school)) return 'immune';
     if (key === 'conflagrate' && !(dotLeft('immolate', ti) > 0)) return 'immolate';
     if (s.shards && !(key === 'soulFire' && buff('decimation')) && S.shards < s.shards) return 'shards';
     if (S.mana < effectiveCost(key) - 1e-6) return 'mana';
@@ -882,7 +899,7 @@ export function createCombat(opts) {
     }
     S.t = to;
     if (linear) {
-      const ft = fightTime(S.t), pct = ft < 0 ? 100 : Math.max(0, 100 * (1 - ft / linear));
+      const ft = fightTime(S.t), pct = scheduledPct(ft);
       for (let i = 1; i <= N; i++) { if (!scheduled(i)) continue; T[i].hpPct = pct; if (timed) T[i].health = T[i].maxHealth * pct / 100; }
     }
   }
@@ -1099,6 +1116,7 @@ export function createCombat(opts) {
       view.nextTarget = 0; view.actionIndex = i;
       const k = a.pick(view);
       if (k === 'lifeTap' && !canTap()) continue;          // a Life Tap the list would like but has no health for
+      if (k && table[k] && needsTarget(k) && immuneTo(standing[(view.nextTarget || 1) - 1] || boss, SPELLS[k].school)) continue;   // nothing she is immune to
       if (k && table[k] && fits(k) && affordable(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
     }
     const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false, why: found ? 'mana' : 'moving', need: found ? found.key : null };

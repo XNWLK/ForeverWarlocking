@@ -43,7 +43,7 @@ export function createControls(canvas, camera, world) {
   // Moved by something else: steer = you run that way and the keys do nothing (fear), shove = a push that dies away
   // (a knockback). Both count as moving.
   let steer = null;
-  const shove = { x: 0, z: 0 };
+  const shove = { x: 0, z: 0, fade: 5 };
 
   function reset() {
     player.x = start.x; player.z = start.z; player.yaw = start.yaw; player.height = 0; player.fall = 0;
@@ -192,7 +192,7 @@ export function createControls(canvas, camera, world) {
     }
     if (shove.x || shove.z) {
       player.x += shove.x * dt; player.z += shove.z * dt;
-      const fade = Math.exp(-5 * dt);
+      const fade = Math.exp(-shove.fade * dt);
       shove.x *= fade; shove.z *= fade;
       if (Math.hypot(shove.x, shove.z) < 0.5) shove.x = shove.z = 0;
       player.moving = true;
@@ -257,7 +257,8 @@ export function createControls(canvas, camera, world) {
     setStart: function (x, z, yaw) { start.x = x; start.z = z; start.yaw = yaw; },
     // Fear: run that way (yards a second) until steer(null). Knockback: a push of that speed that dies away, with a hop.
     steer: function (vx, vz) { steer = vx == null ? null : { x: vx, z: vz }; },
-    shove: function (vx, vz, hop) { shove.x = vx; shove.z = vz; if (hop && player.height === 0) player.fall = hop; },
+    // fade: how fast the push dies away (5 by default); it carries you speed / fade yards.
+    shove: function (vx, vz, hop, fade) { shove.x = vx; shove.z = vz; shove.fade = fade || 5; if (hop && player.height === 0) player.fall = hop; },
     get steered() { return !!steer; }
   };
 }

@@ -9,10 +9,13 @@
 // through combat.injure(); the ghost raid's healers give it back a few seconds later (combat.heal()), and the ghost
 // raid kills the adds (combat.raidHurt()).
 import * as THREE from 'three';
-import { LAIR, caveOf, walkable, inChamber } from './lair.js';
+import { LAIR, caveOf, walkable, inChamber, ERUPT_REACH } from './lair.js';
 import { makeOnyxia, makeWhelp, makeWarder, makeGhostTank } from './onyxia.js';
 
-const SECONDS = 240;
+// Xn, 2026-10-29: phase 2 twice as long as an even pace would make it ("let the fight extend over 4 minutes"):
+// 100% to 65% in 84 s, 65% to 40% in 168 s, 40% to 0% in 96 s. Her health follows this whatever you do.
+const CURVE = [[0, 100], [84, 65], [252, 40], [348, 0]];
+const SECONDS = 348;
 const WAVE = 20, EXTRA = 8, FIRST_WHELP = 3, COUNT = 2 + WAVE + EXTRA;
 const HEALTH = { onyxia: 1099230, warder: 106821, whelp: 3052 };
 const RUN = 9, WHELP_SPEED = 8, WARDER_SPEED = 5, FLY_SPEED = 16, CROSS_SPEED = 22;
@@ -26,10 +29,10 @@ const DMG = {
 
 export const BOSSES = [
   { id: 'onyxia', name: 'Onyxia', where: "Onyxia's Lair", seconds: SECONDS,
-    short: 'Four minutes. Stay off her front and tail, dodge Deep Breath, keep out of the egg caves, mind the lava after each fear.',
-    text: 'Four minutes in her lair. A ghost tank holds her; she loses health at an even pace (phase 2 at 65%, phase 3 at 40%), so the fight is about staying alive and keeping your damage up. ' +
+    short: 'About six minutes. Stay off her front and tail, dodge Deep Breath, keep out of the egg caves, mind the lava after each fear. She is immune to fire.',
+    text: 'About six minutes in her lair. A ghost tank holds her; she loses health on a fixed schedule (phase 2 at 65% after 1:24, phase 3 at 40% after 4:12), so the fight is about staying alive and keeping your damage up. She is immune to fire: Immolate, Searing Pain, Soul Fire and the Imp\'s Firebolt do nothing to her. ' +
           'Phase 1: stand on her side - Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back. ' +
-          'Phase 2: she flies; fireballs land on you and around the room, Deep Breath burns a lane across the cave (watch for the emote and get to the side), 20 whelps come out of the egg caves and an Onyxian Warder walks in. Stay out of the egg caves. ' +
+          'Phase 2: she flies; fireballs land on you and around the room, Deep Breath burns a lane across the cave at least twice (watch for the emote and get to the side), 20 whelps come out of the egg caves and more later, and an Onyxian Warder walks in. Stay out of the egg caves: they burn while she breathes. ' +
           'Phase 3: she lands; Bellowing Roar fears everyone, and the lava cracks erupt after each fear.' }
 ];
 
@@ -39,9 +42,10 @@ export function bossChallenge(id) {
   const healths = [HEALTH.onyxia, HEALTH.warder], absent = [];
   for (let i = 3; i <= COUNT; i++) healths.push(HEALTH.whelp);
   for (let i = 2; i <= COUNT; i++) absent.push(i);
-  // The sim cannot fight Onyxia: it is measured in a 4-minute fight on one target with about as much moving
+  // The sim cannot fight Onyxia: it is measured in a fight of the same length on one target with about as much moving
   // (phase 2's repositioning and phase 3's fears).
   return { id: 'boss:' + id, boss: id, name: b.name, text: b.short, long: b.text, targets: COUNT, fight: { timed: true, seconds: SECONDS },
+           curve: CURVE, immune: { 1: { fire: true } },
            healths: healths, absent: absent, simTargets: 1, sim: { moveEvery: 20, moveDuration: 3, hitEvery: 0 } };
 }
 
@@ -102,7 +106,7 @@ export function createBossFight(scene, h) {
       erupt: null,                                       // { from, ends, list: [{ at, fissure, done }] }
       roar: null,                                        // { ends } the roar being cast
       tankGoal: { x: LAIR.tank.x, z: LAIR.tank.z },
-      banner: null, shake: 0, hatchAt: 0, lastT: -1, heat: 0, heatAt: 0, heatSaid: false
+      banner: null, shake: 0, hatchAt: 0, lastT: -1, heat: 0, heatAt: 0, heatSaid: false, breaths: 0, airFrom: 0
     };
     lair.eggs.forEach(function (e) { e.hatched = false; e.mesh.visible = true; });
     markers.forEach(function (m) { m.live = false; m.group.visible = false; });
@@ -231,8 +235,9 @@ export function createBossFight(scene, h) {
       visual({ n: 'tail', x: back.x, z: back.z });
       if (behind(player, 30, 0.9)) {
         hurt(roll(DMG.tailSweep), "Onyxia's Tail Sweep");
-        const r = relative(player), sx = -r.fz * r.side, sz = r.fx * r.side;   // flung to the side you stand on, and back
-        h.controls.shove(sx * 26 - r.fx * 8, sz * 26 - r.fz * 8, 6);
+        // Flung about 40 yards (Xn) to the side you stand on, and a little back: speed / fade = distance.
+        const r = relative(player), sx = -r.fz * r.side - r.fx * 0.3, sz = r.fx * r.side - r.fz * 0.3, len = Math.hypot(sx, sz) || 1;
+        h.controls.shove(sx / len * 112, sz / len * 112, 9, 2.8);
       }
       return;
     }
@@ -291,10 +296,14 @@ export function createBossFight(scene, h) {
   function airMove(t) {
     if (S.breath) return;
     if (t < S.next.move) return;
-    const choice = Math.floor(Math.random() * 3);
+    // At least two Deep Breaths in every phase 2 (Xn: "people need to test that mechanic out"): the first move of the air
+    // phase is one, and another comes at the first move a minute later; after that it is up to chance again.
+    let choice = Math.floor(Math.random() * 3);
+    if (S.breaths === 0 || (S.breaths === 1 && t >= S.airFrom + 60)) choice = 0;
     if (choice === 0) {                                  // Deep Breath: she breathes in, then crosses to the far side
       const from = LAIR.flight[S.point], to = (S.point + 4) % 8;
       S.breath = { step: 'inhale', ends: t + 5, from: { x: from.x, z: from.z }, to: to, dropped: 0 };
+      S.breaths++;
       say('Onyxia takes in a deep breath...', 'miss', 5);
       act('roar', 5);
       h.sound.play('warn');
@@ -516,7 +525,7 @@ export function createBossFight(scene, h) {
       if (e.done || t < e.at) return;
       e.done = true;
       visual({ n: 'erupt', i: lair.fissures.indexOf(e.fissure) });
-      if (!S.over && lair.nearestFissure(player.x, player.z).fissure === e.fissure && lair.nearestFissure(player.x, player.z).distance <= 2.2) hurt(roll(DMG.eruption), 'Lava Eruption');
+      if (!S.over && lair.nearestFissure(player.x, player.z).fissure === e.fissure && lair.nearestFissure(player.x, player.z).distance <= ERUPT_REACH) hurt(roll(DMG.eruption), 'Lava Eruption');
     });
     if (t >= E.ends) S.erupt = null;
   }
@@ -571,10 +580,14 @@ export function createBossFight(scene, h) {
           say('Onyxia: "This meaningless exertion bores me. I\'ll incinerate you all from above!"', 'proc', 4);
           S.ony.goal = { x: LAIR.liftoff.x, z: LAIR.liftoff.z, y: 0 };
           S.tankGoal = { x: 0, z: -18 };
-          // The Warder walks in through the tunnel.
-          if (fight.spawn(2)) { S.warder.state = 'walk'; warder.root.visible = true; warder.setDead(false); h.log('An Onyxian Warder comes in through the tunnel.', 'proc'); }
+          S.next.warder = t + 8;                         // the Warder walks in once she is up
         }
-      } else if (S.phase === 'toLiftoff') {
+      }
+      if (S.next.warder && t >= S.next.warder) {          // the Warder walks in through the tunnel
+        S.next.warder = 0;
+        if (fight.spawn(2)) { S.warder.state = 'walk'; warder.root.visible = true; warder.setDead(false); h.log('An Onyxian Warder comes in through the tunnel.', 'proc'); }
+      }
+      if (S.phase === 'toLiftoff') {
         if (!S.ony.goal) { S.phase = 'liftoff'; S.next.liftoff = t + 3.5; onyxia.setMode('fly'); S.ony.goal = { x: S.ony.x, z: S.ony.z, y: LAIR.flyHeight * 0.6 }; }
       } else if (S.phase === 'liftoff') {
         if (t >= S.next.liftoff) {
@@ -584,7 +597,7 @@ export function createBossFight(scene, h) {
           flyTo(LAIR.flight[0]);
         }
       } else if (S.phase === 'toNorth') {
-        if (!S.ony.goal) { S.phase = 'air'; S.next.fireball = t; S.next.move = t + 25; }
+        if (!S.ony.goal) { S.phase = 'air'; S.airFrom = t; S.next.fireball = t; S.next.move = t + 25; }
       } else if (S.phase === 'air') {
         if (!S.breath && t >= S.next.fireball) { fireball(t, player); S.next.fireball = t + rand(3, 5); }
         airMove(t);
@@ -659,7 +672,7 @@ export function createBossFight(scene, h) {
       tk: TANKS.map(function (k) { return [r2(tanks[k].x), r2(tanks[k].z), r2(tanks[k].yaw)]; }),
       fl: lair.fissureLevel(), ht: r2(S.heat),
       fb: S.fireballs.map(function (f) { return [r2(f.x), r2(f.z), r2(f.marker.fill.material.opacity)]; }),
-      bn: banner
+      bn: banner, fr: S.fear ? 1 : 0
     };
   }
   // Between two snapshots: positions blended, the rest from the first.
