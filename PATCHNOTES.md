@@ -5,8 +5,14 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-10-29
+- **Fix:** Blood Fury, Berserking and Eureka! could be used in the middle of a cast. Now they say "Can't do that
+  while casting".
+
 ### 2026-10-28
-- Synced with the Warlock SIM v153: Life Tap now follows the sim's new rule (tap only when the rest of the fight needs more mana than you have), Wrack Succubus only channels Wrack while its DoTs have 4+ seconds left, and the Destruction Incinerate Imp build is retired (five builds left).
+- Synced with the Warlock SIM v153: **Life Tap** follows the sim's new rule (tap only when the rest of the fight
+  needs more mana than you have), **Wrack Succubus** only channels Wrack while its DoTs have 4 or more seconds left,
+  and the Destruction Incinerate Imp build is retired (five builds left).
 - **Demonic Brand** on the target shows its time left at the bottom of the icon, like the other debuffs, and its
   charges (x5, x4 ...) at the top.
 - A **Discord** button next to Twitch at the top left leads to Xn's Discord.

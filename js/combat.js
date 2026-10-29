@@ -33,6 +33,7 @@ export const FAIL_TEXT = {
   mana: 'Not enough mana',
   range: 'Out of range',
   moving: "Can't do that while moving",
+  casting: "Can't do that while casting",
   shards: 'No Soul Shards',
   health: 'Not enough health',
   immolate: 'Requires Immolate on the target',
@@ -736,6 +737,8 @@ export function createCombat(opts) {
     const cd = racialOf('cooldown');
     if (!cd) return fail('racial', 'noRacial');
     if (!ready('racial')) return fail('racial', 'cooldown');
+    // Not while a cast bar runs (Xn, 2026-10-29: Blood Fury could be used mid-cast). Same for Berserking and Eureka!.
+    if (S.cast && S.cast.end > S.t + EPS) return fail('racial', 'casting');
     S.cds.racial = S.t + cd.cd;
     if (cd.spPct) S.buffs.bloodFury = S.t + cd.duration;
     if (cd.hastePct) S.buffs.berserking = S.t + cd.duration;
