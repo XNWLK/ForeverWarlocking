@@ -30,8 +30,8 @@ const DMG = {
 
 export const BOSSES = [
   { id: 'onyxia', name: 'Onyxia', where: "Onyxia's Lair", seconds: SECONDS,
-    short: 'About six minutes. Stay off her front and tail, dodge Deep Breath, keep out of the egg caves, mind the lava after each fear. She is immune to fire.',
-    text: 'About six minutes in her lair. A ghost tank holds her; she loses health on a fixed schedule (phase 2 at 65% after 1:24, phase 3 at 40% after 4:12), so the fight is about staying alive and keeping your damage up. She is immune to fire: Immolate, Searing Pain, Soul Fire and the Imp\'s Firebolt do nothing to her. ' +
+    short: 'About six minutes. Stay off her front and tail, dodge Deep Breath, keep out of the egg caves, mind the lava after each fear.',
+    text: 'About six minutes in her lair. A ghost tank holds her; she loses health on a fixed schedule (phase 2 at 65% after 1:24, phase 3 at 40% after 4:12), so the fight is about staying alive and keeping your damage up. ' +
           'Phase 1: stand on her side - Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back. ' +
           'Phase 2: she flies; fireballs land on you and around the room, Deep Breath burns a lane across the cave at least twice (watch for the emote and get to the side), 20 whelps come out of the egg caves and more later, and an Onyxian Warder walks in. Stay out of the egg caves: they burn while she breathes. ' +
           'Phase 3: she lands; Bellowing Roar fears everyone, and the lava cracks erupt after each fear.' }
@@ -46,7 +46,8 @@ export function bossChallenge(id) {
   // The sim cannot fight Onyxia: it is measured in a fight of the same length on one target with about as much moving
   // (phase 2's repositioning and phase 3's fears).
   return { id: 'boss:' + id, boss: id, name: b.name, text: b.short, long: b.text, targets: COUNT, fight: { timed: true, seconds: SECONDS },
-           curve: CURVE, immune: { 1: { fire: true } },
+           // Not immune to fire (Xn, 2026-10-30: "so we can practice every build"); `immune` stays possible for another boss.
+           curve: CURVE,
            healths: healths, absent: absent, simTargets: 1, sim: { moveEvery: 20, moveDuration: 3, hitEvery: 0 } };
 }
 

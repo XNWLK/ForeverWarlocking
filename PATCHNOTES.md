@@ -11,8 +11,6 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   - A ghost tank holds her the whole fight, ghost off-tanks hold the whelps and the Warder. She loses health on a fixed
     schedule, so the kill always takes about 6 minutes: phase 2 at 65% (after 1:24), phase 3 at 40% (after 4:12).
     Phase 2 is the long one, so there is time to practise it.
-  - She is immune to fire: Immolate, Searing Pain, Soul Fire, Conflagrate, Incinerate, Rain of Fire, Hellfire and the
-    Imp's Firebolt do nothing to her (the whelps and the Warder are not immune).
   - Phase 1: Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back and throws you about 40 yards.
   - Phase 2: she flies. Fireballs land on you and around the room, Deep Breath burns a lane across the cave after
     the emote (at least twice every time; the lane is about 40 yards wide), 20 whelps come out of the egg caves and more later, an Onyxian Warder walks
@@ -27,7 +25,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
     your best result against Onyxia.
   - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
   - Your damage is counted in the meter and the review; the sim is measured in a fight of the same length on one
-    target (it knows nothing of her fire immunity, so fire builds fall short of it here).
+    target.
   - Your Succubus no longer runs on the spot when she fights a big target.
   - While she takes in a deep breath and crosses the cave, the egg caves are searing hot (about 1,000 a second):
     you cannot hide from Deep Breath in them.
