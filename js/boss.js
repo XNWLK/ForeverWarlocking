@@ -18,6 +18,7 @@ const CURVE = [[0, 100], [84, 65], [252, 40], [348, 0]];
 const SECONDS = 348;
 const WAVE = 20, EXTRA = 8, FIRST_WHELP = 3, COUNT = 2 + WAVE + EXTRA;
 const HEALTH = { onyxia: 1099230, warder: 106821, whelp: 3052 };
+const BREATH_REACH = 21, BREATH_STEP = 7.8;           // Deep Breath: how far each burst reaches, how far apart they are
 const RUN = 9, WHELP_SPEED = 8, WARDER_SPEED = 5, FLY_SPEED = 16, CROSS_SPEED = 22;
 
 // How much each thing hurts (the game's own spell values; marked "guess" where no source has a number).
@@ -181,12 +182,18 @@ export function createBossFight(scene, h) {
       case 'tail': effects.ring(tmp.set(fx.x, 0.4, fx.z), 0xc8a080, 1, 14, 0.5, true); break;
       case 'bolt': effects.bolt(tmp.set(fx.a[0], fx.a[1], fx.a[2]), tmp2.set(fx.b[0], 0.5, fx.b[1]), { style: 'fire', color: 0xff6a1a, core: 0xfff0b0, size: 1.1, speed: 70 }, function () {}); break;
       case 'boom': effects.play('explosion', { at: tmp.set(fx.x, 0.6, fx.z) }); effects.ring(tmp.set(fx.x, 0.2, fx.z), 0xff8a2a, 1, 5.5, 0.5, false); break;
-      case 'burst': effects.column(tmp.set(fx.x, 0, fx.z), 0xff6a1a, 0xffd27a, 7, 3.2, 0.7); effects.puff(tmp.set(fx.x, 1, fx.z), 0xff7a1f, 5, 0.9, 0, 2.5, 0, 0.8); break;
+      case 'burst':                                       // fire across the whole width of the lane
+        for (let k = -2; k <= 2; k++) {
+          const off = k * BREATH_REACH * 0.4, x = fx.x + (fx.nx || 0) * off, z = fx.z + (fx.nz || 0) * off;
+          effects.column(tmp.set(x, 0, z), 0xff6a1a, 0xffd27a, 8, 3.6, 0.8);
+          if (k % 2 === 0) effects.puff(tmp.set(x, 1, z), 0xff7a1f, 7, 1.0, 0, 2.5, 0, 0.8);
+        }
+        break;
       case 'erupt': {
         const fis = lair.fissures[fx.i];
         if (!fis) break;
-        fis.points.forEach(function (p, i) { if (i % 2 === 0) effects.column(tmp.set(p[0], 0, p[1]), 0xff5a14, 0xffd27a, 4.5, 1.2, 0.6); });
-        effects.puff(tmp.set(fis.cx, 0.8, fis.cz), 0xff7a1f, 4, 0.8, 0, 2, 0, 0.8);
+        [fis.points[1], fis.points[3]].forEach(function (p) { effects.column(tmp.set(p[0], 0, p[1]), 0xff5a14, 0xffd27a, 4.5, 1.4, 0.6); });
+        effects.puff(tmp.set(fis.cx, 0.8, fis.cz), 0xff7a1f, 4, 0.7, 0, 2, 0, 0.8);
         break;
       }
       case 'nova': effects.ring(tmp.set(fx.x, 0.4, fx.z), 0xff6a1a, 1, 10, 0.6, false); effects.ring(tmp.set(fx.x, 0.6, fx.z), 0xffc23d, 0.5, 8, 0.5, true); warder.nova(); break;
@@ -326,14 +333,16 @@ export function createBossFight(scene, h) {
       S.ony.cross = true;
       return;
     }
-    // A burst of fire on the floor every 2.6 yards she flies; each burns 7 yards around it.
-    const o = S.ony, done = Math.hypot(o.x - b.from.x, o.z - b.from.z), STEP = 2.6;
+    // A burst of fire on the floor every so many yards she flies; each burns BREATH_REACH yards around it (three times
+    // as wide as first built, Xn), so the middle of the lane is hit about five times and its edge once.
+    const o = S.ony, done = Math.hypot(o.x - b.from.x, o.z - b.from.z), STEP = BREATH_STEP;
     while (b.dropped * STEP <= done) {
       const total = Math.hypot(LAIR.flight[b.to].x - b.from.x, LAIR.flight[b.to].z - b.from.z), k = Math.min(1, (b.dropped * STEP) / total);
       const x = b.from.x + (LAIR.flight[b.to].x - b.from.x) * k, z = b.from.z + (LAIR.flight[b.to].z - b.from.z) * k;
       b.dropped++;
-      visual({ n: 'burst', x: x, z: z });
-      if (!S.over && Math.hypot(player.x - x, player.z - z) <= 7) hurt(roll(DMG.deepBreath), "Onyxia's Deep Breath");
+      const lx = LAIR.flight[b.to].x - b.from.x, lz = LAIR.flight[b.to].z - b.from.z, ll = Math.hypot(lx, lz) || 1;
+      visual({ n: 'burst', x: x, z: z, nx: -lz / ll, nz: lx / ll });
+      if (!S.over && Math.hypot(player.x - x, player.z - z) <= BREATH_REACH) hurt(roll(DMG.deepBreath), "Onyxia's Deep Breath");
     }
     if (!S.ony.goal) { S.breath = null; S.ony.cross = false; onyxia.act('deep', 0.01); }
   }
@@ -493,8 +502,10 @@ export function createBossFight(scene, h) {
         h.log('Onyxia\'s Bellowing Roar: you flee in fear!', 'miss');
         visual({ n: 'fear', x: player.x, z: player.z });
       }
-      // After the fear the cracks erupt, one after another, for a few seconds.
-      const list = lair.fissures.map(function (f) { return { at: t + 3 + rand(0, 3), fissure: f, done: false }; });
+      // The cracks erupt again and again while you are feared, and a few seconds after (Xn: "make the fire pop up more
+      // frequent when feared"): each one about every second, from the moment the roar lands.
+      const list = [];
+      lair.fissures.forEach(function (f) { for (let at = t + rand(0.2, 1.0); at < t + 6; at += rand(0.8, 1.4)) list.push({ at: at, fissure: f, done: false }); });
       S.erupt = { from: t, ends: t + 6.5, list: list };
       S.next.roar = t + rand(15, 45);
       return;
@@ -520,7 +531,7 @@ export function createBossFight(scene, h) {
   function eruptStep(t, player) {
     const E = S.erupt;
     if (!E) { lair.setFissures(S.roar ? 0.7 : 0); return; }
-    lair.setFissures(t < E.from + 3 ? 0.7 : 1);
+    lair.setFissures(1);
     E.list.forEach(function (e) {
       if (e.done || t < e.at) return;
       e.done = true;

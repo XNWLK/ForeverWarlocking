@@ -15,11 +15,12 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
     Imp's Firebolt do nothing to her (the whelps and the Warder are not immune).
   - Phase 1: Flame Breath, Cleave and Wing Buffet hit the front, Tail Sweep the back and throws you about 40 yards.
   - Phase 2: she flies. Fireballs land on you and around the room, Deep Breath burns a lane across the cave after
-    the emote (at least twice every time), 20 whelps come out of the egg caves and more later, an Onyxian Warder walks
+    the emote (at least twice every time; the lane is about 40 yards wide), 20 whelps come out of the egg caves and more later, an Onyxian Warder walks
     in and is held at the mouth of the tunnel. Walking into an egg cave hatches more whelps, and they come for you.
   - Phase 3: she lands. Bellowing Roar fears you for 3 seconds (a skull in a purple ring over you while it lasts),
-    and the lava cracks erupt after each fear: the floor is a muted brown, and a fiery red line marks where the fire
-    bursts out.
+    and the lava cracks erupt again and again while you are feared and for a few seconds after: the floor is a muted
+    brown, the cracks are spread evenly over it, and a fiery red line marks where the fire bursts out.
+  - She keeps away from the walls when she flies.
   - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
   - Your damage is counted in the meter and the review; the sim is measured in a fight of the same length on one
     target (it knows nothing of her fire immunity, so fire builds fall short of it here).

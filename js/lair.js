@@ -21,12 +21,14 @@ export const ERUPT_REACH = 2.2;
 export const LAIR = {
   home: { x: 0, z: -26 },                 // where Onyxia sleeps and is tanked
   tank: { x: 0, z: -40 },                 // the main tank, back to the north wall
-  liftoff: { x: 0, z: 38 },               // phase 2: she walks here, by the entrance, and takes off
+  liftoff: { x: 0, z: 30 },               // phase 2: she walks here, toward the entrance, and takes off
   land: { x: 14, z: -20 },                // phase 3: where she lands
   landTank: { x: 14, z: -34 },
   flyHeight: 24,
-  // Her eight places in the air, clockwise from the north (a Deep Breath crosses to the opposite one).
-  flight: [{ x: 0, z: -45 }, { x: 32, z: -31 }, { x: 28.5, z: -6 }, { x: 24, z: 42 }, { x: 0, z: 45 }, { x: -27, z: 37 }, { x: -34.5, z: -4.3 }, { x: -35, z: -33 }],
+  // Her eight places in the air, clockwise from the north (a Deep Breath crosses to the opposite one). The Classic
+  // fight's points, pulled 30% toward the middle: at the edge her wings and tail went into the walls (Xn).
+  flight: [{ x: 0, z: -45 }, { x: 32, z: -31 }, { x: 28.5, z: -6 }, { x: 24, z: 42 }, { x: 0, z: 45 }, { x: -27, z: 37 }, { x: -34.5, z: -4.3 }, { x: -35, z: -33 }]
+    .map(function (p) { return { x: Math.round(p.x * 7) / 10, z: Math.round(p.z * 7) / 10 }; }),
   // The whelps come out of the egg caves and are held by an off-tank at each cave's mouth; the Warder walks in
   // through the tunnel and is held in it.
   // The Warder's off-tank: at the mouth of the tunnel, a little toward the middle (Xn: "a little closer to the middle").
@@ -277,12 +279,14 @@ export function buildLair(scene) {
   const fissures = [];
   // (Both sides drawn: the strips are flat on the floor, whichever way their corners run.)
   const fissureMaterial = function () { return new THREE.MeshBasicMaterial({ color: 0xff5a14, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }); };
-  let tries = 0;
-  while (fissures.length < 18 && tries++ < 4000) {
-    const cx = -32 + rand() * 64, cz = -36 + rand() * 76;
+  // One in each square of a grid 12.5 yards wide, placed a little off its middle: spread evenly over the floor (Xn: the
+  // left side had too much empty space).
+  const spots = [];
+  for (let gz = -40; gz <= 43; gz += 12.5) for (let gx = -31.25; gx <= 31.3; gx += 12.5) spots.push([gx, gz]);
+  for (let si = 0, tries = 0; si < spots.length; tries = 0, si++) while (tries++ < 12) {
+    const cx = spots[si][0] + (rand() - 0.5) * 5, cz = spots[si][1] + (rand() - 0.5) * 5;
     if (!inChamber(cx, cz) || Math.hypot(cx - LAIR.tank.x, cz - LAIR.tank.z) < 9) continue;
-    if (fissures.some(function (f) { return Math.hypot(f.cx - cx, f.cz - cz) < 11; })) continue;
-    const a = rand() * Math.PI, len = 7 + rand() * 6, pts = [];
+    const a = rand() * Math.PI, len = 6 + rand() * 4, pts = [];
     for (let k = 0; k <= 4; k++) {
       const t = k / 4 - 0.5;
       const x = cx + Math.cos(a) * len * t + (k % 4 ? (rand() - 0.5) * 2.2 : 0), z = cz + Math.sin(a) * len * t + (k % 4 ? (rand() - 0.5) * 2.2 : 0);
@@ -299,6 +303,7 @@ export function buildLair(scene) {
     const edge = new THREE.MeshBasicMaterial({ color: 0xff2a10, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
     group.add(new THREE.Mesh(ribbon(outline(pts, ERUPT_REACH), 0.22, true), edge));
     fissures.push({ cx: cx, cz: cz, points: pts, material: mat, edge: edge });
+    break;
   }
   // How bright they are: 0 resting, 1 about to erupt / erupting.
   let fissureLevel = 0;
