@@ -91,11 +91,18 @@ function makeImp() {
 
 // The Succubus: tall and lithe, curved horns, long hair, bat wings, hooves, a tail, and a whip that hangs coiled
 // from her hand and cracks forward when she strikes. Her legs swing from the hip and bend at the knee when she runs.
-function makeSuccubus() {
+// Her looks: the usual one, and the Golden Succubus (a reward for beating the sim on Onyxia, js/main.js).
+export const SUCCUBUS_LOOKS = {
+  usual: { skin: 0xcf86b8, skinDark: 0xa5628f, cloth: 0x351846, hair: 0x1b1024, bone: 0xd9d2bf, wing: 0x55285c, membrane: 0x7d3a78, leather: 0x2a1a14, gold: 0xd2a83c },
+  gold: { skin: 0xe8c060, skinDark: 0xb48a30, cloth: 0x5a3a0c, hair: 0xfff2c4, bone: 0xfff8e4, wing: 0x9a7420, membrane: 0xe0b44c, leather: 0x4a3010, gold: 0xfff4d6, shine: 0x4a3608 }
+};
+function makeSuccubus(lookKey) {
   const root = new THREE.Group(), rig = new THREE.Group();
   root.add(rig, groundShadow(0.6));
-  const skin = flat(0xcf86b8), skinDark = flat(0xa5628f), cloth = flat(0x351846), hair = flat(0x1b1024), bone = flat(0xd9d2bf);
-  const wing = flat(0x55285c), membrane = flat(0x7d3a78), leather = flat(0x2a1a14), gold = flat(0xd2a83c);
+  const L = SUCCUBUS_LOOKS[lookKey] || SUCCUBUS_LOOKS.usual, sheen = L.shine ? { emissive: L.shine } : undefined;   // gold catches the light
+  const skin = flat(L.skin, sheen), skinDark = flat(L.skinDark, sheen), cloth = flat(L.cloth), hair = flat(L.hair, sheen), bone = flat(L.bone);
+  const wing = flat(L.wing, sheen), membrane = flat(L.membrane, sheen), leather = flat(L.leather), gold = flat(L.gold, sheen);
+  if (L.shine) { const glint = halo(0xffd77a, 2.6, 0.22); glint.position.y = 1.1; rig.add(glint); }   // a soft golden glow around her
 
   // Legs: thigh from the hip, shin from the knee, a hoof and a gold anklet.
   const legs = [-1, 1].map(function (side) {
@@ -308,6 +315,17 @@ export function createPet(scene, opts) {
 
   return {
     state: pet, setKind: setKind, update: update,
+    // The Succubus in another look ('usual' or 'gold'): her model is made again.
+    setLook: function (key) {
+      const old = models.succubus;
+      models.succubus = makeSuccubus(key);
+      models.succubus.root.visible = pet.kind === 'succubus';
+      models.succubus.root.position.copy(old.root.position);
+      models.succubus.root.rotation.copy(old.root.rotation);
+      if (opts.paint) opts.paint(models.succubus.root);
+      scene.remove(old.root);
+      scene.add(models.succubus.root);
+    },
     strike: function () { if (pet.kind) models[pet.kind].strike(); },
     sendHome: function () { placed = false; },
     // Watching a fight again: stands where the record says, walking or not (no path of its own).

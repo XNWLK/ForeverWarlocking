@@ -594,6 +594,12 @@ function challengeResult() {
   // A boss fight you did not survive: when and of what (the DPS is over the time you lived).
   const died = diedOf ? 'You died after ' + Math.floor(diedOf.at / 60) + ':' + String(Math.floor(diedOf.at % 60)).padStart(2, '0') + (diedOf.what ? ' (' + diedOf.what + ')' : '') + '. Your DPS is over the time you were alive.' : null;
   out.notes = [died, encounter.notes(), challenge.procs ? procNotes() : null, daily].filter(Boolean);
+  if (challenge.boss) {                                    // a boss fight: your best, and maybe a reward
+    noteBossResult(pct, dps, out.grade).forEach(function (name) {
+      out.notes.push('A reward is yours: ' + name + '. Choose it under Rewards in the Bosses window.');
+      hud.log('Reward earned: ' + name + '!', 'crit');
+    });
+  }
   const robes = challenge.drill ? extras.newRobes() : [];   // a grade may have earned you a robe
   if (robes.length) {
     out.notes.push((robes.length === 1 ? 'A new robe is yours: ' : 'New robes are yours: ') + robes.join(', ') + '. Put it on in the Challenges window.');
@@ -1127,6 +1133,56 @@ function startChallenge(next) {
   } else hud.log('Back to your own fight settings.');
 }
 
+// ---------- boss rewards ----------
+// What a boss fight can earn (Xn, 2026-10-29: "create a succubus reward for beating the sim on onyxia. maybe make her gold").
+const BOSS_REWARDS = [
+  { key: 'goldSuccubus', name: 'Golden Succubus', look: 'gold', boss: 'boss:onyxia',
+    how: 'Beat the sim on Onyxia: finish the fight alive with 100% of the sim\'s DPS or more. Your Succubus turns gold.' }
+];
+function rewardEarned(r) { const b = (getSetting('bosses') || {})[r.boss]; return !!(b && b.beat); }
+// The Succubus's look you chose, if it is still yours.
+function demonLook() {
+  const key = getSetting('demonLook');
+  return BOSS_REWARDS.some(function (r) { return r.look === key && rewardEarned(r); }) ? key : 'usual';
+}
+// A boss fight is over: keep your best run (one you lived through) and whether you beat the sim. Returns the names of
+// rewards earned just now.
+function noteBossResult(pct, dps, grade) {
+  const all = Object.assign({}, getSetting('bosses')), mine = Object.assign({}, all[challenge.id]);
+  if (diedOf) return [];
+  if (!mine.best || pct > mine.best.pct) mine.best = { pct: pct, dps: Math.round(dps), grade: grade };
+  if (pct >= 100) mine.beat = true;
+  all[challenge.id] = mine;
+  setSetting('bosses', all);
+  const seen = (getSetting('rewardsSeen') || []).slice(), fresh = BOSS_REWARDS.filter(function (r) { return rewardEarned(r) && seen.indexOf(r.key) < 0; });
+  if (fresh.length) setSetting('rewardsSeen', seen.concat(fresh.map(function (r) { return r.key; })));
+  return fresh.map(function (r) { return r.name; });
+}
+function fillRewards() {
+  const box = document.getElementById('bossRewards'), worn = demonLook();
+  box.textContent = '';
+  BOSS_REWARDS.forEach(function (r) {
+    const earned = rewardEarned(r), wearing = earned && worn === r.look;
+    const card = document.createElement('div'), title = document.createElement('h4'), swatch = document.createElement('i'), text = document.createElement('p'), button = document.createElement('button');
+    card.className = 'card reward' + (wearing ? ' on' : '') + (earned ? '' : ' locked');
+    swatch.className = 'swatch';
+    title.append(r.name, swatch);
+    text.textContent = r.how;
+    button.type = 'button';
+    button.textContent = !earned ? 'Not earned yet' : wearing ? 'Back to her usual look' : 'Summon her';
+    button.disabled = !earned;
+    button.addEventListener('click', function () {
+      button.blur();
+      setSetting('demonLook', wearing ? 'usual' : r.look);
+      pet.setLook(demonLook());
+      hud.log(wearing ? 'Your Succubus is back to her usual look.' : 'Your Succubus answers in gold.', 'proc');
+      fillRewards();
+    });
+    card.append(title, text, button);
+    box.appendChild(card);
+  });
+}
+
 // ---------- the boss list (the Bosses button) ----------
 const bossWindow = document.getElementById('bossWin');
 function fillBosses() {
@@ -1140,12 +1196,16 @@ function fillBosses() {
     where.textContent = b.where + ' · ' + Math.round(b.seconds / 60) + ' minutes';
     title.append(b.name, where);
     text.textContent = b.text;
+    const mine = (getSetting('bosses') || {})['boss:' + b.id], best = document.createElement('p');
+    best.className = 'best';
+    best.textContent = mine && mine.best ? 'Your best: ' + mine.best.pct + '% of the sim, ' + mine.best.dps.toLocaleString('en-US') + ' DPS' + (mine.beat ? ' · beaten' : '') : 'Not beaten yet';
     button.type = 'button';
     button.textContent = running ? 'Leave the lair' : 'Fight ' + b.name;
     button.addEventListener('click', function () { bossWindow.hidden = true; startChallenge(running ? null : bossChallenge(b.id)); });
-    card.append(title, text, button);
+    card.append(title, text, best, button);
     list.appendChild(card);
   });
+  fillRewards();
   // The next raids (Xn, 2026-10-29): only named for now, nothing to start.
   ['Hyjal bosses coming soon', 'Barrow Deeps bosses coming soon'].forEach(function (name) {
     const card = document.createElement('div'), title = document.createElement('h4');
@@ -1251,6 +1311,7 @@ window.addEventListener('hashchange', function () { if (/(^#|&)v=1(&|$)/.test(wi
 if (readCustomBuild().length && getSetting('build') === 'custom') setSetting('build', null);   // a code that cannot be played here
 hud.setScale(getSetting('uiScale'));
 warlock.setRobe(extras.wornRobe());
+if (demonLook() !== 'usual') pet.setLook(demonLook());   // a boss reward: the Golden Succubus
 newCharacter();
 hud.setKeys(keyCodes);
 hud.setBinds(binds);

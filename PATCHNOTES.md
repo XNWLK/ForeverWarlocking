@@ -22,6 +22,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
     brown, the cracks are spread evenly over it, and a fiery red line marks where the fire bursts out.
   - She keeps away from the walls when she flies.
   - The boss list also names what comes next: Hyjal bosses and Barrow Deeps bosses, coming soon.
+  - **A reward: the Golden Succubus.** Beat the sim on Onyxia (finish alive with 100% of the sim's DPS or more) and
+    your Succubus can turn gold: choose her under Rewards in the Bosses window. Looks only. The boss list also shows
+    your best result against Onyxia.
   - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
   - Your damage is counted in the meter and the review; the sim is measured in a fight of the same length on one
     target (it knows nothing of her fire immunity, so fire builds fall short of it here).

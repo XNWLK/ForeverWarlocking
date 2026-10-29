@@ -16,6 +16,8 @@ const DEFAULTS = {
   pullSeconds: 5,                      // how long the pull timer counts down
   resultsVersion: 0,                   // bests and drill grades start over when the way they are measured changes
   robe: 'violet', robesSeen: null,     // the robe you wear, and the robes you were already told you earned
+  bosses: {},                          // per boss fight: { best: { pct, dps, grade } (a run you lived through), beat: true once you had 100% of the sim }
+  demonLook: 'usual', rewardsSeen: [], // the Succubus's look (a boss reward), and the rewards you were already told about
   uiScale: 1, colorBlind: false        // the interface's size (0.8 to 1.4), and colours that do not lean on red against green
 };
 
