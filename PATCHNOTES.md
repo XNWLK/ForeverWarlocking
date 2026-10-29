@@ -7,7 +7,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ### 2026-10-29
 - **Fix:** Blood Fury, Berserking and Eureka! could be used in the middle of a cast. Now they say "Can't do that
-  while casting".
+  while casting". During a channel (Drain Life, Wrack, Hellfire, Rain of Fire) they cancel the channel.
 
 ### 2026-10-28
 - Synced with the Warlock SIM v153: **Life Tap** follows the sim's new rule (tap only when the rest of the fight

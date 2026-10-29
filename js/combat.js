@@ -737,8 +737,10 @@ export function createCombat(opts) {
     const cd = racialOf('cooldown');
     if (!cd) return fail('racial', 'noRacial');
     if (!ready('racial')) return fail('racial', 'cooldown');
-    // Not while a cast bar runs (Xn, 2026-10-29: Blood Fury could be used mid-cast). Same for Berserking and Eureka!.
+    // Not while a cast bar runs; during a channel it cancels the channel and goes off (Xn, 2026-10-29). Same for Blood
+    // Fury, Berserking and Eureka!.
     if (S.cast && S.cast.end > S.t + EPS) return fail('racial', 'casting');
+    if (S.channel) interrupt('clipped');
     S.cds.racial = S.t + cd.cd;
     if (cd.spPct) S.buffs.bloodFury = S.t + cd.duration;
     if (cd.hastePct) S.buffs.berserking = S.t + cd.duration;
