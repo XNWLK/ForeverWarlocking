@@ -372,6 +372,12 @@ export function createHud(WL, handlers) {
     el.executeMark.style.left = c.executePct + '%';
     dummyButtons.forEach(function (button) { button.classList.toggle('on', Number(button.dataset.dummies) === c.targets); });
     el.perDummy.hidden = el.perDummyLabel.hidden = c.targets < 2;
+    // A boss fight: "Per target" over the whole width, one line each (the boss, the Warder, the whelps); a long line in
+    // the right-hand column pushed the meter's numbers out of its box.
+    const wide = !!c.targetGroups;
+    el.perDummy.classList.toggle('wide', wide);
+    el.perDummyLabel.classList.toggle('wide', wide);
+    el.perDummyLabel.textContent = wide ? 'Per target' : 'Per dummy';
     currentTarget = 1;
 
     const petName = byId('petName');
@@ -687,7 +693,7 @@ export function createHud(WL, handlers) {
         setText(li.children[2], whole(dmg) + '  ' + Math.round(100 * dmg / res.total) + '%');
       });
       if (c.targetGroups) {                               // a boss fight: the boss, then each kind of add together
-        setText(el.perDummy, c.targetGroups(res.byTarget).map(function (g) { return g.name + ' ' + whole(g.dmg); }).join(' · '));
+        setText(el.perDummy, c.targetGroups(res.byTarget).map(function (g) { return g.name + '  ' + whole(g.dmg); }).join('\n'));
       } else if (c.targets > 1) {
         const parts = [];
         for (let i = 1; i <= c.targets; i++) parts.push(whole(res.byTarget[i]));

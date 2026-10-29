@@ -10,6 +10,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   spell is one line again, in the review and in the damage meter.
 - The review's timeline shows each tick of a channel (Hellfire, Rain of Fire, Drain Life, Wrack) as a mark on its bar;
   point at one to see what it hit. Hellfire is shown as burning around you, not on your target.
+- **Fix:** in the boss fight the damage meter's per-target line pushed its numbers out of the box. It is now "Per
+  target" with Onyxia, the Warder and the whelps on a line each.
 
 ### 2026-10-29
 - **The first boss: Onyxia.** The Bosses button now opens a list of bosses. Onyxia is fought in her own lair, built in
