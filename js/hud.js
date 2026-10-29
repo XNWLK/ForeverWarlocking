@@ -829,7 +829,7 @@ export function createHud(WL, handlers) {
       showError(e.text);
     } else if (e.type === 'death') {
       if (!e.last) { log(dummy + ' dies.', 'crit'); return; }
-      log((e.stopped ? 'You end the fight. ' : e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
+      log((e.died ? 'You died. ' : e.stopped ? 'You end the fight. ' : e.timed ? 'Time is up. ' : dummy + ' dies. ') + whole(e.total) + ' damage in ' + e.seconds.toFixed(1) + ' s: ' + whole(e.dps) + ' DPS.', 'crit');
       if (simAverage) log('The sim averages ' + whole(simAverage.dps) + ' DPS here. You: ' + Math.round(100 * e.dps / simAverage.dps) + '%.', 'proc');
       log('Reset starts a new fight. "Review the fight" shows where the time went.');
     }

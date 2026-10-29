@@ -5,13 +5,15 @@
 
 const STEP = 0.1;                                          // seconds between two samples
 // What of an event the replay needs to show it again (numbers, bolts, bursts, deaths).
-const FIELDS = ['type', 'key', 'target', 'amount', 'crit', 'pet', 'school', 'castTime', 'channel', 'last', 'timed', 'stopped', 'source', 'reason', 'glance'];
-const SHOWN = { cast: 1, hit: 1, tick: 1, miss: 1, havoc: 1, apply: 1, death: 1, interrupt: 1, mana: 1, proc: 1 };
+const FIELDS = ['type', 'key', 'target', 'amount', 'crit', 'pet', 'school', 'castTime', 'channel', 'last', 'timed', 'stopped', 'source', 'reason', 'glance', 'died', 'fx'];
+// bossfx: a look of a boss fight (her breath, a fireball, the lava ...), with what js/boss.js needs to play it again.
+const SHOWN = { cast: 1, hit: 1, tick: 1, miss: 1, havoc: 1, apply: 1, death: 1, interrupt: 1, mana: 1, proc: 1, bossfx: 1 };
 
 function byId(id) { return document.getElementById(id); }
 function clockText(t) { const s = Math.max(0, t); return Math.floor(s / 60) + ':' + ('0' + Math.floor(s % 60)).slice(-2); }
 
-// handlers: onClose() (back to the review), onSeek() (the slider jumped: start the looks afresh)
+// handlers: onClose() (back to the review), onSeek() (the slider jumped: start the looks afresh),
+//           mix(a, b, f) (optional: blends the `boss` part of two samples - a boss fight's creatures)
 export function createReplay(handlers) {
   let samples = [], events = [], next = 0;
   const state = { active: false, t: 0, playing: false, speed: 1, seconds: 0, from: 0, cursor: 0 };
@@ -48,7 +50,8 @@ export function createReplay(handlers) {
     return { t: t, x: mix(a.x, b.x), z: mix(a.z, b.z), yaw: turn(a.yaw, b.yaw), h: mix(a.h, b.h), mv: a.mv,
              pet: a.pet && b.pet ? { x: mix(a.pet.x, b.pet.x), z: mix(a.pet.z, b.pet.z), yaw: turn(a.pet.yaw, b.pet.yaw), mv: a.pet.mv } : a.pet,
              hp: a.hp, dead: a.dead, gone: a.gone, cast: a.cast && b.cast && a.cast.key === b.cast.key ? Object.assign({}, a.cast, { p: mix(a.cast.p, b.cast.p) }) : a.cast,
-             mana: mix(a.mana, b.mana), dmg: mix(a.dmg, b.dmg) };
+             mana: mix(a.mana, b.mana), dmg: mix(a.dmg, b.dmg),
+             life: a.life, boss: a.boss && b.boss && handlers.mix ? handlers.mix(a.boss, b.boss, f) : a.boss };
   }
   // The events from just after `from` up to and including `to`.
   function between(from, to) { return events.filter(function (e) { return e.t > from && e.t <= to; }); }

@@ -117,7 +117,9 @@ const controls = createControls(canvas, camera, world);
 const bossFight = createBossFight(scene, {
   effects: effects, lair: lair, controls: controls,
   sound: { play: function (name) { sound.play(name); } },
-  log: function (text, kind) { hud.log(text, kind); }
+  log: function (text, kind) { hud.log(text, kind); },
+  // Her breath, a fireball, the lava ...: kept for "Watch it again" at the second of the fight it happened.
+  record: function (fx) { if (combat && combat.state.fightStart !== null && !replay.state.active) replay.event(combat.fightSeconds(), { type: 'bossfx', fx: fx }); }
 });
 let bossOn = false;
 // How many targets there can be: three dummies, or the boss and all its adds.
@@ -172,7 +174,8 @@ let pull = null, pullInfo = null, pullNote = null;
 const sound = createSound(getSetting('sound') === true, getSetting('volume'));   // off until you switch it on (Xn)
 const recorder = createRecorder();                          // what happened when, for the review's timeline
 // Where everyone was and what happened, for watching the fight again afterwards (the review's "Watch it again").
-const replay = createReplay({ onClose: function () { endReplay(); }, onSeek: function () { seekReplay(); } });
+const replay = createReplay({ onClose: function () { endReplay(); }, onSeek: function () { seekReplay(); },
+                              mix: function (a, b, f) { return bossFight.mixSnap(a, b, f); } });   // a boss fight's creatures between two samples
 // A drill or a seeded fight that is running: it sets the fight for as long as it lasts and leaves your saved fight
 // settings alone. null = your own settings.
 let challenge = null;
@@ -182,6 +185,7 @@ let fightBest = null, challengeOut = null;                 // what this fight ca
 let fightLogged = false;                                   // this fight is on the list of your results (once it has ended)
 let progressDue = false;                                   // this fight goes on the Progress page once the sim's number is in
 let historyDue = false;                                    // this fight goes into the fight history (js/fights.js) once the sim's number is in
+let diedOf = null;                                         // a boss fight that killed you: { at (seconds), what }
 let raceBest = null;                                       // your best in this fight, for the race in the meter: its damage curve, or just its pace
 // Procs you got and what became of them (the "Proc watch" drill): open = the one that is up, list = the ones before.
 let procLog = { open: null, list: [] };
@@ -538,7 +542,7 @@ function challengeResult() {
   if (!challenge || !combat.state.over || !simResult) return challenge ? { name: challenge.name, waiting: true, lesson: !!challenge.lesson } : null;
   if (challengeOut) return challengeOut;
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0, pct = Math.round(100 * dps / simResult.dps);
-  const out = { name: challenge.name, grade: gradeFor(pct), pct: pct, dps: dps };
+  const out = { name: challenge.name, grade: diedOf ? 'D' : gradeFor(pct), pct: pct, dps: dps };   // dying in a boss fight is never better than a D
   out.line = 'Forever Warlocking · ' + challenge.name + ' · ' + character.build.short + ' · ' + WL.RACES[character.raceKey].name + ' · ' +
     Math.round(dps).toLocaleString('en-US') + ' DPS · ' + pct + '% of the sim (' + out.grade + ')';
   if (challenge.drill) {
@@ -557,7 +561,9 @@ function challengeResult() {
                    again: function () { extras.startLesson(lesson); }, next: next ? function () { extras.startLesson(next); } : null, list: function () { extras.openLessons(); } };
   }
   const daily = challenge.daily ? extras.recordDaily(challenge, out) : null;   // today's fight: your result of the day and your streak
-  out.notes = [encounter.notes(), challenge.procs ? procNotes() : null, daily].filter(Boolean);
+  // A boss fight you did not survive: when and of what (the DPS is over the time you lived).
+  const died = diedOf ? 'You died after ' + Math.floor(diedOf.at / 60) + ':' + String(Math.floor(diedOf.at % 60)).padStart(2, '0') + (diedOf.what ? ' (' + diedOf.what + ')' : '') + '. Your DPS is over the time you were alive.' : null;
+  out.notes = [died, encounter.notes(), challenge.procs ? procNotes() : null, daily].filter(Boolean);
   const robes = challenge.drill ? extras.newRobes() : [];   // a grade may have earned you a robe
   if (robes.length) {
     out.notes.push((robes.length === 1 ? 'A new robe is yours: ' : 'New robes are yours: ') + robes.join(', ') + '. Put it on in the Challenges window.');
@@ -760,7 +766,7 @@ function onCombatEvent(e) {
   }
   if (e.type === 'injured' || e.type === 'healed') { recorder.event(e, combat); return; }   // a boss fight hurts you; its healers heal you (js/boss.js logs it)
   if (e.type === 'spawn' && bossOn) { boltsAt[e.target] = 0; deathWaiting[e.target] = false; return; }   // the boss's adds come in by themselves
-  if (e.type === 'death' && e.died) { hud.log('You died' + (e.what ? ' (' + e.what + ')' : '') + '.', 'miss'); sound.play('fizzle'); }
+  if (e.type === 'death' && e.died) { diedOf = { at: combat.fightSeconds(), what: e.what || '' }; sound.play('fizzle'); }
   if (e.type === 'spawn') {                                // an add joins the fight (a scripted fight)
     dummies[e.target].setDead(false);
     boltsAt[e.target] = 0; deathWaiting[e.target] = false;
@@ -822,6 +828,7 @@ function procAlert(name) {
 // What you see and hear when something happens. again: the replay plays it once more (no log lines, no casting
 // hum; the dummies fall as its record says).
 function showLooks(e, again) {
+  if (e.type === 'bossfx') { if (again) bossFight.playFx(e.fx); return; }   // a boss fight's looks, watched again
   const ti = e.target || (again ? 1 : combat.state.target), dummy = dummies[ti], anchor = anchors[ti];
   const fx = SPELL_FX[e.key], lands = e.type === 'hit' || e.type === 'miss';
   const rides = e.key === 'pet:brand';   // extra damage that comes with the pet's own hit: no second strike, no second sound
@@ -885,7 +892,7 @@ function showLooks(e, again) {
   } else if (e.type === 'mana' && e.source === 'Life Tap') {
     effects.play('lifeTap', { caster: spot.set(controls.player.x, 1.2 * warlock.size, controls.player.z) });
   } else if (e.type === 'death') {
-    if (again) { if (!e.timed) effects.play('death', where); }
+    if (again) { if (!e.timed) { if (bossOn && ti > 1) effects.ring(spot.set(dummy.chestAt.x, 0.1, dummy.chestAt.z), 0xff8a5a, 0.3, 2.2, 0.5, false); else effects.play('death', where); } }
     else if (!e.timed && bossOn && ti > 1) { dummy.setDead(true); effects.ring(spot.set(dummy.chestAt.x, 0.1, dummy.chestAt.z), 0xff8a5a, 0.3, 2.2, 0.5, false); }   // a whelp or the Warder falls
     else if (!e.timed) { if (boltsAt[ti] > 0) deathWaiting[ti] = true; else { dummy.setDead(true); effects.play('death', where); } }
   }
@@ -1012,6 +1019,7 @@ function resetFight() {
   recorder.reset();
   encounter.reset();
   sound.stopCasting();
+  diedOf = null;
   fightBest = null; challengeOut = null; fightLogged = false; progressDue = false; prevCast = null; castStopped = false; humming = false; bannerKind = '';
   myCurve = [0]; manaCurve = []; manaEnd = null;
   fightClock = 0;
@@ -1439,19 +1447,20 @@ function sampleReplay(last) {
     x: player.x, z: player.z, yaw: player.yaw, h: player.height, mv: player.moving,
     pet: P ? { x: pet.state.x, z: pet.state.z, yaw: pet.state.yaw, mv: pet.state.moving } : null,
     hp: hp, dead: dead, gone: gone, mana: S.mana / character.stats.maxMana, dmg: combat.result.total,
-    cast: c ? { key: c.key, target: c.target, ch: S.channel ? 1 : 0, p: S.cast ? Math.min(1, (S.t - S.cast.start) / (S.cast.end - S.cast.start)) : 0.6 } : null
+    cast: c ? { key: c.key, target: c.target, ch: S.channel ? 1 : 0, p: S.cast ? Math.min(1, (S.t - S.cast.start) / (S.cast.end - S.cast.start)) : 0.6 } : null,
+    boss: bossOn ? bossFight.snapshot() : null,                // where the boss and every add were
+    life: S.health / character.stats.maxHealth
   });
 }
 let replayDead = [false, false, false, false], replayAuras = {}, replaySaved = null;
 function startReplay() {
   if (!replay.has() || !combat.state.over) { hud.showError('Nothing to watch yet: finish a fight first'); return; }
-  if (bossOn) { hud.showError('Watching it again does not work for boss fights yet'); return; }
   panels.hideReview(); touch.closeMenu(); hud.closePanels();
   const p = controls.player;
   replaySaved = { x: p.x, z: p.z, yaw: p.yaw, height: p.height };
   replayAuras = recorder.data().auras;
   replayDead = [false, false, false, false];
-  for (let i = 1; i <= 3; i++) dummies[i].setDead(false);
+  if (!bossOn) for (let i = 1; i <= 3; i++) dummies[i].setDead(false);   // a boss fight's creatures follow the record (applySnap)
   seekReplay();
   sound.stopCasting();
   replay.open(combat.fightSeconds());
@@ -1468,7 +1477,8 @@ function endReplay(quiet) {
   const p = controls.player;
   p.x = replaySaved.x; p.z = replaySaved.z; p.yaw = replaySaved.yaw; p.height = replaySaved.height;
   seekReplay();
-  for (let i = 1; i <= targets; i++) dummies[i].setDead(!combat.timed && !combat.endless && combat.state.targets[i].dead);   // as the fight ended
+  if (bossOn) bossFight.restore();                         // everything back where the fight left it
+  else for (let i = 1; i <= targets; i++) dummies[i].setDead(!combat.timed && !combat.endless && combat.state.targets[i].dead);   // as the fight ended
   ghost.place();
   if (!quiet) showReview();
 }
@@ -1488,18 +1498,24 @@ function replayFrame(dt, time) {
   warlock.root.rotation.y = s.yaw;
   warlock.update(dt, time, s.mv, s.h, spell ? spell.school : null);
   if (combat.pet && s.pet) pet.place(s.pet.x, s.pet.z, s.pet.yaw, s.pet.mv, dt, time);
-  for (let i = 1; i <= targets; i++) {
+  if (bossOn) {                                            // the boss and its adds where the record says
+    bossFight.applySnap(s.boss, dt, time);
+    for (let i = 1; i <= targets; i++) dummies[i].setSelected(false);
+  } else for (let i = 1; i <= targets; i++) {
     dummies[i].root.visible = !s.gone[i];
     if (!!s.dead[i] !== replayDead[i]) { replayDead[i] = !!s.dead[i]; dummies[i].setDead(replayDead[i]); }
     dummies[i].update(dt, time);
     dummies[i].setSelected(false);
   }
   rings.visible = false;
-  chamber.update(time);
+  if (bossOn) lair.update(time); else chamber.update(time);
   warlock.root.updateMatrixWorld();
   if (cast) { const fx = SPELL_FX[cast.key]; effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, cast.p, time, player, dt); }
   else effects.casting(null, 0, 0, time, player, dt);
-  for (let i = 1; i <= 3; i++) effects.setMarks(i, SPOTS[i], i <= targets && !s.dead[i] && !s.gone[i] ? marksAt(i, R.t) : {}, time);
+  for (let i = 1; i <= targetSlots(); i++) {
+    const at = bossOn ? { x: dummies[i].x, z: dummies[i].z, y: i === 1 && s.boss ? s.boss.o[2] : 0 } : SPOTS[i];
+    effects.setMarks(i, at, i <= targets && !s.dead[i] && !s.gone[i] ? marksAt(i, R.t) : {}, time, bossOn ? bossFight.markScale(i) : 1);
+  }
   if (cast && cast.ch && spell && !spell.aoe) {
     beam.material.color.set(cast.key === 'wrack' ? 0xb07cff : 0x8dff9a);
     beam.set(warlock.orbPosition(from), dummies[cast.target || 1].chestAt, time);
@@ -1507,7 +1523,7 @@ function replayFrame(dt, time) {
   effects.update(dt, camera.position);
   ghost.update(dt, time, ghostView({ x: s.x, z: s.z, yaw: s.yaw, moving: s.mv }, R.t >= 0 ? R.t : null));
   renderer.render(scene, camera);
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= targetSlots(); i++) {
     const anchor = anchors[i];
     if (i > targets || s.gone[i]) { anchor.visible = false; continue; }
     head.copy(dummies[i].headAt).project(camera);
@@ -1518,7 +1534,8 @@ function replayFrame(dt, time) {
   hud.floats(time);
   const seconds = Math.max(0, R.t);
   replay.say((spell ? (cast.ch ? 'Channelling ' : 'Casting ') + spell.name : 'Not casting') + '  ·  ' +
-             Math.round(seconds > 0.5 ? s.dmg / seconds : 0).toLocaleString('en-US') + ' DPS so far  ·  mana ' + Math.round(100 * s.mana) + '%');
+             Math.round(seconds > 0.5 ? s.dmg / seconds : 0).toLocaleString('en-US') + ' DPS so far  ·  mana ' + Math.round(100 * s.mana) + '%' +
+             (s.life != null && bossOn ? '  ·  health ' + Math.round(100 * s.life) + '%' : '') + (s.boss && s.boss.bn ? '  ·  ' + s.boss.bn : ''));
 }
 
 // ---------- a controller ----------

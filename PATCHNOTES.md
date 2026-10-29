@@ -17,6 +17,13 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   - Phase 3: she lands. Bellowing Roar fears you for 3 seconds, and the lava cracks erupt after each fear.
   - The raid's healers give back what she does to you a few seconds later; you die if too much comes at once.
   - Your damage is counted in the meter and the review; the sim is measured in a 4-minute fight on one target.
+  - While she takes in a deep breath and crosses the cave, the egg caves are searing hot (about 1,000 a second):
+    you cannot hide from Deep Breath in them.
+  - In phase 3 a few whelps crawl out of the egg caves now and then.
+  - If she kills you, the fight ends there: the log says so, and the review says when and what killed you (and gives
+    no better than a D).
+  - "Watch it again" works for the boss fight: Onyxia, the whelps, the Warder, the ghost tanks, her fire, the
+    fireballs and the lava all come back, with your health under the slider.
 - **Fix:** Blood Fury, Berserking and Eureka! could be used in the middle of a cast. Now they say "Can't do that
   while casting". During a channel (Drain Life, Wrack, Hellfire, Rain of Fire) they cancel the channel.
 

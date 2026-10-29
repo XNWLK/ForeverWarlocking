@@ -310,11 +310,29 @@ export function buildLair(scene) {
     group.add(lamp);
     animated.push(function (time) { lamp.intensity = 55 + fissureLevel * 160 + Math.sin(time * 2.1 + i * 2) * 8; });
   });
+  const caveLamps = [];
   [[40, 38], [-40, 38], [0, 70]].forEach(function (p) {     // a faint purple in the egg caves, a dull red down the tunnel
     const lamp = new THREE.PointLight(p[1] === 70 ? 0xff4a20 : 0x8a4aff, 70, 30, 1.6);
     lamp.position.set(p[0], 3, p[1]);
     group.add(lamp);
+    if (p[1] !== 70) caveLamps.push(lamp);
   });
+  // While Onyxia breathes the egg caves are searing hot: their floor glows and their light turns red.
+  const heatMaterial = new THREE.MeshBasicMaterial({ color: 0xff3a10, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  [EAST_CAVE, WEST_CAVE].forEach(function (poly) {
+    const shape = new THREE.Shape(poly.map(function (p) { return new THREE.Vector2(p[0], -p[1]); }));
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), heatMaterial);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = 0.06;
+    group.add(mesh);
+  });
+  let heatLevel = 0;
+  const purple = new THREE.Color(0x8a4aff), red = new THREE.Color(0xff3a10);
+  function setHeat(level) {
+    heatLevel = level;
+    heatMaterial.opacity = level * 0.32;
+    caveLamps.forEach(function (lamp) { lamp.color.copy(purple).lerp(red, level); lamp.intensity = 70 + level * 200; });
+  }
   // Embers drifting up from the cracks.
   const emberCount = 160, emberPos = new Float32Array(emberCount * 3), emberSpeed = [];
   for (let i = 0; i < emberCount; i++) {
@@ -338,6 +356,7 @@ export function buildLair(scene) {
 
   return {
     group: group, eggs: eggs, fissures: fissures, setFissures: setFissures, nearestFissure: nearestFissure,
+    fissureLevel: function () { return fissureLevel; }, setHeat: setHeat, heatLevel: function () { return heatLevel; },
     wallHeight: WALL_HEIGHT,
     update: function (time) { if (group.visible) animated.forEach(function (fn) { fn(time); }); }
   };

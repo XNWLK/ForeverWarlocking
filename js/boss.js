@@ -21,7 +21,7 @@ const RUN = 9, WHELP_SPEED = 8, WARDER_SPEED = 5, FLY_SPEED = 16, CROSS_SPEED = 
 const DMG = {
   flameBreath: [3063, 3937], cleave: [3000, 4000] /* guess: her melee is not known */, wingBuffet: [563, 937], tailSweep: [600, 1000],
   fireball: [1700, 2300], deepBreath: [4000, 5000], eruption: [1425, 1575], whelp: [450, 650] /* guess */,
-  fireNova: [900, 1100] /* guess */, flameLash: [56, 64]
+  fireNova: [900, 1100] /* guess */, flameLash: [56, 64], heatedGround: [950, 1050] /* guess: every second in an egg cave during Deep Breath */
 };
 
 export const BOSSES = [
@@ -64,7 +64,7 @@ export function createBossFight(scene, h) {
   for (let i = 0; i < WAVE + EXTRA; i++) { const w = makeWhelp(); w.root.visible = false; group.add(w.root); whelps.push(w); }
   const bodies = [null, onyxia, warder].concat(whelps);
   const spots = bodies.map(function () { return { x: 0, z: 0 }; });
-  const tanks = { main: makeGhostTank(), east: makeGhostTank(), west: makeGhostTank(), warder: makeGhostTank() };
+  const tanks = { main: makeGhostTank(), east: makeGhostTank(), west: makeGhostTank(), warder: makeGhostTank() }, TANKS = ['main', 'east', 'west', 'warder'];
   Object.keys(tanks).forEach(function (k) { group.add(tanks[k].root); });
 
   // Fire on the floor where a fireball will land (a ring that fills as the cast goes on).
@@ -102,7 +102,7 @@ export function createBossFight(scene, h) {
       erupt: null,                                       // { from, ends, list: [{ at, fissure, done }] }
       roar: null,                                        // { ends } the roar being cast
       tankGoal: { x: LAIR.tank.x, z: LAIR.tank.z },
-      banner: null, shake: 0, hatchAt: 0, lastT: -1
+      banner: null, shake: 0, hatchAt: 0, lastT: -1, heat: 0, heatAt: 0, heatSaid: false
     };
     lair.eggs.forEach(function (e) { e.hatched = false; e.mesh.visible = true; });
     markers.forEach(function (m) { m.live = false; m.group.visible = false; });
@@ -118,6 +118,7 @@ export function createBossFight(scene, h) {
     tanks.west.place(LAIR.offtank.west.x, LAIR.offtank.west.z, yawTo(LAIR.offtank.west.x, LAIR.offtank.west.z, LAIR.pack.west.x, LAIR.pack.west.z));
     tanks.warder.place(LAIR.offtank.warder.x, LAIR.offtank.warder.z, 0);
     lair.setFissures(0);
+    lair.setHeat(0);
     syncSpots();
   }
 
@@ -135,11 +136,10 @@ export function createBossFight(scene, h) {
   // You are hurt; the raid's healers give it back a few seconds later.
   let combat = null;
   function hurt(amount, what) {
+    if (combat.state.over || combat.state.fightStart === null) return 0;
+    h.log(what + ' hits you for ' + amount.toLocaleString('en-US') + '.', 'miss');   // before the death it may cause
     const got = combat.injure(amount, what);
-    if (got > 0) {
-      S.heals.push({ at: S.lastT + rand(2.5, 4), amount: got });
-      h.log(what + ' hits you for ' + got.toLocaleString('en-US') + '.', 'miss');
-    }
+    if (got > 0) S.heals.push({ at: S.lastT + rand(2.5, 4), amount: got });
     return got;
   }
 
@@ -156,14 +156,42 @@ export function createBossFight(scene, h) {
   // Fire poured out in a cone in front of her (Flame Breath; looks only).
   function coneFire(range, halfAngle) {
     onyxia.mouthAt(mouth);
-    const o = S.ony;
-    for (let i = 0; i < 26; i++) {
-      const a = o.yaw + rand(-halfAngle, halfAngle), r = rand(4, range), fx = -Math.sin(a), fz = -Math.cos(a);
-      const at = tmp.set(o.x + fx * r, 0.8 + Math.random() * 2, o.z + fz * r);
-      if (i < 10) effects.play('burn', { at: at });
-      else effects.puff(at, i % 2 ? 0xff7a1f : 0xffc23d, 2.2 + Math.random() * 1.5, 0.7, fx * 2, 1.2, fz * 2, 0.6);
+    visual({ n: 'cone', x: S.ony.x, z: S.ony.z, yaw: S.ony.yaw, m: [mouth.x, mouth.y, mouth.z], r: range, a: halfAngle });
+  }
+  function act(name, seconds) { visual({ n: 'act', a: name, s: seconds }); }
+  // A look that the replay shows again: played now and handed to main.js (h.record) with the fight's second.
+  function visual(fx) { playFx(fx); if (h.record) h.record(fx); }
+  function playFx(fx) {
+    switch (fx.n) {
+      case 'act': onyxia.act(fx.a, fx.s); break;
+      case 'cone':
+        for (let i = 0; i < 26; i++) {
+          const a = fx.yaw + rand(-fx.a, fx.a), r = rand(4, fx.r), ax = -Math.sin(a), az = -Math.cos(a);
+          const at = tmp.set(fx.x + ax * r, 0.8 + Math.random() * 2, fx.z + az * r);
+          if (i < 10) effects.play('burn', { at: at });
+          else effects.puff(at, i % 2 ? 0xff7a1f : 0xffc23d, 2.2 + Math.random() * 1.5, 0.7, ax * 2, 1.2, az * 2, 0.6);
+        }
+        effects.ball(tmp.set(fx.m[0], fx.m[1], fx.m[2]), 0xffa040, 1.6, 0.35);
+        break;
+      case 'buffet': effects.ring(tmp.set(fx.x, 0.3, fx.z), 0xd8c0a0, 2, 30, 0.6, true); break;
+      case 'tail': effects.ring(tmp.set(fx.x, 0.4, fx.z), 0xc8a080, 1, 14, 0.5, true); break;
+      case 'bolt': effects.bolt(tmp.set(fx.a[0], fx.a[1], fx.a[2]), tmp2.set(fx.b[0], 0.5, fx.b[1]), { style: 'fire', color: 0xff6a1a, core: 0xfff0b0, size: 1.1, speed: 70 }, function () {}); break;
+      case 'boom': effects.play('explosion', { at: tmp.set(fx.x, 0.6, fx.z) }); effects.ring(tmp.set(fx.x, 0.2, fx.z), 0xff8a2a, 1, 5.5, 0.5, false); break;
+      case 'burst': effects.column(tmp.set(fx.x, 0, fx.z), 0xff6a1a, 0xffd27a, 7, 3.2, 0.7); effects.puff(tmp.set(fx.x, 1, fx.z), 0xff7a1f, 5, 0.9, 0, 2.5, 0, 0.8); break;
+      case 'erupt': {
+        const fis = lair.fissures[fx.i];
+        if (!fis) break;
+        fis.points.forEach(function (p, i) { if (i % 2 === 0) effects.column(tmp.set(p[0], 0, p[1]), 0xff5a14, 0xffd27a, 4.5, 1.2, 0.6); });
+        effects.puff(tmp.set(fis.cx, 0.8, fis.cz), 0xff7a1f, 4, 0.8, 0, 2, 0, 0.8);
+        break;
+      }
+      case 'nova': effects.ring(tmp.set(fx.x, 0.4, fx.z), 0xff6a1a, 1, 10, 0.6, false); effects.ring(tmp.set(fx.x, 0.6, fx.z), 0xffc23d, 0.5, 8, 0.5, true); warder.nova(); break;
+      case 'hatch': effects.sparks(tmp.set(fx.x, 0.8, fx.z), 0x9a6aff, 10, 1); break;
+      case 'fear': effects.ring(tmp.set(fx.x, 1, fx.z), 0x9a5aff, 0.5, 3, 0.6, true); break;
+      case 'tank': if (tanks[fx.w]) tanks[fx.w][fx.k](); break;
+      case 'warder': warder.attack(); break;
+      case 'whelp': if (bodies[fx.s]) bodies[fx.s].attack(); break;
     }
-    effects.ball(mouth, 0xffa040, 1.6, 0.35);
   }
 
   // ---------- phase 1 and 3: on the ground ----------
@@ -185,7 +213,7 @@ export function createBossFight(scene, h) {
         if (inFront(player, 45, Math.PI / 4)) hurt(roll(DMG.flameBreath), "Onyxia's Flame Breath");
         h.sound.play('ignite');
       } else if (name === 'wingBuffet') {
-        effects.ring(tmp.set(S.ony.x, 0.3, S.ony.z), 0xd8c0a0, 2, 30, 0.6, true);
+        visual({ n: 'buffet', x: S.ony.x, z: S.ony.z });
         if (inFront(player, 30, 0.9)) {
           hurt(roll(DMG.wingBuffet), "Onyxia's Wing Buffet");
           const r = relative(player);
@@ -194,13 +222,13 @@ export function createBossFight(scene, h) {
       }
       return;
     }
-    if (t >= S.next.flameBreath) { S.cast = { name: 'flameBreath', ends: t + 2 }; onyxia.act('breath', 3.0); S.next.flameBreath = t + 2 + rand(10, 20); return; }
-    if (t >= S.next.wingBuffet) { S.cast = { name: 'wingBuffet', ends: t + 1 }; onyxia.act('buffet', 1.3); S.next.wingBuffet = t + 1 + rand(15, 30); return; }
+    if (t >= S.next.flameBreath) { S.cast = { name: 'flameBreath', ends: t + 2 }; act('breath', 3.0); S.next.flameBreath = t + 2 + rand(10, 20); return; }
+    if (t >= S.next.wingBuffet) { S.cast = { name: 'wingBuffet', ends: t + 1 }; act('buffet', 1.3); S.next.wingBuffet = t + 1 + rand(15, 30); return; }
     if (t >= S.next.tailSweep) {
-      onyxia.act('tail', 0.9);
+      act('tail', 0.9);
       S.next.tailSweep = t + rand(15, 20);
       const o = S.ony, back = tmp.set(o.x + Math.sin(o.yaw) * 10, 0.4, o.z + Math.cos(o.yaw) * 10);
-      effects.ring(back, 0xc8a080, 1, 14, 0.5, true);
+      visual({ n: 'tail', x: back.x, z: back.z });
       if (behind(player, 30, 0.9)) {
         hurt(roll(DMG.tailSweep), "Onyxia's Tail Sweep");
         const r = relative(player), sx = -r.fz * r.side, sz = r.fx * r.side;   // flung to the side you stand on, and back
@@ -209,19 +237,19 @@ export function createBossFight(scene, h) {
       return;
     }
     if (t >= S.next.cleave) {
-      onyxia.act('cleave', 0.8);
+      act('cleave', 0.8);
       S.next.cleave = t + rand(5, 10);
-      tanks.main.swing();
+      visual({ n: 'tank', w: 'main', k: 'swing' });
       if (inFront(player, 12, 1.05)) hurt(roll(DMG.cleave), "Onyxia's Cleave");
       return;
     }
     if (t >= S.next.knockAway) {
-      onyxia.act('knock', 0.8);
-      tanks.main.knocked();
+      act('knock', 0.8);
+      visual({ n: 'tank', w: 'main', k: 'knocked' });
       S.next.knockAway = t + rand(25, 40);
       return;
     }
-    if (t >= S.next.melee) { S.next.melee = t + 2; tanks.main.swing(); }
+    if (t >= S.next.melee) { S.next.melee = t + 2; visual({ n: 'tank', w: 'main', k: 'swing' }); }
   }
 
   // ---------- phase 2: in the air ----------
@@ -237,7 +265,7 @@ export function createBossFight(scene, h) {
     const m = marker();
     m.live = true; m.group.visible = true; m.group.position.set(x, 0, z);
     S.fireballs.push({ lands: t + 3, player: atYou, x: x, z: z, marker: m, flying: false, cast: t });
-    onyxia.act('fireball', 0.8);
+    act('fireball', 0.8);
   }
   function fireballs(t, player) {
     S.fireballs.forEach(function (f) {
@@ -246,7 +274,7 @@ export function createBossFight(scene, h) {
       if (!f.flying && t >= f.lands - 0.5) {
         f.flying = true;
         onyxia.mouthAt(mouth);
-        effects.bolt(mouth, tmp2.set(f.x, 0.5, f.z), { style: 'fire', color: 0xff6a1a, core: 0xfff0b0, size: 1.1, speed: 70 }, function () {});
+        visual({ n: 'bolt', a: [mouth.x, mouth.y, mouth.z], b: [f.x, f.z] });
       }
     });
     for (let i = S.fireballs.length - 1; i >= 0; i--) {
@@ -254,9 +282,7 @@ export function createBossFight(scene, h) {
       if (t < f.lands) continue;
       S.fireballs.splice(i, 1);
       f.marker.live = false; f.marker.group.visible = false;
-      const at = tmp.set(f.x, 0.6, f.z);
-      effects.play('explosion', { at: at });
-      effects.ring(tmp.set(f.x, 0.2, f.z), 0xff8a2a, 1, 5.5, 0.5, false);
+      visual({ n: 'boom', x: f.x, z: f.z });
       if (S.over) continue;
       if (f.player || Math.hypot(player.x - f.x, player.z - f.z) <= 5) hurt(roll(DMG.fireball), "Onyxia's Fireball");
     }
@@ -270,6 +296,7 @@ export function createBossFight(scene, h) {
       const from = LAIR.flight[S.point], to = (S.point + 4) % 8;
       S.breath = { step: 'inhale', ends: t + 5, from: { x: from.x, z: from.z }, to: to, dropped: 0 };
       say('Onyxia takes in a deep breath...', 'miss', 5);
+      act('roar', 5);
       h.sound.play('warn');
       S.next.move = t + 5 + 25;
     } else {
@@ -282,26 +309,24 @@ export function createBossFight(scene, h) {
     const b = S.breath;
     if (!b) return;
     if (b.step === 'inhale') {
-      onyxia.act('roar', 0.5);
       if (t < b.ends) return;
       b.step = 'cross';
+      act('deep', 6);
       S.point = b.to;
       flyTo(LAIR.flight[b.to]);
       S.ony.cross = true;
       return;
     }
-    onyxia.act('deep', 0.4);
     // A burst of fire on the floor every 2.6 yards she flies; each burns 7 yards around it.
     const o = S.ony, done = Math.hypot(o.x - b.from.x, o.z - b.from.z), STEP = 2.6;
     while (b.dropped * STEP <= done) {
       const total = Math.hypot(LAIR.flight[b.to].x - b.from.x, LAIR.flight[b.to].z - b.from.z), k = Math.min(1, (b.dropped * STEP) / total);
       const x = b.from.x + (LAIR.flight[b.to].x - b.from.x) * k, z = b.from.z + (LAIR.flight[b.to].z - b.from.z) * k;
       b.dropped++;
-      effects.column(tmp.set(x, 0, z), 0xff6a1a, 0xffd27a, 7, 3.2, 0.7);
-      effects.puff(tmp.set(x, 1, z), 0xff7a1f, 5, 0.9, 0, 2.5, 0, 0.8);
+      visual({ n: 'burst', x: x, z: z });
       if (!S.over && Math.hypot(player.x - x, player.z - z) <= 7) hurt(roll(DMG.deepBreath), "Onyxia's Deep Breath");
     }
-    if (!S.ony.goal) { S.breath = null; S.ony.cross = false; }
+    if (!S.ony.goal) { S.breath = null; S.ony.cross = false; onyxia.act('deep', 0.01); }
   }
 
   // ---------- whelps ----------
@@ -365,7 +390,7 @@ export function createBossFight(scene, h) {
         body.setMoving(false);
         const ot = LAIR.offtank[w.side];
         body.place(w.x, w.z, yawTo(w.x, w.z, ot.x, ot.z));
-        if (t >= w.swingAt) { w.swingAt = t + rand(1.2, 2.2); body.attack(); }
+        if (t >= w.swingAt) { w.swingAt = t + rand(1.2, 2.2); visual({ n: 'whelp', s: w.slot }); }
         if (!S.over) combat.raidHurt(w.slot, w.rate * dt);   // the raid's area spells
         return;
       }
@@ -382,7 +407,7 @@ export function createBossFight(scene, h) {
         if (w.state === 'run') { w.path.shift(); if (!w.path.length) w.state = 'pack'; }
         else if (w.state === 'chase' && t >= w.swingAt && !S.over) {
           w.swingAt = t + 2;
-          body.attack();
+          visual({ n: 'whelp', s: w.slot });
           hurt(roll(DMG.whelp), 'Onyxian Whelp');
         }
       }
@@ -399,10 +424,21 @@ export function createBossFight(scene, h) {
       const w = freeWhelp(FIRST_WHELP + WAVE);
       if (!w) return;
       e.hatched = true; e.mesh.visible = false;
-      effects.sparks(tmp.set(e.x, 0.8, e.z), 0x9a6aff, 10, 1);
+      visual({ n: 'hatch', x: e.x, z: e.z });
       if (launchWhelp(w, cave, e.x, e.z, true)) hatched++;
     });
     if (hatched) { S.hatchAt = t + 1; say('You stepped on her eggs: ' + (hatched === 1 ? 'a whelp hatches' : hatched + ' whelps hatch') + '!', 'miss', 2.5); }
+  }
+
+  // While she breathes, the egg caves are searing hot: nobody hides from Deep Breath in them.
+  function heatStep(dt, t, player) {
+    const hot = !!S.breath && !S.over;
+    S.heat += ((hot ? 1 : 0) - S.heat) * Math.min(1, dt * 3);
+    lair.setHeat(S.heat);
+    if (!hot) { S.heatSaid = false; return; }
+    if (!caveOf(player.x, player.z)) return;
+    if (!S.heatSaid) { S.heatSaid = true; h.log('The egg cave is searing hot!', 'miss'); }
+    if (t >= S.heatAt) { S.heatAt = t + 1; hurt(roll(DMG.heatedGround), 'Heated Ground'); }
   }
 
   // ---------- the Warder ----------
@@ -425,15 +461,13 @@ export function createBossFight(scene, h) {
     if (S.over) return;
     if (t >= W.nova) {
       W.nova = t + rand(8, 12);
-      warder.nova();
-      effects.ring(tmp.set(W.x, 0.4, W.z), 0xff6a1a, 1, 10, 0.6, false);
-      effects.ring(tmp.set(W.x, 0.6, W.z), 0xffc23d, 0.5, 8, 0.5, true);
+      visual({ n: 'nova', x: W.x, z: W.z });
       if (Math.hypot(player.x - W.x, player.z - W.z) <= 10) hurt(roll(DMG.fireNova), "Onyxian Warder's Fire Nova");
     }
     if (t >= W.lash) {
       W.lash = t + rand(8, 12);
-      warder.attack();
-      tanks.warder.swing();
+      visual({ n: 'warder' });
+      visual({ n: 'tank', w: 'warder', k: 'swing' });
       if (Math.hypot(player.x - W.x, player.z - W.z) <= 20) hurt(roll(DMG.flameLash), "Onyxian Warder's Flame Lash");
     }
   }
@@ -448,7 +482,7 @@ export function createBossFight(scene, h) {
       if (!S.over) {
         S.fear = { ends: t + 3, turnAt: t };
         h.log('Onyxia\'s Bellowing Roar: you flee in fear!', 'miss');
-        effects.ring(tmp.set(player.x, 1, player.z), 0x9a5aff, 0.5, 3, 0.6, true);
+        visual({ n: 'fear', x: player.x, z: player.z });
       }
       // After the fear the cracks erupt, one after another, for a few seconds.
       const list = lair.fissures.map(function (f) { return { at: t + 3 + rand(0, 3), fissure: f, done: false }; });
@@ -458,7 +492,7 @@ export function createBossFight(scene, h) {
     }
     if (t >= S.next.roar && !S.cast) {
       S.roar = { ends: t + 1.5 };
-      onyxia.act('roar', 1.8);
+      act('roar', 1.8);
       say("Onyxia's Bellowing Roar!", 'miss', 2);
       h.sound.play('warn');
     }
@@ -481,11 +515,7 @@ export function createBossFight(scene, h) {
     E.list.forEach(function (e) {
       if (e.done || t < e.at) return;
       e.done = true;
-      e.fissure.points.forEach(function (p, i) {
-        if (i % 2) return;
-        effects.column(tmp.set(p[0], 0, p[1]), 0xff5a14, 0xffd27a, 4.5, 1.2, 0.6);
-      });
-      effects.puff(tmp.set(e.fissure.cx, 0.8, e.fissure.cz), 0xff7a1f, 4, 0.8, 0, 2, 0, 0.8);
+      visual({ n: 'erupt', i: lair.fissures.indexOf(e.fissure) });
       if (!S.over && lair.nearestFissure(player.x, player.z).fissure === e.fissure && lair.nearestFissure(player.x, player.z).distance <= 2.2) hurt(roll(DMG.eruption), 'Lava Eruption');
     });
     if (t >= E.ends) S.erupt = null;
@@ -569,9 +599,19 @@ export function createBossFight(scene, h) {
       } else if (S.phase === 'landing') {
         if (!S.ony.goal) {
           if (!S.next.landed) { S.next.landed = t + 2; onyxia.setMode('stand'); }
-          else if (t >= S.next.landed) { S.phase = 'p3'; groundTimers(t, true); S.next.roar = t; }
+          else if (t >= S.next.landed) { S.phase = 'p3'; groundTimers(t, true); S.next.roar = t; S.next.smallWhelps = t + rand(20, 30); }
         }
       } else if (S.phase === 'p3') {
+        // Now and then a few whelps crawl out (about five): held by the off-tanks like the others.
+        if (t >= S.next.smallWhelps) {
+          S.next.smallWhelps = t + rand(35, 50);
+          let out = 0;
+          ['east', 'west'].forEach(function (side) {
+            const n = Math.random() < 0.5 ? 2 : 3, deep = LAIR.caveDeep[side][0];
+            for (let k = 0; k < n; k++) { const w = freeWhelp(FIRST_WHELP); if (w && launchWhelp(w, side, deep.x + rand(-2, 2), deep.z + rand(-3, 3), false)) out++; }
+          });
+          if (out) h.log('More whelps crawl out of the egg caves.', 'proc');
+        }
         roarStep(t, player);
         if (!S.roar) groundAbilities(t, player);
       }
@@ -579,6 +619,7 @@ export function createBossFight(scene, h) {
       eggs(t, player);
     }
     if (S.started) {
+      heatStep(dt, t, player);
       fireballs(t, player);
       warderStep(dt, t, player);
       moveWhelps(dt, t, player);
@@ -607,8 +648,65 @@ export function createBossFight(scene, h) {
     return { banner: banner, shake: S.shake, feared: !!S.fear };
   }
 
+  // What the replay keeps ten times a second: where everything is and how it looks.
+  function r2(v) { return Math.round(v * 100) / 100; }
+  function snapshot() {
+    const banner = S.banner && S.lastT < S.banner.until ? S.banner.text : '';
+    return {
+      o: [r2(S.ony.x), r2(S.ony.z), r2(S.ony.y), r2(S.ony.yaw)], om: onyxia.mode(), od: onyxia.dead ? 1 : 0, os: S.phase === 'toLiftoff' && S.ony.goal ? 1 : 0,
+      w: [r2(S.warder.x), r2(S.warder.z), r2(warder.yaw), warder.root.visible ? 1 : 0, warder.dead ? 1 : 0, S.warder.state === 'walk' ? 1 : 0],
+      wh: S.whelps.map(function (w) { const b = bodies[w.slot]; return [r2(w.x), r2(w.z), r2(b.yaw), b.root.visible ? 1 : 0, b.dead ? 1 : 0, w.state === 'run' || w.state === 'chase' ? 1 : 0]; }),
+      tk: TANKS.map(function (k) { return [r2(tanks[k].x), r2(tanks[k].z), r2(tanks[k].yaw)]; }),
+      fl: lair.fissureLevel(), ht: r2(S.heat),
+      fb: S.fireballs.map(function (f) { return [r2(f.x), r2(f.z), r2(f.marker.fill.material.opacity)]; }),
+      bn: banner
+    };
+  }
+  // Between two snapshots: positions blended, the rest from the first.
+  function mixSnap(a, b, f) {
+    const m = function (p, q) { return p + (q - p) * f; };
+    const turnTo = function (p, q) { let d = q - p; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return p + d * f; };
+    const out = Object.assign({}, a);
+    out.o = [m(a.o[0], b.o[0]), m(a.o[1], b.o[1]), m(a.o[2], b.o[2]), turnTo(a.o[3], b.o[3])];
+    out.w = a.w.slice(); out.w[0] = m(a.w[0], b.w[0]); out.w[1] = m(a.w[1], b.w[1]);
+    out.wh = a.wh.map(function (p, i) { const q = b.wh[i]; if (!q || !p[3] || !q[3]) return p; const r = p.slice(); r[0] = m(p[0], q[0]); r[1] = m(p[1], q[1]); r[2] = turnTo(p[2], q[2]); return r; });
+    out.tk = a.tk.map(function (p, i) { const q = b.tk[i]; return [m(p[0], q[0]), m(p[1], q[1]), turnTo(p[2], q[2])]; });
+    return out;
+  }
+  // Puts every creature where a snapshot says, and moves their animations on.
+  function applySnap(n, dt, time) {
+    if (!n) return;
+    if (onyxia.dead !== !!n.od) onyxia.setDead(!!n.od);
+    if (!n.od) onyxia.setMode(n.om);
+    onyxia.setSpeed(n.os ? RUN : 0);
+    onyxia.place(n.o[0], n.o[1], n.o[3], n.o[2]);
+    warder.root.visible = !!n.w[3];
+    if (warder.dead !== !!n.w[4]) warder.setDead(!!n.w[4]);
+    warder.setMoving(!!n.w[5]);
+    warder.place(n.w[0], n.w[1], n.w[2]);
+    n.wh.forEach(function (p, i) {
+      const b = bodies[FIRST_WHELP + i];
+      if (b.dead !== !!p[4]) b.setDead(!!p[4]);
+      b.root.visible = !!p[3];
+      b.setMoving(!!p[5]);
+      b.place(p[0], p[1], p[2]);
+    });
+    TANKS.forEach(function (k, i) { tanks[k].place(n.tk[i][0], n.tk[i][1], n.tk[i][2]); });
+    lair.setFissures(n.fl);
+    lair.setHeat(n.ht);
+    markers.forEach(function (mk) { mk.live = false; mk.group.visible = false; });
+    n.fb.forEach(function (p) { const mk = marker(); mk.live = true; mk.group.visible = true; mk.group.position.set(p[0], 0, p[1]); mk.fill.material.opacity = p[2]; });
+    onyxia.update(dt, time);
+    warder.update(dt, time);
+    whelps.forEach(function (w) { if (w.root.visible) w.update(dt, time); });
+    TANKS.forEach(function (k) { tanks[k].update(dt, time); });
+  }
+
   fresh();
   return {
+    snapshot: snapshot, mixSnap: mixSnap, applySnap: applySnap, playFx: playFx,
+    // After watching again: everything back as the fight left it.
+    restore: function () { applySnap(snapshot(), 0, 0); },
     group: group, bodies: bodies, spots: spots, count: COUNT,
     show: function (on) { group.visible = on; },
     reset: function () { if (S && S.fear) h.controls.steer(null); fresh(); },
