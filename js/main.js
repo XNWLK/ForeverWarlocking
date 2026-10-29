@@ -1146,6 +1146,14 @@ function fillBosses() {
     card.append(title, text, button);
     list.appendChild(card);
   });
+  // The next raids (Xn, 2026-10-29): only named for now, nothing to start.
+  ['Hyjal bosses coming soon', 'Barrow Deeps bosses coming soon'].forEach(function (name) {
+    const card = document.createElement('div'), title = document.createElement('h4');
+    card.className = 'card locked';
+    title.textContent = name;
+    card.appendChild(title);
+    list.appendChild(card);
+  });
 }
 document.getElementById('btnBosses').addEventListener('click', function (e) {
   e.currentTarget.blur();

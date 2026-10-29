@@ -81,7 +81,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #challengeBar { position: absolute; left: 14px; top: 54px; z-index: 2; }
 #bossBar { position: absolute; left: 14px; top: 98px; z-index: 2; }
 #bossBar button.on { color: var(--gold); border-color: rgba(240, 207, 122, 0.6); }
-.boss-cards { grid-template-columns: 1fr; }
+.cards.boss-cards { grid-template-columns: 1fr; }   /* (two classes: .cards later in this file would win) */
+.boss-cards .card.locked h4 { color: var(--ink-dim); font-weight: 500; font-style: italic; }
 .boss-cards .card p { font-size: 13px; line-height: 1.45; }
 .boss-cards .card .where { color: var(--ink-dim); font-size: 12px; font-weight: 400; }
 #moveBanner.emote { background: rgba(90, 20, 10, 0.78); border-color: rgba(255, 120, 60, 0.7); color: #ffd2a8; font-size: 18px; }
