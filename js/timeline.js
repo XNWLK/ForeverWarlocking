@@ -62,11 +62,18 @@ export function drawTimeline(d) {
         free = c.t + Math.max(c.len, c.gcd || 0);        // busy until the cast and the global cooldown are both over
         started = true;
       }
-      const where = c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
+      const around = d.spells[c.key] && d.spells[c.key].aoe && !d.spells[c.key].range;   // Hellfire burns around you: no target
+      const where = around ? ' around you' : c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
       const what = c.kind === 'channel' ? ', channelled ' + secs(c.len) : c.len > 0.005 ? ', ' + secs(c.len) + ' cast' : '';
       const title = spellName(c.key) + (c.t < -0.005 ? ' started ' + secs(-c.t) + ' before the fight (precast)' : ' at ' + secs(c.t)) + what + where +
         (c.stopped ? c.stopped === 'clipped' ? ' – cut short by your next cast' : ' – stopped' : '') + (c.pushed ? ' – pushed back ' + secs(c.pushed) : '');
       if (c.len > 0.005) block(line, c.t, c.t + c.len, (c.kind === 'channel' ? 'chan' : 'cast') + (c.stopped && c.stopped !== 'clipped' ? ' stopped' : ''), title);
+      // A channel's ticks: a bright mark on its bar for each one, and what it hit.
+      (c.ticks || []).forEach(function (k, n) {
+        const mark = block(line, k.t, k.t, 'tick' + (k.hits ? '' : ' empty'), spellName(c.key) + ' tick ' + (n + 1) + ' at ' + secs(k.t) + ': ' +
+          (k.hits === 0 ? 'missed' : k.hits === 1 ? 'hit 1 target' : 'hit ' + k.hits + ' targets'));
+        mark.style.width = '2px';
+      });
       const icon = d.icon(c.key), img = icon ? document.createElement('img') : el('b', spellName(c.key).charAt(0));
       if (icon) { img.src = icon; img.alt = ''; }
       img.title = title;
@@ -82,14 +89,14 @@ export function drawTimeline(d) {
   rec.moves.forEach(function (m) { block(mine, m[0], m[1], 'moved', 'Made to move for ' + secs(m[1] - m[0])); });
   if (d.simCasts && d.simCasts.length) {
     castRow('The sim', d.simCasts.filter(function (c) { return c.t <= seconds + 0.01; }).map(function (c) {
-      const m = /^x(\d):(.+)$/.exec(c.k);
+      const m = /^x(\d+):(.+)$/.exec(c.k);
       return { t: c.t, key: m ? m[2] : c.k, target: m ? Number(m[1]) : 1, len: c.d || 0, kind: c.ch ? 'channel' : c.d > 0 ? 'cast' : 'instant', off: c.k === 'baneOfHavoc' };
     }), true);
   }
 
   // When each DoT was on each dummy.
   Object.keys(rec.auras).sort().forEach(function (id) {
-    const target = Number(id.charAt(0)), key = id.slice(2), spans = rec.auras[id];
+    const cut = id.indexOf(':'), target = Number(id.slice(0, cut)), key = id.slice(cut + 1), spans = rec.auras[id];
     if (!spans.length) return;
     const name = (d.spells[key] ? d.spells[key].name : AURA_NAMES[key] || key) + (d.targets > 1 ? ' · ' + target : '');
     const line = row(name, ROW.aura, 'tl-aura' + (d.spells[key] && d.spells[key].school === 'fire' ? ' fire' : ''));

@@ -326,7 +326,7 @@ export function createPanels(handlers) {
     const mine = {}, theirs = {};
     function add(into, rows) {
       Object.keys(rows || {}).forEach(function (key) {
-        const base = key.replace(/^x\d:/, ''), r = into[base] || (into[base] = { casts: 0, dmg: 0 });
+        const base = key.replace(/^x\d+:/, ''), r = into[base] || (into[base] = { casts: 0, dmg: 0 });
         r.casts += rows[key].casts || 0; r.dmg += rows[key].dmg || 0;
       });
     }
@@ -355,7 +355,7 @@ export function createPanels(handlers) {
     const upRows = [];
     for (let i = 1; i <= d.targets; i++) {
       const names = {};
-      Object.keys(k.uptime).forEach(function (id) { if (id.indexOf(i + ':') === 0) names[id.slice(2)] = true; });
+      Object.keys(k.uptime).forEach(function (id) { if (id.indexOf(i + ':') === 0) names[id.slice(String(i).length + 1)] = true; });
       if (sim) Object.keys(sim.uptime).forEach(function (id) {
         const m = i === 1 ? /^(?:dot:(.+)|(coe|isb|brand))$/.exec(id) : new RegExp('^(?:dot' + i + ':(.+)|deb' + i + ':(.+))$').exec(id);
         if (m && sim.uptime[id] >= 0.5) names[m[1] || m[2]] = true;

@@ -46,8 +46,8 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
   let list = null, next = 0, lastT = -1, said = null, pending = [];
   const from = new THREE.Vector3(), head = new THREE.Vector3();
 
-  function spell(k) { return WL.SPELLS[k.replace(/^x\d:/, '')] || null; }
-  function targetOf(k) { const m = /^x(\d):/.exec(k); return m ? Number(m[1]) : 1; }
+  function spell(k) { return WL.SPELLS[k.replace(/^x\d+:/, '')] || null; }
+  function targetOf(k) { const m = /^x(\d+):/.exec(k); return m ? Number(m[1]) : 1; }
 
   // o: { show, race, player: { x, z, yaw, moving }, t: seconds into the fight (null before it begins), casts (the
   //      sim's, or null), spot(i) -> { x, z } of dummy i, chest(i) -> where a spell lands on it, targets, camera }
@@ -113,7 +113,7 @@ export function createGhost(scene, makeWarlock, effects, WL, icon) {
     tag.style.left = ((head.x * 0.5 + 0.5) * window.innerWidth).toFixed(1) + 'px';
     tag.style.top = ((-head.y * 0.5 + 0.5) * window.innerHeight).toFixed(1) + 'px';
     const show = current || (said && t < said.until ? said.c : null), shown = show ? spell(show.k) : null;
-    const key = show ? show.k.replace(/^x\d:/, '') : '';
+    const key = show ? show.k.replace(/^x\d+:/, '') : '';
     word.textContent = show ? (shown ? shown.name : key) : o.t == null ? 'waits for you' : list ? '' : 'thinking';
     pic.hidden = !show || !icon(key);
     if (show && icon(key) && pic.getAttribute('src') !== icon(key)) pic.src = icon(key);

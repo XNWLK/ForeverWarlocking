@@ -6,7 +6,7 @@
 
 // What a check gets: { res: the fight's result (js/combat.js), seconds, sim: the worker's numbers for the same fight,
 // procs: { all, used, mean, lost } (Shadow Trance and Decimation), targets }.
-function base(key) { return String(key).replace(/^x\d:/, ''); }
+function base(key) { return String(key).replace(/^x\d+:/, ''); }
 function pct(n) { return Math.round(n) + '%'; }
 function upPct(r, key) {                                   // how long it was on the first dummy, as a share of the fight
   return r.seconds > 0 ? 100 * (r.res.track.uptime['1:' + key] || 0) / r.seconds : 0;

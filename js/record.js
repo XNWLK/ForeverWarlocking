@@ -19,6 +19,11 @@ export function createRecorder() {
     } else if (e.type === 'interrupt' && latest && latest.key === e.key && latest.kind !== 'instant' && !latest.stopped && at < latest.at + latest.len - 0.02) {
       latest.stopped = e.reason || 'stopped';
       latest.len = Math.max(0, at - latest.at);
+    } else if ((e.type === 'tick' || e.type === 'miss') && e.tick !== false && latest && latest.kind === 'channel' && latest.key === e.key && !e.pet) {
+      // A tick of the channel you are in (Hellfire, Rain of Fire, Drain Life, Wrack): one mark however many targets it hit.
+      const ticks = latest.ticks || (latest.ticks = []), lastTick = ticks[ticks.length - 1];
+      if (lastTick && at - lastTick.at < 0.05) { if (e.type === 'tick') lastTick.hits++; }
+      else ticks.push({ at: at, hits: e.type === 'tick' ? 1 : 0 });
     } else if (e.type === 'pushback' && latest && latest.key === e.key) {
       latest.len = Math.max(0, latest.len + (e.channel ? -e.lost : e.lost));
       latest.pushed = (latest.pushed || 0) + e.lost;
@@ -44,7 +49,10 @@ export function createRecorder() {
     for (let i = 1; i <= targets; i++) {
       const T = S.targets[i], alive = !T.dead && !S.over;
       for (const key in T.dots) mark(i + ':' + key, alive && combat.dotLeft(key, i) > 0, t);
-      for (const id in open) if (id.charAt(0) === String(i) && !WATCH_DEBUFFS.includes(id.slice(2)) && id.slice(2) !== 'baneOfHavoc' && !T.dots[id.slice(2)]) mark(id, false, t);
+      for (const id in open) {                          // ("12:corruption": the target's number runs up to the colon)
+        const cut = id.indexOf(':'), key = id.slice(cut + 1);
+        if (id.slice(0, cut) === String(i) && !WATCH_DEBUFFS.includes(key) && key !== 'baneOfHavoc' && !T.dots[key]) mark(id, false, t);
+      }
       WATCH_DEBUFFS.forEach(function (name) { if (T.deb[name] !== Infinity) mark(i + ':' + name, alive && combat.debuff(i, name), t); });
       mark(i + ':baneOfHavoc', alive && combat.havocOn() === i, t);
     }
@@ -60,7 +68,7 @@ export function createRecorder() {
     Object.keys(auras).forEach(function (id) { out[id] = auras[id].slice(); });
     Object.keys(open).forEach(function (id) { (out[id] || (out[id] = [])).push([open[id], last]); });
     const shown = start === null ? [] : casts.filter(function (c) { return c.at >= start - 1e-6 || (!c.stopped && c.kind === 'cast' && c.at + c.len >= start - 0.05); })
-      .map(function (c) { return Object.assign({}, c, { t: c.at - start }); });
+      .map(function (c) { return Object.assign({}, c, { t: c.at - start, ticks: (c.ticks || []).map(function (k) { return { t: k.at - start, hits: k.hits }; }) }); });
     return { casts: shown, auras: out, moves: moveOpen != null ? moves.concat([[moveOpen, last]]) : moves.slice(), seconds: last };
   }
 

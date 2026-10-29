@@ -638,7 +638,7 @@ const CARD_ICONS = { 'pet:firebolt': 'firebolt', 'pet:lashOfPain': 'lashOfPain',
 // The result of the fight as a picture: how = 'copy' (onto the clipboard) or 'save' (as a file). The button says how it went.
 function resultPicture(how, button) {
   const seconds = combat.fightSeconds(), res = combat.result, sums = {}, drill = challengeOut;
-  Object.keys(res.bySpell).forEach(function (k) { const base = k.replace(/^x\d:/, ''); if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg; });
+  Object.keys(res.bySpell).forEach(function (k) { const base = k.replace(/^x\d+:/, ''); if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg; });
   const spells = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; }).slice(0, 3).map(function (k) {
     const pet = k.indexOf('pet:') === 0;
     return { name: combat.spells[k] ? combat.spells[k].name : CARD_NAMES[k] || k, pct: 100 * sums[k] / res.total,

@@ -19,7 +19,7 @@ export function costs(d) {
   if (!(T > 1) || !(res.total > 0)) return null;
   const dps = res.total / T, rows = [];
   let petDmg = 0;
-  Object.keys(res.bySpell).forEach(function (key) { if (key.replace(/^x\d:/, '').indexOf('pet:') === 0) petDmg += res.bySpell[key].dmg || 0; });
+  Object.keys(res.bySpell).forEach(function (key) { if (key.replace(/^x\d+:/, '').indexOf('pet:') === 0) petDmg += res.bySpell[key].dmg || 0; });
   const rate = k.busy > 1 ? (res.total - petDmg) / k.busy : 0;          // your own damage per second of casting
   // kind: which sort of mistake it is (the Progress window adds them up by it, js/progress.js).
   function add(kind, what, detail, lost) { if (lost > 0) rows.push({ kind: kind, what: what, detail: detail, dps: lost / T }); }
@@ -41,7 +41,7 @@ export function costs(d) {
   // DoTs and Curse of the Elements that were on a dummy for less time than the sim keeps them there.
   for (let i = 1; i <= d.targets; i++) {
     const seen = {};
-    Object.keys(k.uptime).forEach(function (id) { if (id.indexOf(i + ':') === 0) seen[id.slice(2)] = true; });
+    Object.keys(k.uptime).forEach(function (id) { if (id.indexOf(i + ':') === 0) seen[id.slice(String(i).length + 1)] = true; });
     if (sim) Object.keys(sim.uptime || {}).forEach(function (id) {
       const m = i === 1 ? /^(?:dot:(.+)|(coe))$/.exec(id) : new RegExp('^(?:dot' + i + ':(.+)|deb' + i + ':(coe))$').exec(id);
       if (m) seen[m[1] || m[2]] = true;

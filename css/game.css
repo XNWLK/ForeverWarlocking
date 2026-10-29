@@ -444,6 +444,8 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .tl-casts i { top: 24px; height: 5px; border-radius: 2px; background: #e2ae36; }
 .tl-casts i.chan { background: #43b96c; }
 .tl-casts i.stopped { background: #7a4a44; }
+.tl-casts i.tick { top: 21px; height: 11px; border-radius: 1px; background: #f4fff6; box-shadow: 0 0 3px rgba(120, 255, 160, 0.8); z-index: 1; }
+.tl-casts i.tick.empty { background: #8a8a8a; box-shadow: none; }
 .tl-casts i.idle { top: 2px; height: 28px; border-radius: 3px; background: rgba(255, 70, 60, 0.28); box-shadow: 0 0 0 1px rgba(255, 110, 100, 0.5) inset; }
 .tl-casts i.moved { top: 2px; height: 28px; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(200, 200, 215, 0.22) 0 4px, transparent 4px 8px); }
 .tl-casts.sim img { opacity: 0.8; }

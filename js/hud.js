@@ -667,7 +667,7 @@ export function createHud(WL, handlers) {
       setText(el.threat, whole(time > 0.5 ? res.threat / time : 0) + ' a second');
       const sums = {};
       Object.keys(res.bySpell).forEach(function (k) {
-        const base = k.replace(/^x\d:/, '');
+        const base = k.replace(/^x\d+:/, '');
         if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg;
       });
       const rows = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; }).slice(0, 7);

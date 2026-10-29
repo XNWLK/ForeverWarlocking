@@ -57,7 +57,7 @@ self.onmessage = function (e) {
       (one.log || []).forEach(function (line) { if (line.dmg > 0) sums[Math.min(count, Math.floor(line.t) + 1)] += line.dmg; });
       taps += one.lifeTaps || 0; tapMana += one.manaFromTaps || 0; endMana += one.endMana || 0; lowMana += isFinite(one.minMana) ? one.minMana : 0; movingTaps += one.movingTaps || 0;
       var cast = (one.log || []).filter(function (line) { return line.type === 'cast' && !/^(summon:|demonicSacrifice|felDomination)/.test(line.spell); });
-      var first = cast.slice(0, 8).map(function (line) { return line.spell.replace(/^x\d:/, ''); }).join(' ');   // the spell, whichever dummy it went to
+      var first = cast.slice(0, 8).map(function (line) { return line.spell.replace(/^x\d+:/, ''); }).join(' ');   // the spell, whichever dummy it went to
       starts[first] = (starts[first] || 0) + 1;
       if (n === 0) casts = cast.map(function (line) { return { t: line.t, k: line.spell, d: line.channel || line.castTime || 0, ch: line.channel ? 1 : 0 }; });
       // The pet's spells in that same fight (Firebolt, Lash of Pain; landed or missed), for the ghost's demon. Plain melee
