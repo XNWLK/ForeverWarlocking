@@ -751,6 +751,17 @@ export function createBossFight(scene, h) {
     markScale: function (ti) { return ti === 1 ? 3.2 : ti === 2 ? 1.2 : 0.45; },
     lift: function (ti) { return ti === 1 ? S.ony.y : 0; },
     phase: function () { return S.phase; },
+    phaseName: phaseName,
+    // What she is doing right now, for her frame ('' = nothing worth a word).
+    doing: function () {
+      if (S.breath) return S.breath.step === 'inhale' ? 'Taking in a deep breath...' : 'Deep Breath';
+      if (S.roar) return 'Casting Bellowing Roar';
+      if (S.cast) return S.cast.name === 'flameBreath' ? 'Casting Flame Breath' : 'Casting Wing Buffet';
+      if (S.phase === 'toLiftoff' || S.phase === 'liftoff') return 'Taking off';
+      if (S.phase === 'landing') return 'Landing';
+      if (S.phase === 'air' || S.phase === 'toNorth') return 'In the air';
+      return '';
+    },
     state: function () { return S; }                  // for checks from the console
   };
   function phaseName() { return S.phase === 'p1' || S.phase === 'asleep' ? 'phase 1' : S.phase === 'p3' ? 'phase 3' : S.phase === 'landing' ? 'landing' : 'phase 2'; }

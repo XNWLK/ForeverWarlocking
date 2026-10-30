@@ -1222,6 +1222,26 @@ document.getElementById('btnBosses').addEventListener('click', function (e) {
   bossWindow.hidden = !bossWindow.hidden;
 });
 document.getElementById('bossClose').addEventListener('click', function () { bossWindow.hidden = true; });
+// The boss's frame (top centre in a boss fight): a click targets her, wherever she is.
+const bossFrame = { box: document.getElementById('bossFrame'), name: document.getElementById('bossFrameName'), phase: document.getElementById('bossFramePhase'),
+                    fill: document.getElementById('bossFrameFill'), health: document.getElementById('bossFrameHealth'), cast: document.getElementById('bossFrameCast'), shown: {} };
+bossFrame.box.addEventListener('click', function () { bossFrame.box.blur(); setTarget(1); });
+function showBossFrame() {
+  const on = bossOn && !!combat;
+  if (bossFrame.box.hidden !== !on) bossFrame.box.hidden = !on;
+  if (!on) return;
+  const t = combat.state.targets[1], pct = Math.max(0, t.hpPct), was = bossFrame.shown;
+  const name = bossFight.targetName(1), phase = bossFight.phaseName(), doing = t.dead || pct <= 0 ? 'Dead' : bossFight.doing();
+  const health = Math.ceil(pct) + '%  ·  ' + Math.round(t.health).toLocaleString('en-US');
+  if (was.name !== name) bossFrame.name.textContent = was.name = name;
+  if (was.phase !== phase) bossFrame.phase.textContent = was.phase = phase;
+  if (was.health !== health) bossFrame.health.textContent = was.health = health;
+  if (was.doing !== doing) bossFrame.cast.textContent = was.doing = doing;
+  const width = pct.toFixed(1) + '%';
+  if (was.width !== width) bossFrame.fill.style.width = was.width = width;
+  bossFrame.box.classList.toggle('current', combat.state.target === 1);
+  bossFrame.box.classList.toggle('dead', pct <= 0);
+}
 
 // ---------- keys and mouse buttons ----------
 // Is this key, button or wheel turn (with its modifiers) bound to an action?
@@ -1520,6 +1540,7 @@ function frame() {
   const ends = combat.endless && !combat.state.over && combat.state.fightStart !== null;   // "Review the fight" is what ends a fight with infinite health
   if (ends !== reviewEnds) { reviewEnds = ends; panels.setReviewButton(ends); }
   hud.render(combat, ctx, time, anchors);
+  showBossFrame();
   extras.render(combat, time, simResult, raceBest);
   aids.render(combat, time, extras.show(), simResult, recorder);
 }

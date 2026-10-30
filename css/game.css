@@ -145,6 +145,16 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .rotation li img, .rotation li .no-icon { flex: none; width: 18px; height: 18px; border-radius: 4px; }
 
 #topCentre { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; }
+.boss-frame { display: grid; gap: 3px; width: 280px; padding: 6px 10px 7px; text-align: left; background: var(--glass); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.boss-frame:hover { border-color: var(--line-bright); }
+.boss-frame.current { border-color: rgba(240, 207, 122, 0.75); box-shadow: 0 0 0 1px rgba(240, 207, 122, 0.35); }
+.boss-frame .bf-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+.boss-frame .bf-top span { font-size: 11px; color: var(--ink-dim); }
+.boss-frame .bf-bar { position: relative; display: block; height: 14px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); overflow: hidden; }
+.boss-frame .bf-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#d9473c, #9c2a22); }
+.boss-frame .bf-bar span { position: relative; display: block; text-align: center; font-size: 11px; line-height: 14px; font-weight: 600; text-shadow: 0 1px 2px #000; }
+.boss-frame .bf-cast { min-height: 14px; font-size: 11px; color: #ffcf9a; }
+.boss-frame.dead { opacity: 0.6; }
 .chip { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 12px; max-width: 520px; background: var(--glass); border-color: rgba(240, 207, 122, 0.45); font-size: 12px; }
 .callout { min-height: 18px; font-size: 14px; font-weight: 600; color: var(--gold); text-shadow: 0 1px 2px #000, 0 0 3px #000; opacity: 0; transition: opacity 0.5s; }
 .callout.show { opacity: 1; transition: none; }

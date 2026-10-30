@@ -12,6 +12,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   point at one to see what it hit. Hellfire is shown as burning around you, not on your target.
 - **Fix:** in the boss fight the damage meter's per-target line pushed its numbers out of the box. It is now "Per
   target" with Onyxia, the Warder and the whelps on a line each.
+- **Boss frame:** in the boss fight Onyxia's frame stays at the top of the screen all the time: her health, the phase
+  and what she is doing (casting Flame Breath, taking in a deep breath, in the air ...). Click it to target her, even
+  while she flies out of view.
 
 ### 2026-10-29
 - **The first boss: Onyxia.** The Bosses button now opens a list of bosses. Onyxia is fought in her own lair, built in
