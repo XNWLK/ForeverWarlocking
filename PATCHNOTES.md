@@ -15,6 +15,12 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **Boss frame:** in the boss fight Onyxia's frame stays at the top of the screen all the time: her health, the phase
   and what she is doing (casting Flame Breath, taking in a deep breath, in the air ...). Click it to target her, even
   while she flies out of view.
+- **Spellbook:** the "Edit bar" button is now "Spellbook". It opens a board with every spell you can cast: drag one
+  onto any slot of your action bar (or click it, then a slot), drag slots to swap them, or drag a slot off the bar to
+  take it away. Each build keeps its own bar. It works on phones too.
+- **Amplify Curse as a button:** builds with the talent find it in the spellbook. Put it on your bar and you press it
+  yourself (instant, off the global cooldown, 3 minute cooldown); your next Bane of Agony within 30 seconds is 50%
+  stronger. Left off the bar, it still goes off by itself with Bane of Agony, as the sim does it.
 
 ### 2026-10-29
 - **The first boss: Onyxia.** The Bosses button now opens a list of bosses. Onyxia is fought in her own lair, built in

@@ -5,7 +5,8 @@ import { makeDummy, makeBeam } from './models.js';
 import { makeWarlock } from './warlock.js';
 import { createControls } from './controls.js';
 import { createHud, ACTION_CODES, RACIAL_ICON } from './hud.js';
-import { createCombat, actionBarFor } from './combat.js';
+import { createCombat, actionBarFor, bookSpells } from './combat.js';
+import { createSpellbook } from './spellbook.js';
 import { getSetting, setSetting, getStore, saveStore } from './settings.js';
 import { saveFight, listFights, deleteFight, clearFights, KEEP as FIGHTS_KEPT } from './fights.js';
 import { createPet } from './pets.js';
@@ -312,14 +313,9 @@ const hud = createHud(WL, {
   onPet: function (mode) { combat.update(fightClock, ctx); combat.petCommand(mode); },
   onSound: function (on) { setSetting('sound', on); sound.setOn(on); },
   // Edit bar: swap what is in two slots, give a slot another key, or go back to the default.
-  onSwap: function (a, b) {
-    const homes = Object.assign({}, getSetting('homes')), A = character.bar[a], B = character.bar[b];
-    if (!A && !B) return;
-    if (A) homes[A] = b;
-    if (B) homes[B] = a;
-    setSetting('homes', homes);
-    newCharacter();
-  },
+  onSwap: function (a, b) { swapSlots(a, b); },
+  // The Spellbook button / Done / Escape: the bar's edit mode and the spellbook open and close together.
+  onEditing: function (on) { if (on) { touch.closeMenu(); spellbook.open(); } else spellbook.close(); },
   // A new key for a slot (id = its number) or for another action (id = its name). A key that is in use trades places.
   onRebind: function (id, code) {
     if (MOVE_BINDS.indexOf(id) >= 0) {
@@ -346,6 +342,7 @@ const hud = createHud(WL, {
   },
   onBarReset: function () {
     setSetting('homes', {}); setSetting('keys', null);
+    const bars = Object.assign({}, getSetting('bars')); delete bars[barKey(character.build)]; setSetting('bars', bars);
     keyCodes = ACTION_CODES.slice();
     hud.setKeys(keyCodes);
     newCharacter();
@@ -379,12 +376,77 @@ const extras = createExtras(WL, {
   log: function (text, kind) { hud.log(text, kind); }
 });
 
-// What a spell's picture is (the race's cooldown has its own).
+// What a spell's picture is (the race's cooldown and Amplify Curse have their own).
 function iconFor(key) {
   if (key === 'racial') return character && character.racial ? WL.ICONS[RACIAL_ICON[character.racial.name]] || '' : '';
+  if (key === 'amplifyCurse') return WL.ICONS.talent_amplifyCurse || '';
   return WL.ICONS[key] || '';
 }
-const aids = createAids(WL, { icon: iconFor, hint: function (key, racial) { hud.setHint(key, racial); } });
+const aids = createAids(WL, { icon: iconFor, hint: function (key, racial, amplify) { hud.setHint(key, racial, amplify); } });
+
+// ---------- your own action bar (the spellbook and Edit bar) ----------
+// Each build keeps its own bar once you change it (setting 'bars': { build: { slots: [a key or null per slot], off:
+// [keys you took off] } }). A spell the build gains later that is in neither list (the race's cooldown after a race
+// change, a new spell after a sync) goes to its usual slot when that is free, else to the first free one.
+function barKey(build) { return build.custom ? 'c' + hash(getSetting('buildCode')) : build.key; }
+function layoutBar(build, table, race) {
+  const auto = actionBarFor(build, table, race, ACTION_CODES.length, getSetting('homes'));
+  const saved = (getSetting('bars') || {})[barKey(build)];
+  if (!saved || !Array.isArray(saved.slots)) return auto;
+  const off = saved.off || [];
+  function usable(k) {
+    if (k === 'racial') return race.racials.some(function (r) { return r.effect === 'cooldown'; });
+    if (k === 'amplifyCurse') return !!(build.talents && build.talents.amplifyCurse);
+    return !!table[k] && k !== 'drainSoul';
+  }
+  const bar = auto.map(function (x, i) { const k = saved.slots[i]; return k && usable(k) ? k : null; });
+  auto.forEach(function (k, i) {
+    if (!k || bar.indexOf(k) >= 0 || off.indexOf(k) >= 0 || saved.slots.indexOf(k) >= 0) return;
+    const at = bar[i] === null ? i : bar.indexOf(null);
+    if (at >= 0) bar[at] = k;
+  });
+  return bar;
+}
+function barOff() { const s = (getSetting('bars') || {})[barKey(character.build)]; return s && s.off ? s.off.slice() : []; }
+function saveBar(bar, off) {
+  const bars = Object.assign({}, getSetting('bars'));
+  bars[barKey(character.build)] = { slots: bar.slice(), off: off.filter(function (k, i) { return off.indexOf(k) === i && bar.indexOf(k) < 0; }) };
+  setSetting('bars', bars);
+  newCharacter();
+}
+function swapSlots(a, b) {
+  const bar = character.bar.slice();
+  if (a === b || (!bar[a] && !bar[b])) return;
+  const A = bar[a]; bar[a] = bar[b]; bar[b] = A;
+  saveBar(bar, barOff());
+}
+function bookName(key) {
+  if (key === 'racial') return combat.racial() ? combat.racial().name : 'Racial';
+  if (key === 'amplifyCurse') return 'Amplify Curse';
+  return combat.spells[key] ? combat.spells[key].name : key;
+}
+const spellbook = createSpellbook(WL, {
+  icon: iconFor, name: bookName, tip: function (key) { return hud.tipFor(key); }, bar: function () { return character.bar; },
+  // A spell from the book onto a slot: what was there leaves the bar; one already on the bar trades places.
+  onPlace: function (key, slot) {
+    const bar = character.bar.slice(), from = bar.indexOf(key), before = bar[slot];
+    if (from === slot) return;
+    const off = barOff().filter(function (k) { return k !== key; });
+    bar[slot] = key;
+    if (from >= 0) bar[from] = before; else if (before) off.push(before);
+    saveBar(bar, off);
+    hud.log(bookName(key) + ' is now on ' + hud.labelFor(keyCodes[slot]) + '.', 'proc');
+  },
+  onMove: function (a, b) { swapSlots(a, b); },
+  onRemove: function (slot) {
+    const bar = character.bar.slice(), key = bar[slot];
+    if (!key) return;
+    bar[slot] = null;
+    saveBar(bar, barOff().concat([key]));
+    hud.log(bookName(key) + ' is off the bar (it is still in the spellbook).');
+  },
+  onClose: function () { hud.setEditing(false); }
+});
 const burnAt = new THREE.Vector3();
 const encounter = createEncounter(scene, { burn: function (x, z) { effects.play('burn', { at: burnAt.set(x, 0.9, z) }); } });
 
@@ -719,7 +781,7 @@ function saveHistory(force) {
 function openStoredFight(f) {
   const r = f.review;
   panels.showReview(Object.assign({}, r, {
-    icon: function (key) { return key === 'racial' ? WL.ICONS[RACIAL_ICON[f.racial]] || '' : WL.ICONS[key] || ''; },
+    icon: function (key) { return key === 'racial' ? WL.ICONS[RACIAL_ICON[f.racial]] || '' : key === 'amplifyCurse' ? WL.ICONS.talent_amplifyCurse || '' : WL.ICONS[key] || ''; },
     dummyName: function (i) { return f.names[i - 1] || 'Dummy ' + i; }, copy: extras.copy, picture: null, replay: null, best: null, history: null,
     log: f.log, stored: { at: f.at, title: f.title, build: f.build, race: f.race }
   }));
@@ -988,7 +1050,8 @@ function newCharacter() {
                           seed: challenge && challenge.seeded ? challenge.seed : undefined,   // a seeded fight rolls the same dice every time
                           boss: !!bossId, healthCurve: bossId ? challenge.curve : null, immune: bossId ? challenge.immune : null });
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
-  const bar = actionBarFor(build, combat.table, WL.RACES[raceKey], ACTION_CODES.length, getSetting('homes'));
+  const bar = layoutBar(build, combat.table, WL.RACES[raceKey]);
+  combat.setAmplifyButton(bar.indexOf('amplifyCurse') >= 0);   // on the bar: you press it; off: it goes by itself
   panels.setFight(fight);
   panels.hideReview();
   const ranges = bar.filter(function (k) { return combat.table[k]; }).map(function (k) { return combat.table[k].range; });
@@ -1005,6 +1068,7 @@ function newCharacter() {
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
   hud.setCharacter(character);
+  spellbook.setSpells(bookSpells(build, combat.table, WL.RACES[raceKey], bookName));
   aids.setCharacter(character);
   touch.setTargets(Math.min(3, targets));
   encounter.start(challenge && challenge.encounter ? challenge : null);

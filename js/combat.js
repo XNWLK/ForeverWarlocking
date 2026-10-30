@@ -148,6 +148,10 @@ export function createCombat(opts) {
   }
 
   let S, T, R, P, res, events, order, inst, queued, lastCtx = null, maxHealth = opts.dummyHealth || 50000;
+  // Amplify Curse on your action bar (put there from the spellbook): you press it and it waits for your next Bane of
+  // Agony. Off the bar it goes by itself with Bane of Agony, as in the sim. setAmplifyButton(on) sets it.
+  let AMP_BTN = false;
+  const AMP_CD = 180, AMP_LASTS = 30;                     // the sim's cooldown; "Lasts 30 sec." (the talent's text)
 
   function reset(seed) {
     const seed0 = seed != null ? seed : (opts.seed != null ? opts.seed : Math.floor(Math.random() * 4294967296));
@@ -634,10 +638,11 @@ export function createCombat(opts) {
     let castMult = 1;
     // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): that Bane's whole tick
     // value, after everything else, times 1.5 (sim 2a33649; it was the base value only).
-    if (key === 'baneOfAgony' && tv('amplifyCurse') && ready('amplifyCurse')) {
+    // As a button (AMP_BTN) it is used up by the Bane of Agony cast while it is up.
+    if (key === 'baneOfAgony' && tv('amplifyCurse') && (AMP_BTN ? buff('amplifyCurse') : ready('amplifyCurse'))) {
       castMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
-      S.cds.amplifyCurse = S.t + 180;
-      emit({ type: 'used', name: 'Amplify Curse' });
+      if (AMP_BTN) delete S.buffs.amplifyCurse;
+      else { S.cds.amplifyCurse = S.t + AMP_CD; emit({ type: 'used', name: 'Amplify Curse' }); }
     }
     const free = key === 'soulFire' && (startedWithDecimation || buff('decimation'));
     if (s.shards && !free) S.shards -= s.shards;
@@ -773,6 +778,21 @@ export function createCombat(opts) {
     return { ok: true };
   }
 
+  // Amplify Curse as a button: instant and not on the global cooldown (the sim uses it for free, with no time of its
+  // own); like the race's cooldown it is refused while a cast bar runs and cuts a channel short. The cooldown starts
+  // when you press it; the next Bane of Agony within 30 s takes it.
+  function useAmplify() {
+    if (!tv('amplifyCurse')) return fail('amplifyCurse', 'unknown');
+    if (!ready('amplifyCurse')) return fail('amplifyCurse', 'cooldown');
+    if (S.cast && S.cast.end > S.t + EPS) return fail('amplifyCurse', 'casting');
+    if (S.channel) interrupt('clipped');
+    S.cds.amplifyCurse = S.t + AMP_CD;
+    S.buffs.amplifyCurse = S.t + AMP_LASTS;
+    S.presses.push({ t: S.t, k: 'amplifyCurse' });
+    emit({ type: 'used', name: 'Amplify Curse', key: 'amplifyCurse' });
+    return { ok: true };
+  }
+
   // Bane of Havoc: instant, not on the global cooldown, cannot miss (as the engine casts it). It sits on one target at
   // a time and takes the place of any other Bane there.
   function castHavoc(ctx) {
@@ -803,6 +823,7 @@ export function createCombat(opts) {
 
   // Why this spell cannot be cast right now (null = it can), at your current target.
   function blocked(key, ctx) {
+    if (key === 'amplifyCurse') return !tv('amplifyCurse') ? 'unknown' : !ready(key) ? 'cooldown' : null;
     const s = SPELLS[key], e = table[key], ti = S.target;
     if (!e) return 'unknown';
     if (key === 'baneOfHavoc') return !alive(ti) ? 'dead' : S.mana < e.cost - 1e-6 ? 'mana' : distanceTo(ti, ctx) > e.range + EPS ? 'range' : null;
@@ -833,6 +854,7 @@ export function createCombat(opts) {
     if (ctx) lastCtx = ctx;
     if (S.over) return fail(key, 'dead');
     if (key === 'racial') return useRacial();
+    if (key === 'amplifyCurse') return useAmplify();
     if (key === 'baneOfHavoc') return castHavoc(ctx);
     if (!table[key]) return fail(key, 'unknown');
     const free = readyAt();
@@ -1125,6 +1147,8 @@ export function createCombat(opts) {
     if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) || !canTap() ? null : tap;   // no health for the tap: it waits for a heal
     const open = list.indexOf('bane') < 0 || leftOn(boss, 'baneOfDoom') > 0 || leftOn(boss, 'baneOfAgony') > 0;
     found.racial = !!racialOf('cooldown') && view.ready('racial') && SPELLS[found.key].kind !== 'utility' && open;
+    // Amplify Curse as a button: press it before the Bane of Agony (the sim uses it on every one while it is ready).
+    found.amplify = AMP_BTN && found.key === 'baneOfAgony' && !!tv('amplifyCurse') && view.ready('amplifyCurse') && !view.buff('amplifyCurse');
     return found;
   }
 
@@ -1167,6 +1191,8 @@ export function createCombat(opts) {
     threatMult: threatMult,                                // threat per damage of a spell, with everything that lowers it
     timeLeft: function () { return timed ? (S.fightStart === null ? linear : Math.max(0, endAt() - S.t)) : null; },
     racial: function () { return racialOf('cooldown'); },
+    amplify: function () { return !!tv('amplifyCurse'); },  // has the talent
+    setAmplifyButton: function (on) { AMP_BTN = !!on && !!tv('amplifyCurse'); },
     fightSeconds: function () { return S.fightStart === null ? 0 : (S.fightEnd !== null ? S.fightEnd : S.t) - S.fightStart; }
   };
 }
@@ -1187,6 +1213,17 @@ export const ACTION_SPELLS = {
   hellfire: ['hellfire'], rainOfFire: ['rainOfFire']
 };
 const NOT_ON_BAR = { drainSoul: true };    // Drain Soul is not used
+
+// What the spellbook shows: every spell this character can cast, then the race's cooldown and Amplify Curse when
+// they are there. Ordered by their usual slot, then by name.
+export function bookSpells(build, table, race, names) {
+  const keys = Object.keys(table).filter(function (k) { return !NOT_ON_BAR[k]; });
+  function place(k) { return HOME[k] ? HOME[k][0] : 99; }
+  keys.sort(function (a, b) { return place(a) - place(b) || String(names(a)).localeCompare(String(names(b))); });
+  if (race.racials.some(function (r) { return r.effect === 'cooldown'; })) keys.push('racial');
+  if (build.talents && build.talents.amplifyCurse) keys.push('amplifyCurse');
+  return keys;
+}
 
 // Every spell has its own key, the same in every build (Xn, 2026-10-05). The slots are, in order:
 // 1 2 3 4 5 6 7 8 R F T G C V B. A spell that has no place of its own in a build takes the place of the one it stands

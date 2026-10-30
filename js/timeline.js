@@ -42,7 +42,7 @@ export function drawTimeline(d) {
     line.appendChild(b);
     return b;
   }
-  function spellName(key) { return key === 'racial' ? d.racialName || 'Racial' : d.spells[key] ? d.spells[key].name : key; }
+  function spellName(key) { return key === 'racial' ? d.racialName || 'Racial' : key === 'amplifyCurse' ? 'Amplify Curse' : d.spells[key] ? d.spells[key].name : key; }
 
   // The clock along the top.
   const axis = row('', ROW.axis, 'tl-axis');
@@ -65,7 +65,7 @@ export function drawTimeline(d) {
       const around = d.spells[c.key] && d.spells[c.key].aoe && !d.spells[c.key].range;   // Hellfire burns around you: no target
       const where = around ? ' around you' : c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
       const what = c.kind === 'channel' ? ', channelled ' + secs(c.len) : c.len > 0.005 ? ', ' + secs(c.len) + ' cast' : '';
-      const title = spellName(c.key) + (c.t < -0.005 ? ' started ' + secs(-c.t) + ' before the fight (precast)' : ' at ' + secs(c.t)) + what + where +
+      const title = spellName(c.key) + (c.t < -0.005 ? (c.off ? ' used ' + secs(-c.t) + ' before the fight' : ' started ' + secs(-c.t) + ' before the fight (precast)') : ' at ' + secs(c.t)) + what + where +
         (c.stopped ? c.stopped === 'clipped' ? ' – cut short by your next cast' : ' – stopped' : '') + (c.pushed ? ' – pushed back ' + secs(c.pushed) : '');
       if (c.len > 0.005) block(line, c.t, c.t + c.len, (c.kind === 'channel' ? 'chan' : 'cast') + (c.stopped && c.stopped !== 'clipped' ? ' stopped' : ''), title);
       // A channel's ticks: a bright mark on its bar for each one, and what it hit.

@@ -131,7 +131,7 @@ export function createAids(WL, handlers) {
     }
     const w = S.over ? null : combat.simWould(remaining);
     const why = w ? reason(w, combat) : '';
-    const id = S.over ? 'over' : w ? w.key + '|' + w.target + '|' + w.action + '|' + w.racial + '|' + S.target + '|' + why : 'none';
+    const id = S.over ? 'over' : w ? w.key + '|' + w.target + '|' + w.action + '|' + w.racial + '|' + w.amplify + '|' + S.target + '|' + why : 'none';
     if (id === shownHint) return;
     shownHint = id;
     hintBox.hidden = false;
@@ -143,8 +143,9 @@ export function createAids(WL, handlers) {
     if (icon) hintIcon.src = icon;
     hintText.textContent = (spell ? spell.name : w.key) +
       (character.targets > 1 && w.key !== 'lifeTap' && w.target !== S.target ? ' on dummy ' + w.target : '') +
+      (w.amplify ? ', Amplify Curse first' : '') +
       (w.racial && character.racial ? ', ' + character.racial.name + ' first' : '');
-    handlers.hint(w.key, w.racial);
+    handlers.hint(w.key, w.racial, w.amplify);
     mark(w.action);
   }
   // ---------- the opener trainer ----------

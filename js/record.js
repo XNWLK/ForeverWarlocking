@@ -27,6 +27,8 @@ export function createRecorder() {
     } else if (e.type === 'pushback' && latest && latest.key === e.key) {
       latest.len = Math.max(0, latest.len + (e.channel ? -e.lost : e.lost));
       latest.pushed = (latest.pushed || 0) + e.lost;
+    } else if (e.type === 'used' && e.key === 'amplifyCurse') {               // pressed as a button (the spellbook)
+      casts.push({ at: at, key: 'amplifyCurse', name: e.name, target: 0, len: 0, kind: 'instant', off: true });
     } else if (e.type === 'used' && combat.racial() && e.name === combat.racial().name) {
       casts.push({ at: at, key: 'racial', name: e.name, target: 0, len: 0, kind: 'instant', off: true });
     } else if (e.type === 'apply' && e.key === 'baneOfHavoc') {
@@ -67,7 +69,8 @@ export function createRecorder() {
     const out = {};
     Object.keys(auras).forEach(function (id) { out[id] = auras[id].slice(); });
     Object.keys(open).forEach(function (id) { (out[id] || (out[id] = [])).push([open[id], last]); });
-    const shown = start === null ? [] : casts.filter(function (c) { return c.at >= start - 1e-6 || (!c.stopped && c.kind === 'cast' && c.at + c.len >= start - 0.05); })
+    const shown = start === null ? [] : casts.filter(function (c) { return c.at >= start - 1e-6 || (!c.stopped && c.kind === 'cast' && c.at + c.len >= start - 0.05) ||
+                                                       (c.off && c.at >= start - 12); })   // Amplify Curse or the race's cooldown pressed just before the pull
       .map(function (c) { return Object.assign({}, c, { t: c.at - start, ticks: (c.ticks || []).map(function (k) { return { t: k.at - start, hits: k.hits }; }) }); });
     return { casts: shown, auras: out, moves: moveOpen != null ? moves.concat([[moveOpen, last]]) : moves.slice(), seconds: last };
   }

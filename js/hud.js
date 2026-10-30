@@ -41,6 +41,7 @@ const AURA_INFO = {
   bloodFury: { icon: 'racial_bloodFury', name: 'Blood Fury' },
   berserking: { icon: 'racial_berserking', name: 'Berserking' },
   eureka: { icon: 'racial_eureka', name: 'Eureka!' },
+  amplifyCurse: { icon: 'talent_amplifyCurse', name: 'Amplify Curse' },
   snfShadow: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Shadow)' },
   snfFire: { icon: 'talent_shadowAndFlame', name: 'Shadow and Flame (Fire)' },
   brand: { icon: 'talent_demonicBrand', name: 'Demonic Brand' }
@@ -295,8 +296,7 @@ export function createHud(WL, handlers) {
     BIND_ROWS.forEach(function (r) { bindRow(left, r[0], r[1], binds[r[0]]); });
     slots.forEach(function (slot, i) {
       if (!slot.key) return;
-      const name = slot.key === 'racial' ? character.racial.name : character.spells[slot.key].name;
-      bindRow(right, i, name, codes[i]);
+      bindRow(right, i, slotName(slot.key), codes[i]);
     });
   }
   byId('bindsReset').addEventListener('click', function () { handlers.onKeysReset(); });
@@ -305,7 +305,9 @@ export function createHud(WL, handlers) {
   let editing = false, picked = -1;
   const editButton = byId('btnEdit'), editStrip = byId('editStrip');
   function setEditing(on) {
+    const changed = editing !== on;
     editing = on; picked = -1;
+    if (changed && handlers.onEditing) handlers.onEditing(on);   // the spellbook opens and closes with it
     editStrip.hidden = !on;
     el.bar.classList.toggle('editing', on);
     editButton.classList.toggle('on', on);
@@ -402,10 +404,10 @@ export function createHud(WL, handlers) {
       button.className = 'slot' + (key ? '' : ' empty');
       const slot = { key: key, button: button, cool: null, secs: null, count: null, kbd: document.createElement('kbd') };
       if (key) {
-        const racial = key === 'racial' ? c.racial : null;
-        const name = racial ? racial.name : c.spells[key].name;
+        const name = slotName(key);
         const img = document.createElement('img');
-        img.src = WL.ICONS[racial ? RACIAL_ICON[racial.name] : key] || '';
+        img.src = slotIcon(key);
+        img.draggable = false;
         img.alt = name;
         slot.cool = document.createElement('span'); slot.cool.className = 'cool';
         slot.secs = document.createElement('span'); slot.secs.className = 'secs';
@@ -425,6 +427,10 @@ export function createHud(WL, handlers) {
     el.bar.classList.toggle('editing', editing);
     showBinds();
   }
+
+  // What a slot holds: a spell, the race's cooldown or Amplify Curse (put there from the spellbook).
+  function slotName(key) { return key === 'racial' ? character.racial.name : key === 'amplifyCurse' ? 'Amplify Curse' : character.spells[key].name; }
+  function slotIcon(key) { return (key === 'racial' ? WL.ICONS[RACIAL_ICON[character.racial.name]] : key === 'amplifyCurse' ? WL.ICONS.talent_amplifyCurse : WL.ICONS[key]) || ''; }
 
   // ---------- tooltips ----------
   function spellText(id) { const t = WL.SPELL_TEXT && WL.SPELL_TEXT[id]; return typeof t === 'string' ? tidy(t) : ''; }
@@ -450,13 +456,21 @@ export function createHud(WL, handlers) {
   }
 
   // The spell in slot i: what it costs and how long it takes right now, what it does, and its key.
-  function spellTip(i) {
-    const slot = slots[i], key = slot && slot.key, c = character;
+  function spellTip(i) { return tipOf(slots[i] && slots[i].key, i); }
+  // The same for any spell (i = its slot, or nothing for the spellbook: then no key line).
+  function tipOf(key, i) {
+    const c = character;
     if (!key) return null;
-    const keyLine = 'Key: ' + labelFor(codes[i]);
+    const keyLine = i != null ? 'Key: ' + labelFor(codes[i]) : '';
     if (key === 'racial') {
       return { title: c.racial.name, right: 'Racial', rows: [['Instant', span(c.racial.cd) + ' cooldown']],
                text: spellText(c.racial.id), notes: ['Not on the global cooldown.', keyLine] };
+    }
+    if (key === 'amplifyCurse') {
+      return { title: 'Amplify Curse', right: 'Talent', rows: [['Instant', '3 min cooldown']], text: talentText('amplifyCurse'),
+               notes: ['Not on the global cooldown.',
+                       'On your action bar you press it yourself, before Bane of Agony. Not on your bar, it goes off by itself with Bane of Agony whenever it is ready, as the sim does.',
+                       keyLine] };
     }
     const e = c.table[key], s = c.spells[key];
     const cost = lastCombat ? lastCombat.cost(key) : e.cost, cast = lastCombat ? lastCombat.castTime(key) : e.cast;
@@ -494,6 +508,7 @@ export function createHud(WL, handlers) {
     if (key === 'snfShadow' || key === 'snfFire') { const v = talentValue('shadowAndFlame', 'schoolPct'); return 'All ' + (key === 'snfFire' ? 'Fire' : 'Shadow') + ' damage you deal is increased' + (v ? ' by ' + v + '%.' : '.'); }
     if (key === 'brand') return 'Your pet\'s next attacks against this target deal extra damage.';
     if (key === 'bloodFury' || key === 'berserking' || key === 'eureka') return c.racial ? spellText(c.racial.id) : '';
+    if (key === 'amplifyCurse') return talentText('amplifyCurse');
     return '';
   }
   function auraTip(a) {
@@ -603,7 +618,7 @@ export function createHud(WL, handlers) {
     const buffs = (c.standing || []).map(function (b) {
       return { key: b.key, icon: b.icon, name: b.name, text: '', desc: b.id ? spellText(b.id) : '', notes: [b.desc, b.from ? 'From: ' + b.from : ''] };
     });
-    ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'eureka', 'snfShadow', 'snfFire'].forEach(function (k) {
+    ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'eureka', 'amplifyCurse', 'snfShadow', 'snfFire'].forEach(function (k) {
       if (combat.buff(k)) buffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) });
     });
     auraList(el.buffs, 'buffs', buffs);
@@ -645,13 +660,13 @@ export function createHud(WL, handlers) {
       if (!key) continue;
       // A spell that is still being cast has no cooldown yet: it starts when the cast is complete.
       const own = cast && cast.key === key ? 0 : Math.max(0, (S.cds[key] || 0) - S.t);
-      const span = key === 'racial' ? c.racial.cd : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'baneOfHavoc';
+      const span = key === 'racial' ? c.racial.cd : key === 'amplifyCurse' ? 180 : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'amplifyCurse' || key === 'baneOfHavoc';
       let frac = 0, text = '';
       if (own > gcdLeft && span) { frac = own / span; text = own >= 60 ? Math.ceil(own / 60) + 'm' : String(Math.ceil(own)); }
       else if (!offGcd && gcdLeft > 0) frac = gcdLeft / gcdSpan;
       setLeft(slot.cool, Math.min(1, frac));
       setText(slot.secs, text);
-      const why = key === 'racial' || S.over ? null : combat.blocked(key, ctx);
+      const why = key === 'racial' || key === 'amplifyCurse' || S.over ? null : combat.blocked(key, ctx);
       setClass(slot.button, 'no-mana', why === 'mana');
       setClass(slot.button, 'no-range', why === 'range');
       setClass(slot.button, 'unusable', why === 'shards' || why === 'health' || why === 'immolate' || why === 'dead' || S.over);
@@ -710,10 +725,10 @@ export function createHud(WL, handlers) {
     return key;
   }
 
-  // The sim's next cast, lit up on the bar (key: a spell or null; racial: the race's cooldown goes first).
-  function setHint(key, racial) {
+  // The sim's next cast, lit up on the bar (key: a spell or null; racial / amplify: that goes first).
+  function setHint(key, racial, amplify) {
     slots.forEach(function (slot) {
-      const on = !!slot.key && (slot.key === key || (racial && slot.key === 'racial'));
+      const on = !!slot.key && (slot.key === key || (racial && slot.key === 'racial') || (amplify && slot.key === 'amplifyCurse'));
       setClass(slot.button, 'hint', on);
     });
   }
@@ -844,7 +859,7 @@ export function createHud(WL, handlers) {
   return {
     log: log, render: render, event: event, setCharacter: setCharacter, setRings: setRings, showError: showError,
     setSimAverage: setSimAverage, floatFor: floatFor, floats: function (now) { clock = now; moveFloats(now); }, setSound: setSound, setHint: setHint, setBest: setBest, setPull: setPull,
-    labelFor: labelFor,
+    labelFor: labelFor, tipFor: function (key) { return tipOf(key); }, setEditing: setEditing,
     setScale: function (value) { scale = Math.max(0.8, Math.min(1.4, Number(value) || 1)); fit(); },
     // labels: what to press on a controller for each slot (an array), or null to show the keys again.
     setPadLabels: function (labels) { if (padLabels === labels) return; padLabels = labels; showKeyLabels(); },

@@ -63,6 +63,7 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 .toolbar { display: flex; align-items: center; padding: 4px 0; background: var(--glass); border: 1px solid var(--line); border-radius: 10px; }
 .toolbar .group { display: flex; align-items: center; gap: 2px; padding: 0 8px; }
 .toolbar .group + .group { border-left: 1px solid var(--line); }
+#topBar .toolbar .group { padding: 0 6px; }   /* a little tighter than 8, so the Spellbook button fits next to the links at 1280 wide */
 .toolbar button { background: none; }
 .toolbar button:hover { background: rgba(255, 255, 255, 0.1); }
 .toolbar button.on { background: rgba(185, 138, 255, 0.14); }
@@ -311,6 +312,23 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .edit-strip { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12px; }
 .editing .slot { border-style: dashed; border-color: var(--line-bright); cursor: grab; }
 .editing .slot.picked { border-style: solid; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold) inset; }
+.editing .slot { touch-action: none; }
+.editing .slot.drop { border-style: solid; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold) inset, 0 0 10px rgba(240, 207, 122, 0.5); }
+/* The spellbook: every spell, dragged onto the bar from here. */
+.spellbook { width: 100%; box-sizing: border-box; padding: 8px 10px 10px; display: grid; gap: 8px; }
+.spellbook header { display: flex; align-items: baseline; gap: 10px; }
+.spellbook h2 { margin: 0; font-size: 14px; }
+.spellbook header span { flex: 1; font-size: 11px; color: var(--ink-dim); }
+.book-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 5px; max-height: min(40vh, 320px); overflow-y: auto; }
+.book-spell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 3px 4px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid transparent; cursor: grab; touch-action: none; }
+.book-spell:hover { border-color: var(--line-bright); }
+.book-spell img { width: 36px; height: 36px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.65); pointer-events: none; }
+.book-spell span { font-size: 10.5px; line-height: 1.15; text-align: center; color: var(--ink); }
+.book-spell.on-bar img { opacity: 0.55; }
+.book-spell.on-bar span { color: var(--ink-dim); }
+.book-spell.picked { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+.book-ghost { position: fixed; z-index: 40; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 7px; border: 1px solid var(--gold); pointer-events: none; opacity: 0.9; box-shadow: 0 2px 10px #000; }
+body.book-dragging, body.book-dragging * { cursor: grabbing !important; }
 
 /* --- Bottom corners: combat log and damage meter ------------------------- */
 .log { position: absolute; left: 14px; bottom: 14px; width: 270px; height: 196px; display: flex; flex-direction: column; background: rgba(20, 11, 30, 0.5); border-color: transparent; }
@@ -584,10 +602,14 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
 .touch, .touch body { overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .touch #hud button, .touch #hud .aura, .touch #hud label, .touch #meter { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .touch .slot img, .touch .aura img { pointer-events: none; }
-.touch #combatLog, .touch #petFrame, .touch #editStrip, .touch #btnKeys, .touch #btnEdit, .touch #keysPanel, .touch .slot kbd, .touch .slot.empty { display: none !important; }
+.touch #combatLog, .touch #petFrame, .touch #editStrip, .touch #btnKeys, .touch #keysPanel, .touch .slot kbd, .touch .slot.empty { display: none !important; }
+.touch .editing .slot.empty { display: block !important; }   /* the spellbook is open: empty slots take a spell too */
 
 /* Top: your DPS (tap it for the review), you and your target, the Menu button. */
 .touch #bottomCentre { display: contents; }
+.touch .spellbook { position: absolute; left: calc(8px + var(--sl)); right: calc(280px + var(--sr)); top: calc(64px + var(--st)); width: auto; z-index: 4; }   /* left of the action bar, so slots stay free to drop on */
+.touch .book-list { max-height: 34vh; }
+.touch .book-spell { touch-action: pan-y; }   /* a finger moving up or down scrolls the book; sideways it drags the spell */
 .touch #frames { position: absolute; left: 50%; top: calc(6px + var(--st)); transform: translateX(-50%); width: var(--top-width); grid-template-columns: 1fr 1fr; gap: 5px; }
 .touch .unit { padding: 4px 8px 6px; gap: 6px; border-radius: 9px; }
 .touch .portrait { display: none; }
@@ -651,6 +673,8 @@ button.name:hover { background: none; border-bottom-color: currentColor; }
   .touch .castbar { bottom: calc(190px + var(--sb)); width: 230px; }
   .touch .sim-hint { bottom: calc(216px + var(--sb)); }
   .touch .error-text { bottom: calc(242px + var(--sb)); }
+  .touch .spellbook { right: calc(8px + var(--sr)); top: calc(140px + var(--st)); }
+  .touch .book-list { max-height: 26vh; }
 }
 
 /* The menu: everything you set up before a fight, one under the other. */
