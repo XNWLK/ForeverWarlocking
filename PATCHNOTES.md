@@ -5,6 +5,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-01
+- Behind the scenes: boss fights now run on shared parts (rooms, mechanics, creatures), so new bosses can be added
+  much faster once they are known. Onyxia plays exactly as before.
+
 ### 2026-10-30
 - **Fix:** in the boss fight the review listed area spells once per whelp under odd names ("x12:hellfire"). Each
   spell is one line again, in the review and in the damage meter.

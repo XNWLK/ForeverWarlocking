@@ -39,7 +39,8 @@ export const FAIL_TEXT = {
   immolate: 'Requires Immolate on the target',
   noRacial: 'Your race has nothing to use',
   feared: 'You are feared',
-  immune: 'That target is immune to fire'
+  immune: 'That target is immune to fire',
+  shielded: 'That target is shielded'
 };
 
 // The key a spell's damage is booked under: plain for the first target, x2: / x3: for the others (as in the engine).
@@ -83,8 +84,12 @@ export function createCombat(opts) {
   const N = Math.max(1, Math.min(BOSS ? 40 : 3, opts.targets || 1));
   // Health that follows the clock (a timed fight; in a boss fight only the boss) rather than the damage taken.
   function scheduled(ti) { return !!linear && (!BOSS || ti === 1); }
-  const CURVE = BOSS && opts.healthCurve ? opts.healthCurve : null, IMM = BOSS && opts.immune ? opts.immune : null;
-  function immuneTo(ti, school) { return !!(IMM && IMM[ti] && IMM[ti][school]); }
+  const CURVE = BOSS && opts.healthCurve ? opts.healthCurve : null;
+  // What a boss's targets are immune to: { ti: { fire: true } } from the start, or { all: true } while a shield is up
+  // (setImmune). OUT_MULT: your damage times this while a boss's curse is on you (setOutMult). Never outside a boss fight.
+  let IMM = BOSS && opts.immune ? JSON.parse(JSON.stringify(opts.immune)) : null, OUT_MULT = 1;
+  function immuneTo(ti, school) { return !!(IMM && IMM[ti] && (IMM[ti][school] || IMM[ti].all)); }
+  function shielded(ti) { return !!(IMM && IMM[ti] && IMM[ti].all); }
   // Health on the clock: even (100% to 0% over the fight), or along a boss's curve.
   function scheduledPct(ft) {
     if (ft < 0) return 100;
@@ -340,6 +345,8 @@ export function createCombat(opts) {
   }
 
   function deal(key, amount, crit, isTick, ti, extra) {
+    if (BOSS && shielded(ti)) { emit({ type: 'miss', key: key, target: ti, immune: true, pet: key.indexOf('pet:') === 0 }); return; }   // a shield takes it all
+    if (OUT_MULT !== 1 && key.indexOf('pet:') !== 0) amount = Math.round(amount * OUT_MULT);   // a boss's curse on you
     const rk = key === 'touchOfTheGrave' ? key : rowKey(ti, key), r = row(rk);   // the Undead proc has one row for all targets (as in the engine)
     r.dmg += amount; res.total += amount;
     if (isTick) { r.ticks++; if (crit) r.tickCrits++; } else { r.hits++; if (crit) r.crits++; }
@@ -831,7 +838,7 @@ export function createCombat(opts) {
     if (key === 'lifeTap' && TAP_HP && !canTap()) return 'health';
     if (s.selfDamage && S.health <= selfTick(key)) return 'health';           // its first tick would kill you
     if (needsTarget(key) && !alive(ti)) return 'dead';
-    if (needsTarget(key) && immuneTo(ti, s.school)) return 'immune';
+    if (needsTarget(key) && immuneTo(ti, s.school)) return shielded(ti) ? 'shielded' : 'immune';
     if (key === 'conflagrate' && !(dotLeft('immolate', ti) > 0)) return 'immolate';
     if (s.shards && !(key === 'soulFire' && buff('decimation')) && S.shards < s.shards) return 'shards';
     if (S.mana < effectiveCost(key) - 1e-6) return 'mana';
@@ -1172,6 +1179,9 @@ export function createCombat(opts) {
     castTime: castTime, gcd: gcd, cost: effectiveCost, selfTick: selfTick, buff: buff, debuff: debuff, dotLeft: dotLeft, ready: ready,
     alive: alive, havocOn: havocOn, eurekaUp: eurekaUp, executePhase: executePhase,
     timed: timed, duration: linear, endless: endless, stop: stop, boss: BOSS, injure: injure, heal: heal, raidHurt: raidHurt,
+    // A boss fight's shield (map null = gone) and curse (1 = gone); nothing else calls these.
+    setImmune: function (ti, map) { if (!BOSS) return; IMM = IMM || {}; if (map) IMM[ti] = map; else delete IMM[ti]; },
+    setOutMult: function (f) { if (BOSS) OUT_MULT = f; },
     // { moving, left } while you are made to move; { moving: false, next } = seconds until the next phase (null = none)
     movePhase: function () {
       if (!MOVE) return null;

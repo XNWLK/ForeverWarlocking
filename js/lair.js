@@ -5,6 +5,7 @@
 // Yards; x to the east, z to the south (Onyxia sleeps at the north end, at -z). Built once, shown only in the fight.
 import * as THREE from 'three';
 import { flat, glow, seeded } from './kit.js';
+import { buildRoom, areaTools, insidePoly, segmentDistance } from './room.js';
 
 // The main cave, the two egg caves and the tunnel: where you can walk.
 const CHAMBER = [[0, -46], [18.75, -44], [32, -35], [37.5, -22], [38.6, -7], [37.5, 6], [35.6, 12], [30, 23], [22.5, 34.5], [13, 44],
@@ -39,62 +40,17 @@ export const LAIR = {
   start: { x: -22, z: -10, yaw: -0.91 }   // you start on her west flank, looking at her
 };
 
-function insidePoly(poly, x, z) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1];
-    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
-  }
-  return inside;
-}
-export function walkable(x, z) { for (let i = 0; i < AREAS.length; i++) if (insidePoly(AREAS[i], x, z)) return true; return false; }
+// Where you can walk, as the room builder (js/room.js) takes it.
+const ROOM_AREAS = [{ name: 'chamber', poly: CHAMBER }, { name: 'east', poly: EAST_CAVE }, { name: 'west', poly: WEST_CAVE }, { name: 'tunnel', poly: TUNNEL }];
+const tools = areaTools(ROOM_AREAS);
+export const walkable = tools.walkable, keepInside = tools.keepInside;
 export function caveOf(x, z) { return insidePoly(EAST_CAVE, x, z) ? 'east' : insidePoly(WEST_CAVE, x, z) ? 'west' : null; }
 export function inChamber(x, z) { return insidePoly(CHAMBER, x, z); }
+export { segmentDistance };
 
-// The nearest point on a segment.
-function nearestOnSegment(px, pz, ax, az, bx, bz) {
-  const dx = bx - ax, dz = bz - az, len = dx * dx + dz * dz;
-  const t = len ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len)) : 0;
-  return [ax + dx * t, az + dz * t];
-}
-export function segmentDistance(px, pz, ax, az, bx, bz) { const q = nearestOnSegment(px, pz, ax, az, bx, bz); return Math.hypot(px - q[0], pz - q[1]); }
-
-// Keeps something inside the lair (you, your pet): outside every area, it goes to the nearest edge and a little in.
-export function keepInside(p) {
-  if (walkable(p.x, p.z)) return;
-  let best = null, bestD = Infinity;
-  AREAS.forEach(function (poly) {
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const q = nearestOnSegment(p.x, p.z, poly[j][0], poly[j][1], poly[i][0], poly[i][1]), d = Math.hypot(p.x - q[0], p.z - q[1]);
-      if (d < bestD) { bestD = d; best = q; }
-    }
-  });
-  if (!best) return;
-  const dx = best[0] - p.x, dz = best[1] - p.z, d = Math.hypot(dx, dz) || 1;
-  p.x = best[0] + dx / d * 0.35;
-  p.z = best[1] + dz / d * 0.35;
-}
-
-// A number from a place, the same every time (so neighbouring pieces of wall meet).
-function hash(x, z, k) {
-  const s = Math.sin(x * 12.9898 + z * 78.233 + k * 37.719) * 43758.5453;
-  return s - Math.floor(s);
-}
-
-export function buildLair(scene) {
-  const group = new THREE.Group();
-  group.visible = false;
-  scene.add(group);
-  const rand = seeded(2159);
-  const animated = [];
-
-  // ---------- the floor: one picture for the whole lair ----------
-  const X0 = -52, X1 = 52, Z0 = -52, Z1 = 95, W = 1536, H = Math.round(W * (Z1 - Z0) / (X1 - X0));
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const g = canvas.getContext('2d');
-  const px = function (x) { return (x - X0) / (X1 - X0) * W; }, pz = function (z) { return (z - Z0) / (Z1 - Z0) * H; }, yd = W / (X1 - X0);
-  function path(poly) { g.beginPath(); poly.forEach(function (p, i) { if (i) g.lineTo(px(p[0]), pz(p[1])); else g.moveTo(px(p[0]), pz(p[1])); }); g.closePath(); }
+// The muted brown floor with its web of dark cracks (painted on the room's floor picture).
+function paintFloor(g, t) {
+  const px = t.px, pz = t.pz, yd = t.yd, path = t.path, rand = t.rand, W = t.W, H = t.H;
   g.fillStyle = '#2a211b';
   g.fillRect(0, 0, W, H);
   for (let i = 0; i < 2600; i++) {                        // grit and stains on the rock
@@ -141,72 +97,19 @@ export function buildLair(scene) {
     }
   });
   g.restore();
-  const floorMap = new THREE.CanvasTexture(canvas);
-  floorMap.colorSpace = THREE.SRGBColorSpace;
-  floorMap.anisotropy = 4;
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0), new THREE.MeshLambertMaterial({ map: floorMap }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set((X0 + X1) / 2, 0, (Z0 + Z1) / 2);
-  floor.receiveShadow = true;
-  group.add(floor);
+}
 
-  // ---------- the walls: rough rock along every edge, open where one area runs into another ----------
-  const positions = [], colors = [], ROWS = 9;
-  function wallPoint(x, z, nx, nz, row) {
-    const y = row / ROWS * WALL_HEIGHT, k = row / ROWS;
-    const out = 0.3 + hash(Math.round(x * 2) / 2, Math.round(z * 2) / 2, row) * 1.8 + Math.sin(k * Math.PI) * 2.5 - k * k * 6;   // bulges, then leans in toward the roof
-    return [x + nx * out, y, z + nz * out];
-  }
-  AREAS.forEach(function (poly, which) {
-    let area = 0;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) area += (poly[j][0] * poly[i][1] - poly[i][0] * poly[j][1]);
-    const sign = area > 0 ? 1 : -1;                       // which side is out
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const ax = poly[j][0], az = poly[j][1], bx = poly[i][0], bz = poly[i][1];
-      const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.5));
-      const nx = sign * (bz - az) / len, nz = -sign * (bx - ax) / len;
-      for (let s = 0; s < n; s++) {
-        const x0 = ax + (bx - ax) * s / n, z0 = az + (bz - az) * s / n, x1 = ax + (bx - ax) * (s + 1) / n, z1 = az + (bz - az) * (s + 1) / n;
-        const mx = (x0 + x1) / 2 + nx * 1.4, mz = (z0 + z1) / 2 + nz * 1.4;
-        let open = false;
-        AREAS.forEach(function (other, k) { if (k !== which && insidePoly(other, mx, mz)) open = true; });
-        if (open) continue;
-        for (let r = 0; r < ROWS; r++) {
-          const p00 = wallPoint(x0, z0, nx, nz, r), p10 = wallPoint(x1, z1, nx, nz, r), p01 = wallPoint(x0, z0, nx, nz, r + 1), p11 = wallPoint(x1, z1, nx, nz, r + 1);
-          positions.push.apply(positions, p00.concat(p01, p10, p10, p01, p11));
-          const shade = function (row) { const v = 0.42 - row / ROWS * 0.34; return [v * 1.05, v * 0.8, v * 0.7]; };
-          const c0 = shade(r), c1 = shade(r + 1);
-          colors.push.apply(colors, c0.concat(c1, c0, c0, c1, c1));
-        }
-      }
-    }
+export function buildLair(scene) {
+  const rand = seeded(2159);
+  const room = buildRoom(scene, {
+    areas: ROOM_AREAS, rand: rand, wallHeight: WALL_HEIGHT,
+    floor: { paint: paintFloor, bounds: [-52, 52, -52, 95] },
+    light: { hemi: [0xb0a0a8, 0x1a1010, 1.0], ambient: [0x50404a, 0.7],
+             key: { color: 0xfff0e4, intensity: 1.7, from: [-20, 60, -30], to: [0, 0, 10], shadow: { left: -60, right: 60, top: 70, bottom: -70, near: 10, far: 160 } } },
+    look: { background: 0x0a0504, fog: [0x0e0605, 45, 150] }, start: LAIR.start, minPitch: -0.55   // look up at her when she flies
   });
-  const wallGeometry = new THREE.BufferGeometry();
-  wallGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  wallGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  wallGeometry.computeVertexNormals();
-  const walls = new THREE.Mesh(wallGeometry, new THREE.MeshLambertMaterial({ color: 0x8a6a5a, vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
-  walls.receiveShadow = true;
-  group.add(walls);
-
-  // Rocks and stalagmites along the walls, so the edge is not a clean line.
-  const rockGeometry = new THREE.DodecahedronGeometry(1, 0), rockMaterial = flat(0x3a2a24), spikeGeometry = new THREE.ConeGeometry(1, 1, 6);
-  AREAS.forEach(function (poly) {
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const len = Math.hypot(poly[i][0] - poly[j][0], poly[i][1] - poly[j][1]);
-      for (let s = 0; s < len / 7; s++) {
-        const t = rand(), x = poly[j][0] + (poly[i][0] - poly[j][0]) * t, z = poly[j][1] + (poly[i][1] - poly[j][1]) * t;
-        if (walkable(x + 1.6, z) && walkable(x - 1.6, z) && walkable(x, z + 1.6) && walkable(x, z - 1.6)) continue;   // an opening
-        const big = 0.8 + rand() * 1.6;
-        const m = new THREE.Mesh(rand() < 0.35 ? spikeGeometry : rockGeometry, rockMaterial);
-        if (m.geometry === spikeGeometry) m.scale.set(big * 0.8, big * 4, big * 0.8); else m.scale.set(big, big * 0.8, big * 1.2);
-        m.position.set(x, m.geometry === spikeGeometry ? big * 2 : big * 0.3, z);
-        m.rotation.y = rand() * 6;
-        m.castShadow = true; m.receiveShadow = true;
-        group.add(m);
-      }
-    }
-  });
+  const group = room.group;
+  const animated = { push: function (fn) { room.animate(fn); } };
 
   // ---------- the egg caves: clutches of black eggs ----------
   const eggGeometry = new THREE.IcosahedronGeometry(0.55, 1), eggMaterial = flat(0x261c2c, { emissive: 0x2a0c3a, emissiveIntensity: 0.4 });
@@ -328,17 +231,7 @@ export function buildLair(scene) {
     return { distance: best, fissure: which };
   }
 
-  // ---------- light: dim, warm, from the lava ----------
-  const hemi = new THREE.HemisphereLight(0xb0a0a8, 0x1a1010, 1.0);
-  const ambient = new THREE.AmbientLight(0x50404a, 0.7);
-  const key = new THREE.DirectionalLight(0xfff0e4, 1.7);
-  key.position.set(-20, 60, -30);
-  key.target.position.set(0, 0, 10);
-  key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
-  Object.assign(key.shadow.camera, { left: -60, right: 60, top: 70, bottom: -70, near: 10, far: 160 });
-  key.shadow.bias = -0.0006;
-  group.add(hemi, ambient, key, key.target);
+  // ---------- light: dim, warm, from the lava (the room has the sky, the ambient light and the key light) ----------
   [[0, -10], [-20, 18], [20, 18], [0, 30], [-22, -26], [22, -26]].forEach(function (p, i) {
     const lamp = new THREE.PointLight(0xffa070, 40, 40, 1.4);
     lamp.position.set(p[0], 2.5, p[1]);
@@ -389,10 +282,9 @@ export function buildLair(scene) {
     emberGeometry.attributes.position.needsUpdate = true;
   });
 
-  return {
-    group: group, eggs: eggs, fissures: fissures, setFissures: setFissures, nearestFissure: nearestFissure,
+  return Object.assign(room, {
+    eggs: eggs, fissures: fissures, setFissures: setFissures, nearestFissure: nearestFissure,
     fissureLevel: function () { return fissureLevel; }, setHeat: setHeat, heatLevel: function () { return heatLevel; },
-    wallHeight: WALL_HEIGHT,
-    update: function (time) { if (group.visible) animated.forEach(function (fn) { fn(time); }); }
-  };
+    caveOf: caveOf, inChamber: inChamber
+  });
 }

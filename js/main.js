@@ -28,8 +28,7 @@ import { createReplay } from './replay.js';
 import { judgeLesson } from './lessons.js';
 import { noteProgress } from './progress.js';
 import { costs } from './cost.js';
-import { buildLair, LAIR, keepInside, walkable } from './lair.js';
-import { createBossFight, bossChallenge, BOSSES } from './boss.js';
+import { BOSSES, bossChallenge, makeBossFight } from './bosses.js';
 
 const WL = window.WL;
 // A demon's melee reach in yards, from the Warlock data (the Succubus: 5). The data names none for the Felhunter and
@@ -57,12 +56,10 @@ renderer.toneMappingExposure = 1.1;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 
-// The fel chamber is the room of every fight but a boss fight; its parts are hidden while a boss's lair is shown.
+// The fel chamber is the room of every fight but a boss fight; its parts are hidden while a boss's room is shown.
 const chamberFrom = scene.children.length;
 const chamber = buildChamber(scene);
 const chamberParts = scene.children.slice(chamberFrom), chamberLook = { background: scene.background, fog: scene.fog };
-const lair = buildLair(scene);
-const lairLook = { background: new THREE.Color(0x0a0504), fog: new THREE.Fog(0x0e0605, 45, 150) };
 const dummies = [null];
 for (let i = 1; i <= 3; i++) {
   const d = makeDummy();
@@ -143,38 +140,45 @@ const world = {
   onWheel: wheelAct
 };
 const controls = createControls(canvas, camera, world);
-// A boss fight (the Bosses button): its creatures, its script, its room.
-const bossFight = createBossFight(scene, {
-  effects: effects, lair: lair, controls: controls,
+// A boss fight (the Bosses button): its creatures, its script, its room (js/bosses.js, js/raid.js). Each boss's fight is
+// made the first time it is entered and kept; bossFight is the one shown now (null in the fel chamber).
+const bossHelp = {
+  effects: effects, controls: controls,
   sound: { play: function (name) { sound.play(name); } },
   log: function (text, kind) { hud.log(text, kind); },
-  // Her breath, a fireball, the lava ...: kept for "Watch it again" at the second of the fight it happened.
+  // A breath, a fireball, the lava ...: kept for "Watch it again" at the second of the fight it happened.
   record: function (fx) { if (combat && combat.state.fightStart !== null && !replay.state.active) replay.event(combat.fightSeconds(), { type: 'bossfx', fx: fx }); }
-});
-let bossOn = false;
+};
+const bossFights = {};
+function fightFor(id) { return bossFights[id] || (bossFights[id] = makeBossFight(id, scene, bossHelp)); }
+let bossOn = false, bossFight = null;
+let fastMode = false;                                      // FW.fast: frames are worked out but not drawn, nothing is kept (the boss test bot)
 // How many targets there can be: three dummies, or the boss and all its adds.
 function targetSlots() { return bossOn ? bossFight.count : 3; }
-// Into the boss's lair (true) or back to the fel chamber (false).
-function setRoom(boss) {
-  if (bossOn === boss) return;
+// Into a boss's room (its id) or back to the fel chamber (null).
+function setRoom(id) {
+  const next = id ? fightFor(id) : null;
+  if (next === bossFight) return;
+  if (bossFight) bossFight.show(false);
+  bossFight = next;
+  const boss = !!next, room = boss ? next.room : null;
   bossOn = boss;
   chamberParts.forEach(function (o) { o.visible = !boss; });
-  lair.group.visible = boss;
-  bossFight.show(boss);
-  scene.background = boss ? lairLook.background : chamberLook.background;
-  scene.fog = boss ? lairLook.fog : chamberLook.fog;
+  if (boss) bossFight.show(true);
+  scene.background = boss ? room.look.background : chamberLook.background;
+  scene.fog = boss ? room.look.fog : chamberLook.fog;
   dummies.length = 1; SPOTS.length = 1;
   (boss ? bossFight.bodies : dummySet).slice(1).forEach(function (d) { dummies.push(d); });
   (boss ? bossFight.spots : dummySpots).slice(1).forEach(function (p) { SPOTS.push(p); });
   dummySet.slice(1).forEach(function (d) { d.root.visible = false; });
-  world.bound = boss ? keepInside : null;
-  world.inside = boss ? walkable : null;
-  world.wallHeight = boss ? lair.wallHeight : 20;
-  world.minPitch = boss ? -0.55 : null;              // look up at her when she flies
+  world.bound = boss ? room.keepInside : null;
+  world.inside = boss ? room.walkable : null;
+  world.wallHeight = boss ? room.wallHeight : 20;
+  world.minPitch = boss ? room.minPitch : null;      // look up at a boss that flies
   colliders.length = 0;
-  if (!boss) chamber.colliders.forEach(function (c) { colliders.push(c); });
+  (boss ? room.colliders : chamber.colliders).forEach(function (c) { colliders.push(c); });
   fixedColliders = colliders.length;
-  if (boss) controls.setStart(LAIR.start.x, LAIR.start.z, LAIR.start.yaw); else controls.setStart(0, 24, 0);
+  if (boss) controls.setStart(room.start.x, room.start.z, room.start.yaw); else controls.setStart(0, 24, 0);
   fearMark.visible = false;
   controls.reset();
   while (anchors.length <= targetSlots()) anchors.push({ x: 0, y: 0, visible: false });
@@ -477,6 +481,7 @@ function resultKey() {
 }
 // A fight that ran to its end goes on the list of your results in this fight: [when, DPS], the last 30 of them.
 function noteResult() {
+  if (fastMode) return;                                   // the test bot keeps nothing
   if (fightLogged || !combat.state.over || combat.endless) return;   // infinite health: you choose how long it lasts, so two of them do not compare
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
   if (!(dps > 0)) return;
@@ -491,6 +496,7 @@ function noteResult() {
 // A fight that ran to its end goes on the Progress page: your share of the sim and what "What it cost you" lists,
 // each kind of mistake as a share of your DPS. Waits for the sim's number (progressDue).
 function noteProgressNow() {
+  if (fastMode) { progressDue = false; return; }
   if (!progressDue || !combat.state.over || !simResult) return;
   progressDue = false;
   const d = reviewData(), dps = d.seconds > 0 ? combat.result.total / d.seconds : 0;
@@ -536,6 +542,7 @@ function showBest() {
 }
 // Once the fight is over: is this your best? Returns { record, best, previous } (null in a challenge or an empty fight).
 function settleBest() {
+  if (fastMode) return null;
   if (challenge || !combat.state.over || combat.endless) return null;
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0;
   if (!(dps > 0)) return null;
@@ -764,6 +771,7 @@ function fightTitle() {
 }
 // Keeps the fight that just ended: once the sim's number is in, or without it when the fight is left before (force).
 function saveHistory(force) {
+  if (fastMode) { historyDue = false; return; }           // the test bot's fights are not kept
   if (!historyDue || !combat || !combat.state.over || !(combat.fightSeconds() > 0)) return;
   if (!simResult && !force) return;
   historyDue = false;
@@ -1038,7 +1046,7 @@ function newCharacter() {
   controls.setEyeHeight(1.7 * warlock.size);
   const dummyHealth = getSetting('dummyHealth');
   const bossId = challenge && challenge.boss ? challenge.boss : null;
-  setRoom(!!bossId);
+  setRoom(bossId);
   document.getElementById('btnBosses').classList.toggle('on', !!bossId);
   targets = bossId ? challenge.targets : Math.max(1, Math.min(3, Number(challenge ? challenge.targets : getSetting('dummies')) || 1));
   config = buildConfig();
@@ -1063,7 +1071,8 @@ function newCharacter() {
     lessonKey: build.custom ? 'c' + hash(getSetting('buildCode')) : build.key,  // lessons and progress are kept per build
     // A boss fight names its targets and sums the adds in the meter.
     boss: !!bossId, targetName: bossId ? bossFight.targetName : null, targetSub: bossId ? bossFight.targetSub : null,
-    smallPlate: bossId ? bossFight.smallPlate : null, targetGroups: bossId ? bossFight.groups : null
+    smallPlate: bossId ? bossFight.smallPlate : null, targetGroups: bossId ? bossFight.groups : null,
+    bossAuras: bossId ? bossFight.auras : null           // what the boss put on you (a curse), for the buff row
   };
   character.standing = standingBuffs(build, combat.stats);
   extras.setCharacter(character, config, leftOut, challenge);
@@ -1212,6 +1221,7 @@ function demonLook() {
 // A boss fight is over: keep your best run (one you lived through) and whether you beat the sim. Returns the names of
 // rewards earned just now.
 function noteBossResult(pct, dps, grade) {
+  if (fastMode) return [];
   const all = Object.assign({}, getSetting('bosses')), mine = Object.assign({}, all[challenge.id]);
   if (diedOf) return [];
   if (!mine.best || pct > mine.best.pct) mine.best = { pct: pct, dps: Math.round(dps), grade: grade };
@@ -1549,7 +1559,7 @@ function frame() {
   if (edge !== ringEdge) { scene.remove(rings); ringEdge = edge; rings = makeRangeRings(ringList, edge); scene.add(rings); }
   rings.position.set(SPOTS[S.target].x, 0, SPOTS[S.target].z);
   rings.visible = getSetting('rings');
-  if (bossOn) lair.update(time); else chamber.update(time);
+  if (bossOn) bossFight.room.update(time); else chamber.update(time);
 
   // Spell looks: motes at the staff while casting, marks on the dummies for what is on them, bolts and bursts.
   warlock.root.updateMatrixWorld();
@@ -1591,7 +1601,7 @@ function frame() {
   } else areaPulse = 0;
 
   if (bossOut && bossOut.shake) camera.position.add(spot.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.4).multiplyScalar(bossOut.shake));   // Bellowing Roar shakes the cave
-  renderer.render(scene, camera);
+  if (!fastMode) renderer.render(scene, camera);          // the test bot runs without drawing
 
   for (let i = 1; i <= targetSlots(); i++) {
     const anchor = anchors[i];
@@ -1696,12 +1706,12 @@ function replayFrame(dt, time) {
     dummies[i].setSelected(false);
   }
   rings.visible = false;
-  if (bossOn) lair.update(time); else chamber.update(time);
+  if (bossOn) bossFight.room.update(time); else chamber.update(time);
   warlock.root.updateMatrixWorld();
   if (cast) { const fx = SPELL_FX[cast.key]; effects.casting(warlock.orbPosition(from), fx ? fx.cast : 0xffffff, cast.p, time, player, dt); }
   else effects.casting(null, 0, 0, time, player, dt);
   for (let i = 1; i <= targetSlots(); i++) {
-    const at = bossOn ? { x: dummies[i].x, z: dummies[i].z, y: i === 1 && s.boss ? s.boss.o[2] : 0 } : SPOTS[i];
+    const at = bossOn ? { x: dummies[i].x, z: dummies[i].z, y: bossFight.lift(i) } : SPOTS[i];
     effects.setMarks(i, at, i <= targets && !s.dead[i] && !s.gone[i] ? marksAt(i, R.t) : {}, time, bossOn ? bossFight.markScale(i) : 1);
   }
   if (cast && cast.ch && spell && !spell.aoe) {
@@ -1710,7 +1720,7 @@ function replayFrame(dt, time) {
   } else beam.hide();
   effects.update(dt, camera.position);
   ghost.update(dt, time, ghostView({ x: s.x, z: s.z, yaw: s.yaw, moving: s.mv }, R.t >= 0 ? R.t : null));
-  renderer.render(scene, camera);
+  if (!fastMode) renderer.render(scene, camera);          // the test bot runs without drawing
   for (let i = 1; i <= targetSlots(); i++) {
     const anchor = anchors[i];
     if (i > targets || s.gone[i]) { anchor.visible = false; continue; }
@@ -1755,5 +1765,16 @@ window.FW = {
   get config() { return config; }, get simResult() { return simResult; },
   ghost: ghost, replay: replay, startReplay: startReplay, endReplay: endReplay, reviewData: reviewData, procSummary: procSummary,
   get combat() { return combat; }, get character() { return character; }, get rings() { return rings; },
-  bossFight: bossFight, lair: lair
+  get bossFight() { return bossFight; }, get lair() { return bossFight && bossFight.room; },
+  get fast() { return fastMode; }, set fast(v) { fastMode = !!v; },
+  resyncClock: function () { clock.getDelta(); },          // after the clock was moved by hand (the test bot)
+  fightLog: function () { return hud.fightLog(); },
+  startBoss: function (id) { startChallenge(bossChallenge(id)); },
+  leaveBoss: function () { if (challenge) startChallenge(null); },
+  // Many runs added up (averages, lowest, highest): FW.bossTests('onyxia', { immortal: true }, 20).
+  bossTests: function (id, opts, n) { return import('./bossbot.js').then(function (m) { return m.runMany(window.FW, id, opts, n || 10); }); },
+  // The boss test bot: FW.bossTest('onyxia', { mode: 'dodge', seed: 1 }).then(r => ...) (js/bossbot.js).
+  bossTest: function (id, opts) {
+    return import('./bossbot.js').then(function (m) { return m.runBossBot(window.FW, id, opts).then(function (r) { console.log(m.summary(r)); return r; }); });
+  }
 };

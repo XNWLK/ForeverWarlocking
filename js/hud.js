@@ -621,6 +621,7 @@ export function createHud(WL, handlers) {
     ['shadowTrance', 'decimation', 'bloodFury', 'berserking', 'eureka', 'amplifyCurse', 'snfShadow', 'snfFire'].forEach(function (k) {
       if (combat.buff(k)) buffs.push({ key: k, icon: AURA_INFO[k].icon, name: AURA_INFO[k].name, text: seconds(S.buffs[k] - S.t) });
     });
+    if (c.bossAuras) c.bossAuras().forEach(function (a) { buffs.push({ key: a.key, icon: a.icon, name: a.name, text: seconds(a.left), desc: a.text }); });
     auraList(el.buffs, 'buffs', buffs);
 
     // The pet: what it is doing, and its mana.
@@ -819,7 +820,7 @@ export function createHud(WL, handlers) {
       log(name + ' ticks ' + (c.targets > 1 ? dummy + ' ' : '') + 'for ' + whole(e.amount) + (e.crit ? ' (crit).' : '.'), e.crit ? 'crit' : '');
       floatFor(e, anchor);
     } else if (e.type === 'miss') {
-      log(name + ' misses ' + dummy + '.', 'miss');
+      log(e.immune ? dummy + ' is immune to your ' + name + '.' : name + ' misses ' + dummy + '.', 'miss');
       if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'apply') {
       log(dummy + ' is afflicted by ' + (e.key === 'brand' ? 'Demonic Brand' : name) + '.');
