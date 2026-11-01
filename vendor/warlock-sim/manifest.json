@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "30a99ee",
-    "subject":  "Round 170: By fight length shows -- for the reference and sits at the bottom",
+    "commit":  "dffc2d5",
+    "subject":  "Round 176: layout editor - drag the boxes of the page where you want them (wide and narrow arrangements, kept in the browser)",
     "uncommittedChanges":  false,
-    "synced":  "2026-10-28 22:19",
+    "synced":  "2026-11-01 20:48",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

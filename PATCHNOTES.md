@@ -8,6 +8,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ### 2026-11-01
 - Behind the scenes: boss fights now run on shared parts (rooms, mechanics, creatures), so new bosses can be added
   much faster once they are known. Onyxia plays exactly as before.
+- Synced with the Warlock SIM v155 (its new priority-list conditions). The ready builds play and rank as before.
 
 ### 2026-10-30
 - **Fix:** in the boss fight the review listed area spells once per whelp under odd names ("x12:hellfire"). Each
