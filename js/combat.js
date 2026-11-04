@@ -131,9 +131,9 @@ export function createCombat(opts) {
   const TOG = racialOf('proc');                                                                           // Undead
   const COMMAND = racialOf('petDmgPct');                                                                  // Orc: demon damage +5%
   // Threat (Xn, 2026-10-07; as in the engine): 1 damage = 1 threat, Searing Pain twice that (less with Demonic Brand),
-  // all of it reduced by Suppression and by Salvation. Your pet's damage is the pet's threat, not yours. It changes
-  // nothing in the fight; it is counted so you can see it. Threat buffs of one group do not stack (the biggest counts);
-  // none share a group since Tranquil Air Totem left with the patch of 2026-10-16.
+  // all of it reduced by Suppression and by threat buffs (none left: Salvation went with the patch of 2026-11-03).
+  // Your pet's damage is the pet's threat, not yours. It changes nothing in the fight; it is counted so you can see it.
+  // Threat buffs of one group do not stack (the biggest counts).
   const THREAT_BUFFS = (function () {
     let m = 1;
     const best = {};
@@ -1119,7 +1119,9 @@ export function createCombat(opts) {
       // The sim's lifeTapNeed (2026-10-28): the mana the rest of the fight needs at the rate it went down so far (Life Tap's
       // own mana left out); nothing in the first 6 s. No free mana here (no Innervate, Mana Tide, potions or trinkets).
       manaNeedLeft: function () { const f = fightTime(at); if (f < 6) return Infinity; return Math.max(0, (stats.maxMana - mana + res.track.tapMana) / f) * view.remaining; },
-      freeManaLevel: function () { return 0; }
+      freeManaLevel: function () { return 0; },
+      // The sim's fsr condition (v161): seconds since you last spent mana. A cast bar still running spends at its end.
+      lastSpend: c && c.cost > 0 ? c.end : S.lastSpend, spendAt: null
     };
     const made = forcedMove(at) || !!(lastCtx && lastCtx.forced), ft = fightTime(at);
     function fits(k) {                                     // made to move: only instants, and no cast that runs into the next phase

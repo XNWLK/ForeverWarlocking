@@ -5,6 +5,14 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-04
+- Synced with the Warlock SIM v161 and the Forever patch of 2026-11-03:
+  - **New builds: Wrack DS and Incinerate DS.** Both sacrifice their demon (Demonic Sacrifice), so you fight without a
+    pet. Wrack DS uses Life Tap right after a full Wrack, once the 5-second rule is over.
+  - SM Ruin and Wrack Succubus are gone. If you played one of them, you start on the top build of the list.
+  - Wrack hits harder (Improved Drains no longer raises it), and Shadow and Flame gives up to 20%.
+  - Salvation is gone from the game.
+
 ### 2026-11-01
 - Behind the scenes: boss fights now run on shared parts (rooms, mechanics, creatures), so new bosses can be added
   much faster once they are known. Onyxia plays exactly as before.

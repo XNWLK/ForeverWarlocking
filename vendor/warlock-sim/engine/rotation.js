@@ -97,7 +97,7 @@ WL.ACTIONS = {
   // ≤ 3 s left (≈ one filler cast, so the refresh is not pushed past the expiry), instead of on every 15 s cooldown
   // (user, round 25). Tested thresholds 1 GCD / 2.5 / 3 / 4 s: all within noise of "on cooldown" (04_EXPLORATION §14).
   shadowburnSnF: {
-    label: 'Shadowburn only to keep Shadow and Flame (Fire +10%) up (≤ 3 s left)',
+    label: 'Shadowburn only to keep Shadow and Flame (Fire bonus) up (≤ 3 s left)',
     pick: function (S) {
       if (!S.has('shadowburn') || !S.build.talents.shadowAndFlame || !S.ready('shadowburn') || !(S.shards > 0)) return null;
       var left = S.buff('snfFire') ? S.buffs.snfFire - S.t : 0;
@@ -107,7 +107,7 @@ WL.ACTIONS = {
   // Conflagrate only to keep Shadow and Flame's Shadow buff (+10% Shadow, 20 s) up (round 67, user; like shadowburnSnF):
   // cast when the buff is missing or has ≤ 3 s left, instead of on every 10 s cooldown. Needs Immolate on the target.
   conflagrateSnF: {
-    label: 'Conflagrate only to keep Shadow and Flame (Shadow +10%) up (≤ 3 s left)',
+    label: 'Conflagrate only to keep Shadow and Flame (Shadow bonus) up (≤ 3 s left)',
     pick: function (S) {
       if (!S.has('conflagrate') || !S.build.talents.shadowAndFlame || !S.ready('conflagrate') || !(S.dotLeft('immolate') > 0)) return null;
       var left = S.buff('snfShadow') ? S.buffs.snfShadow - S.t : 0;
@@ -328,6 +328,8 @@ WL.ACTIONS = {
 //   { t: 'manaNeed' }            the rest of the fight needs more mana than you have (as lifeTapNeed)
 //   { t: 'freeMana' }            free mana is ready (Innervate, Mana Tide, a rune, a potion, a mana trinket)
 //   { t: 'minDot', op, v }       the shortest DoT this priority keeps up (as wrackDots)
+//   { t: 'fsr', op, v }          seconds since you last spent mana (round 186; the 5-second rule: Spirit regenerates from 5 s on,
+//                                not while you channel; a cast being cast counts as spending now)
 //   { t: 'check', act }          the whole check of a built-in action that has no shorter form (WL.APL_CHECKS)
 // op = '<', '<=', '>', '>=' or '='; v = a number, or { var: name } = a named number of build.vars ({ num: 12 }),
 // or (round 172) { cast: spell } = that spell's cast time now, { exec: 1 } = the execute threshold (Fight & pets).
@@ -372,6 +374,7 @@ WL.ruleCond = function (n, S, build, depth) {
     case 'manaNeed': return !!S.manaNeedLeft && S.mana < S.manaNeedLeft();
     case 'freeMana': return !!S.freeManaLevel && S.mana >= S.freeManaLevel() && S.freeManaLevel() > 0;
     case 'minDot': return ruleCmp(WL.minDotLeft(S), n.op, val());
+    case 'fsr': return ruleCmp(S.spendAt != null ? 0 : S.t - S.lastSpend, n.op, val());   // nothing spent yet: Infinity
     case 'check': return !!WL.APL_CHECKS[n.act] && WL.ACTIONS[n.act].pick(S) != null;
   }
   return false;
@@ -433,6 +436,7 @@ WL.condText = function (n, build) {
     case 'manaNeed': return 'the rest of the fight needs more mana than you have';
     case 'freeMana': return 'free mana is ready';
     case 'minDot': return 'shortest DoT time left ' + n.op + ' ' + v() + u();
+    case 'fsr': return 'time since you last spent mana ' + n.op + ' ' + v() + u();
     case 'check': return WL.APL_CHECKS[n.act] || n.act;
   }
   return '?';
@@ -469,7 +473,7 @@ WL.condErrors = function (n, build, where, depth) {
     case 'setting': if (!WL.APL_SETTINGS[n.key]) out.push(where + ': unknown setting "' + n.key + '"'); break;
     case 'check': if (!WL.APL_CHECKS[n.act]) out.push(where + ': unknown check "' + n.act + '"'); break;
     case 'pet': case 'manaNeed': case 'freeMana': break;
-    case 'minDot': num(); break;
+    case 'minDot': case 'fsr': num(); break;
     default: out.push(where + ': unknown condition');
   }
   return out;

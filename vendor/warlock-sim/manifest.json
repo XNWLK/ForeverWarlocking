@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "dffc2d5",
-    "subject":  "Round 176: layout editor - drag the boxes of the page where you want them (wide and narrow arrangements, kept in the browser)",
+    "commit":  "d21be65",
+    "subject":  "Round 186: Wrack DS and Incinerate DS, a decision-by-decision rotation search, page fixes",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-01 20:48",
+    "synced":  "2026-11-04 16:59",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
