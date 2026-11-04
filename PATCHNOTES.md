@@ -6,6 +6,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-04
+- Three builds have new names, as in the Warlock SIM: **Shadow Demo** (was Demo Pact Shadow Bolt Succubus), **Fire Demo**
+  (was Demo Pact Fire Imp) and **Incinerate Pandemic** (was Destro Incinerate Succubus). They play the same, and your
+  progress and bests with them stay.
 - Synced with the Warlock SIM v161 and the Forever patch of 2026-11-03:
   - **New builds: Wrack DS and Incinerate DS.** Both sacrifice their demon (Demonic Sacrifice), so you fight without a
     pet. Wrack DS uses Life Tap right after a full Wrack, once the 5-second rule is over, and does not cast Siphon Life.
