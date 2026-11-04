@@ -2,7 +2,7 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-11-04",
-  "simCommit": "d21be65",
+  "simCommit": "c957367",
   "order": [
     {
       "key": "demo_pact_fire",
@@ -21,7 +21,7 @@ window.FW_BUILD_ORDER = {
     },
     {
       "key": "wrack_ds",
-      "dps": 672.1,
+      "dps": 667.7,
       "race": "undead"
     },
     {
