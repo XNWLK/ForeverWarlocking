@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "20387e7",
-    "subject":  "Round 191: Shadow Demo, Fire Demo and Incinerate Pandemic; Stamina grows in Build Scaling",
+    "commit":  "987583c",
+    "subject":  "Round 195: Forever patch of 2026-11-10 - Wrack speeds up DoT ticks, Wrack 70%, Soul Siphon counts Corruption / Agony / Siphon Life",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-04 20:08",
+    "synced":  "2026-11-10 22:11",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

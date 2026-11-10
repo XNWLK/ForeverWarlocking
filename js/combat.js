@@ -80,6 +80,13 @@ export function createCombat(opts) {
   const HIT = cfg.fight.hitEvery > 0 ? cfg.fight.hitEvery : 0;
   const AURA_PUSH = Object.keys(cfg.buffs || {}).reduce(function (a, k) { const b = cfg.buffs[k]; return a + (b.on && b.pushbackResistPct ? b.pushbackResistPct : 0); }, 0);
   const FEL_CONC = { drainLife: 1, drainSoul: 1, wrack: 1 };
+  // Wrack (patch of 2026-11-10, as in the engine): while you channel it at a target, the DoTs in dotSpeedSpells on that
+  // target (Corruption, Bane of Agony, Siphon Life) tick dotSpeedPct faster; their duration stays. When Wrack stops,
+  // each keeps the share of its next tick it has built up, and one that ends between two ticks deals that share as a
+  // smaller last tick.
+  const WRACK_GAIN = 1 + ((SPELLS.wrack && SPELLS.wrack.dotSpeedPct) || 0) / 100;
+  const WRACK_FAST = {};
+  if (table.wrack && SPELLS.wrack.dotSpeedSpells) SPELLS.wrack.dotSpeedSpells.forEach(function (k) { WRACK_FAST[k] = true; });
   const BOSS = !check && !!opts.boss;
   const N = Math.max(1, Math.min(BOSS ? 40 : 3, opts.targets || 1));
   // Health that follows the clock (a timed fight; in a boss fight only the boss) rather than the damage taken.
@@ -168,6 +175,7 @@ export function createCombat(opts) {
       seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
       shards: Infinity,                                   // Soul Shards never run out (Xn, 2026-10-07)
       gcdStart: 0, gcdReady: 0, cast: null, channel: null,
+      wrackOn: 0,                                         // the target Wrack speeds DoTs up on (0 = none)
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, togReady: -Infinity, petSent: false,
       target: 1, havoc: null,
@@ -276,12 +284,14 @@ export function createCombat(opts) {
   function distanceTo(ti, ctx) { const c = ctx || lastCtx; return c && c.distances && c.distances[ti] != null ? c.distances[ti] : 0; }
   function gap(a, b) { const c = lastCtx; return a === b ? 0 : c && c.gaps && c.gaps[a] && c.gaps[a][b] != null ? c.gaps[a][b] : 0; }
 
+  // seqAt: a place in the order kept for it (a DoT's ticks that Wrack can re-time keep the places their fixed
+  // schedule had, as in the engine).
   function push(ev) {            // events in time order; at the same time ticks (0) come before a cast ending (1)
-    ev.seq = order++;
+    ev.seq = ev.seqAt != null ? ev.seqAt : order++;
     let i = events.length;
     while (i > 0) {
       const p = events[i - 1], d = p.t - ev.t;
-      if (d < -EPS || (d <= EPS && p.o <= ev.o)) break;
+      if (d < -EPS || (d <= EPS && (p.o < ev.o || (p.o === ev.o && p.seq <= ev.seq)))) break;
       i--;
     }
     events.splice(i, 0, ev);
@@ -309,7 +319,6 @@ export function createCombat(opts) {
     if (s.school === 'shadow' && debuff(ti, 'isb')) m *= 1 + tv('improvedShadowBolt', 'debuffPct') / 100;
     if (s.school === 'shadow' && buff('snfShadow')) m *= 1 + tv('shadowAndFlame', 'schoolPct') / 100;
     if (s.school === 'fire' && buff('snfFire')) m *= 1 + tv('shadowAndFlame', 'schoolPct') / 100;
-    if (periodic && S.channel && S.channel.key === 'wrack' && S.channel.target === ti && SPELLS.wrack.debuffSpells.indexOf(key) >= 0) m *= 1 + SPELLS.wrack.debuffPct / 100;
     if (s.drain && tv('soulSiphon')) {
       let n = 0;
       WL.SOUL_SIPHON_EFFECTS.forEach(function (e) { if (e === 'curseOfElements' ? debuff(ti, 'coe') : dotLeft(e, ti) > 0) n++; });
@@ -421,14 +430,62 @@ export function createCombat(opts) {
       delete t.dots.baneOfAgony; delete t.dots.baneOfDoom;
       if (!check && S.havoc && S.havoc.target === ti) S.havoc = null;
     }
-    t.dots[key] = { inst: id, applied: S.t, expires: S.t + s.duration, ticks: e.ticks, snap: snap };
+    const d = t.dots[key] = { inst: id, applied: S.t, expires: S.t + s.duration, ticks: e.ticks, snap: snap };
+    if (WRACK_FAST[key]) {                                            // Wrack can speed it up: one tick at a time
+      d.fast = true; d.prog = 0; d.at = S.t; d.rate = wrackRate(ti); d.gen = 0; d.n = 0;
+      d.seq0 = order; order += e.ticks;                              // its ticks keep the places the fixed schedule gives them
+      nextFastTick(ti, key, d);
+      return;
+    }
     for (let i = 1; i <= e.ticks; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'dotTick', key: key, target: ti, inst: id, i: i - 1 });
   }
 
-  function periodicTick(key, snap, i, ti) {
+  // ---------- Wrack speeds DoTs up (patch of 2026-11-10; as in the engine) ----------
+  // A DoT Wrack can speed up keeps d.prog = seconds of its normal tick timer built up since its last tick, growing at
+  // d.rate (2 while you channel Wrack at its target, else 1) since d.at. Its next tick comes when that reaches
+  // tickEvery, while the DoT lasts; one that ends between two ticks deals the share it has built up.
+  function wrackTarget() { return S.channel && S.channel.key === 'wrack' ? S.channel.target : 0; }
+  function wrackRate(ti) { return wrackTarget() === ti ? WRACK_GAIN : 1; }
+  function nextFastTick(ti, key, d) {
+    const s = SPELLS[key], t = S.t + Math.max(0, s.tickEvery - d.prog) / d.rate;
+    const seqAt = d.seq0 + Math.min(d.n, d.ticks - 1);
+    if (t <= d.expires + 1e-6) { push({ t: Math.min(t, d.expires), o: 0, type: 'dotTick', key: key, target: ti, inst: d.inst, gen: d.gen, fast: 1, seqAt: seqAt }); return; }
+    const frac = (d.prog + (d.expires - S.t) * d.rate) / s.tickEvery;
+    if (frac > 1e-6) push({ t: d.expires, o: 0, type: 'dotTick', key: key, target: ti, inst: d.inst, gen: d.gen, fast: 1, seqAt: seqAt, frac: Math.min(1, frac) });
+  }
+  function fastTick(ti, key, d, frac) {
+    const s = SPELLS[key];
+    d.n++;
+    // Bane of Agony's ramp follows the time since it was cast: a tick in the 3rd normal 2-second slot uses ramp[2].
+    const ri = s.ramp ? Math.min(s.ramp.length - 1, Math.max(0, Math.ceil((S.t - d.applied) / s.tickEvery - 1e-6) - 1)) : 0;
+    periodicTick(key, d.snap, ri, ti, frac);
+    d.prog = 0; d.at = S.t;
+    if (S.over || T[ti].dots[key] !== d) return;
+    if (frac == null && S.t < d.expires - EPS) nextFastTick(ti, key, d);
+    else delete T[ti].dots[key];
+  }
+  // Wrack started or stopped (or moved to another target): bring every sped-up DoT's timer up to now and re-time its
+  // next tick. Called right where a channel starts or ends, so the clock is still at that moment.
+  function syncWrack() {
+    const on = wrackTarget();
+    if (on === S.wrackOn) return;
+    S.wrackOn = on;
+    for (let ti = 1; ti <= N; ti++) {
+      const dots = T[ti].dots, r = wrackRate(ti);
+      for (const k in dots) {
+        const d = dots[k];
+        if (!d.fast || d.expires <= S.t + EPS) continue;
+        d.prog += (S.t - d.at) * d.rate; d.at = S.t;
+        if (r !== d.rate) { d.rate = r; d.gen++; nextFastTick(ti, k, d); }
+      }
+    }
+  }
+
+  function periodicTick(key, snap, i, ti, frac) {   // frac: a smaller last tick (the share of a tick a sped-up DoT built up)
     const s = SPELLS[key], e = table[key];
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
+    if (frac != null) amount *= frac;
     amount *= vulnMult(s.school, ti);
     const crit = R.crit() * 100 < e.critPct;
     if (crit) amount *= e.critMult;
@@ -657,8 +714,10 @@ export function createCombat(opts) {
     return { castMult: castMult };
   }
 
-  function startCast(key, ti) {
+  // carry: ticks a Wrack you cast again over a running Wrack takes over from it (patch of 2026-11-10).
+  function startCast(key, ti, carry) {
     const s = SPELLS[key], e = table[key];
+    const nCh = s.kind === 'channel' ? e.ticks + (carry || 0) : 0, chDur = carry ? nCh * s.tickEvery : s.duration;
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
     // A cast bar started before the fight is a precast: the fight begins when it lands (handle, 'castEnd').
@@ -666,7 +725,7 @@ export function createCombat(opts) {
     if (key !== 'lifeTap' && !precast) engage(ti);
     S.presses.push({ t: S.t, k: key, target: ti });
     S.gcdStart = S.t; S.gcdReady = S.t + gcdT;
-    emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? s.duration : 0 });
+    emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? chDur : 0, carry: carry || 0 });
 
     if (key === 'lifeTap') {
       const gain = tapGain();
@@ -701,8 +760,9 @@ export function createCombat(opts) {
       if (!S.over) {
         if (ti === 1 || s.aoe) jowProc();
         const id = ++inst;
-        S.channel = { key: key, inst: id, target: ti, snap: { castMult: 1 }, start: S.t, end: S.t + s.duration };
-        for (let i = 1; i <= e.ticks; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
+        S.channel = { key: key, inst: id, target: ti, snap: { castMult: 1 }, start: S.t, end: S.t + chDur, ticks: nCh, done: 0 };
+        for (let i = 1; i <= nCh; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
+        syncWrack();
       }
     } else if (castT > EPS) {
       const id = ++inst;
@@ -764,6 +824,7 @@ export function createCombat(opts) {
     } else if (S.channel) {
       const key = S.channel.key;
       S.channel = null;
+      syncWrack();
       emit({ type: 'interrupt', key: key, reason: reason, channel: true });
     }
   }
@@ -852,8 +913,13 @@ export function createCombat(opts) {
   function tryCast(key, ctx) {
     const why = blocked(key, ctx);
     if (why) return fail(key, why);
-    if (S.channel) interrupt('clipped');
-    startCast(key, S.target);
+    // Wrack over a running Wrack at the same target (patch of 2026-11-10): nothing is clipped, the new one takes over
+    // the ticks the old one still had (cast between two ticks: the one under way counts as left).
+    const c = S.channel;
+    const carry = c && key === 'wrack' && c.key === 'wrack' && c.target === S.target
+      ? Math.max(0, Math.floor((c.end - c.start) / SPELLS.wrack.tickEvery + 1e-6) - c.done) : 0;
+    if (c) interrupt(carry ? 'recast' : 'clipped');
+    startCast(key, S.target, carry);
     return { ok: true };
   }
 
@@ -1001,6 +1067,7 @@ export function createCombat(opts) {
     } else if (ev.type === 'dotTick') {
       const d = T[ev.target].dots[ev.key];
       if (!d || d.inst !== ev.inst) return;              // refreshed, consumed, or the target is dead
+      if (ev.fast) { if (ev.gen === d.gen) fastTick(ev.target, ev.key, d, ev.frac); return; }   // re-timed by Wrack: a later copy
       periodicTick(ev.key, d.snap, ev.i, ev.target);
       if (!S.over && ev.i === d.ticks - 1 && T[ev.target].dots[ev.key] === d) delete T[ev.target].dots[ev.key];
     } else if (ev.type === 'dmgTaken') {
@@ -1010,12 +1077,14 @@ export function createCombat(opts) {
       const c = S.channel;
       if (!c || c.inst !== ev.inst || c.end > S.t + EPS) return;
       S.channel = null;
+      syncWrack();
     } else if (ev.type === 'chanTick') {
       const c = S.channel;
       if (!c || c.inst !== ev.inst) return;              // stopped
       if (ev.t > c.end + EPS) return;                    // cut off by a hit; the channel's end closes it
       if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target);
-      if (!S.over && S.channel === c && ev.i === table[ev.key].ticks - 1) S.channel = null;
+      c.done = ev.i + 1;
+      if (!S.over && S.channel === c && ev.i === (c.ticks || table[ev.key].ticks) - 1) { S.channel = null; syncWrack(); }
       else if (!S.over && S.channel === c && SPELLS[ev.key].selfDamage && S.health <= selfTick(ev.key)) {   // the next tick would kill you
         S.channel = null;
         emit({ type: 'interrupt', key: ev.key, reason: 'health', channel: true });

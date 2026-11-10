@@ -66,8 +66,8 @@ export function drawTimeline(d) {
       const where = around ? ' around you' : c.target && d.targets > 1 ? ' on ' + d.dummyName(c.target) : '';
       const what = c.kind === 'channel' ? ', channelled ' + secs(c.len) : c.len > 0.005 ? ', ' + secs(c.len) + ' cast' : '';
       const title = spellName(c.key) + (c.t < -0.005 ? (c.off ? ' used ' + secs(-c.t) + ' before the fight' : ' started ' + secs(-c.t) + ' before the fight (precast)') : ' at ' + secs(c.t)) + what + where +
-        (c.stopped ? c.stopped === 'clipped' ? ' – cut short by your next cast' : ' – stopped' : '') + (c.pushed ? ' – pushed back ' + secs(c.pushed) : '');
-      if (c.len > 0.005) block(line, c.t, c.t + c.len, (c.kind === 'channel' ? 'chan' : 'cast') + (c.stopped && c.stopped !== 'clipped' ? ' stopped' : ''), title);
+        (c.stopped ? c.stopped === 'clipped' ? ' – cut short by your next cast' : c.stopped === 'recast' ? ' – cast again: its ticks went to the next one' : ' – stopped' : '') + (c.pushed ? ' – pushed back ' + secs(c.pushed) : '');
+      if (c.len > 0.005) block(line, c.t, c.t + c.len, (c.kind === 'channel' ? 'chan' : 'cast') + (c.stopped && c.stopped !== 'clipped' && c.stopped !== 'recast' ? ' stopped' : ''), title);
       // A channel's ticks: a bright mark on its bar for each one, and what it hit.
       (c.ticks || []).forEach(function (k, n) {
         const mark = block(line, k.t, k.t, 'tick' + (k.hits ? '' : ' empty'), spellName(c.key) + ' tick ' + (n + 1) + ' at ' + secs(k.t) + ': ' +
@@ -79,7 +79,7 @@ export function drawTimeline(d) {
       img.title = title;
       img.style.left = ((c.t + lead) * px).toFixed(1) + 'px';
       if (c.off) img.className = 'off';
-      if (c.stopped && c.stopped !== 'clipped') img.classList.add('stopped');
+      if (c.stopped && c.stopped !== 'clipped' && c.stopped !== 'recast') img.classList.add('stopped');
       line.appendChild(img);
     });
     if (!sim && started && seconds - free > 0.3) block(line, free, seconds, 'idle', 'Nothing cast for ' + secs(seconds - free) + ' (from ' + secs(free) + ')');

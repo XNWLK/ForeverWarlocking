@@ -838,7 +838,7 @@ export function createHud(WL, handlers) {
       log('Shadow and Flame returns the Soul Shard.', 'proc');
     } else if (e.type === 'interrupt') {
       if (e.reason === 'health') { interruptedUntil = clock + 0.7; log(name + ' stops: its next tick would kill you.', 'miss'); }
-      else if (e.reason !== 'clipped' && e.reason !== 'dead') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
+      else if (e.reason !== 'clipped' && e.reason !== 'dead' && e.reason !== 'recast') { interruptedUntil = clock + 0.7; log(name + ' interrupted.', 'miss'); }
     } else if (e.type === 'heal') {
       if (e.amount >= 0.5) log('You are healed for ' + whole(e.amount) + '.', 'gain');
     } else if (e.type === 'selfHit') {

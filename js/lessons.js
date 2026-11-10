@@ -170,7 +170,7 @@ export function lessonsFor(WL, build) {
   if (has('wrack')) {
     list.push({
       id: 'wrack', title: name('wrack') + ' and Improved Shadow Bolt',
-      text: [name('wrack') + ' is your filler: a channel that makes your DoTs on the dummy tick harder while it lasts. Channel it whenever your DoTs are up and nothing else is due.',
+      text: [name('wrack') + ' is your filler: while you channel it, your ' + ['corruption', 'baneOfAgony', 'siphonLife'].filter(has).map(name).join(', ').replace(/, ([^,]*)$/, ' and $1') + ' on the dummy tick twice as often (they last just as long). Channel it whenever your DoTs are up and nothing else is due. Casting it again while it runs loses nothing: the new one keeps the ticks the old one had left.',
              has('isbUpkeep') ? 'A ' + name('shadowBolt') + ' that crits puts Improved Shadow Bolt on the dummy: more Shadow damage. "' + line('isbUpkeep') + '".' : ''].filter(Boolean),
       test: { text: '90 seconds on one dummy.', targets: 1, fight: { timed: true, seconds: 90 },
               checks: [castsCheck(name('wrack'), 'wrack', 85)].concat(has('isbUpkeep') ? [upCheck('Improved Shadow Bolt', ['isb'], 10, 20)] : []) }

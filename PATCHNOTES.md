@@ -5,6 +5,17 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-10
+- Synced with the Warlock SIM v169 and the Forever patch of 2026-11-10 (Wrack):
+  - **While you channel Wrack, your Corruption, Bane of Agony and Siphon Life on that target tick twice as often**
+    and still last as long. When Wrack stops they keep how far they had got toward their next tick, and one that ends
+    between two ticks deals the part it built up as a smaller last tick. (Wrack no longer adds 10% to your DoTs.)
+  - Wrack itself deals 70% of what it did.
+  - **Casting Wrack again while it runs loses nothing**: the new one keeps the ticks the old one had left.
+  - Soul Siphon counts only Corruption, Bane of Agony and Siphon Life.
+  - Wrack DS keeps up Bane of Agony and Siphon Life again and is stronger (about 687 DPS in the SIM). Its lesson
+    explains the new Wrack.
+
 ### 2026-11-04
 - Three builds have new names, as in the Warlock SIM: **Shadow Demo** (was Demo Pact Shadow Bolt Succubus), **Fire Demo**
   (was Demo Pact Fire Imp) and **Incinerate Pandemic** (was Destro Incinerate Succubus). They play the same, and your
