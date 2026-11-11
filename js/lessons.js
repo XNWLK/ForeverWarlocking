@@ -135,13 +135,16 @@ export function lessonsFor(WL, build) {
   }
 
   if (has('shadowTrance')) {
+    // A build can hold the proc (actWhen; Wrack DS since sim v173: only with 8 s or less left, so it does not cut a Wrack short).
+    const held = !!(build.actWhen && build.actWhen.shadowTrance);
     list.push({
       id: 'trance', title: 'Shadow Trance',
       text: ['Each tick of your Corruption' + (has('wrack') ? ' and ' + name('wrack') : '') + ' may give you Shadow Trance: your next ' + name('shadowBolt') + ' is instant. It shows on your buffs, and the ' + name('shadowBolt') + ' button lights up.',
-             'Use it at once: "' + line('shadowTrance') + '". Another proc while it is up is wasted, and it runs out after 10 s. With Corruption on more dummies it comes more often.',
+             (held ? 'Use it as the sim does: "' + line('shadowTrance') + '"' + (has('wrack') ? ', so a proc that comes during ' + name('wrack') + ' does not cut it short at once' : '') + '. Then use it before it runs out.'
+                   : 'Use it at once: "' + line('shadowTrance') + '".') + ' Another proc while it is up is wasted, and it runs out after 10 s. With Corruption on more dummies it comes more often.',
              'The proc alerts (Show, in the bar on the right) make it hard to miss.'],
-      test: { text: 'Three minutes on three dummies: Corruption on all three, and every Shadow Trance used at once.', targets: 3, fight: { timed: true, seconds: 180 },
-              checks: [procCheck('Shadow Trance', 4, 2)] }
+      test: { text: 'Three minutes on three dummies: Corruption on all three, and every Shadow Trance used ' + (held ? 'in time' : 'at once') + '.', targets: 3, fight: { timed: true, seconds: 180 },
+              checks: [procCheck('Shadow Trance', held ? 6 : 4, 2)] }   // held: the sim itself uses it about 2.8 s after it comes
     });
   }
   if (has('soulFire')) {

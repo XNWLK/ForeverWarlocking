@@ -174,7 +174,7 @@ export function createCombat(opts) {
     S = {
       seed: seed0, t: 0, mana: stats.maxMana, health: stats.maxHealth, minHealth: stats.maxHealth,
       shards: Infinity,                                   // Soul Shards never run out (Xn, 2026-10-07)
-      gcdStart: 0, gcdReady: 0, cast: null, channel: null,
+      gcdStart: 0, gcdReady: 0, cast: null, channel: null, ampUp: false,   // ampUp: Amplify Curse used and waiting for a Bane of Agony that lands
       wrackOn: 0,                                         // the target Wrack speeds DoTs up on (0 = none)
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, togReady: -Infinity, petSent: false,
@@ -521,6 +521,7 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
     r.landed++;
+    if (key === 'baneOfAgony') { S.ampUp = false; if (AMP_BTN) delete S.buffs.amplifyCurse; }   // Amplify Curse spent on a Bane that landed
     if (s.kind === 'utility') {
       if (key === 'curseOfElements') { t.deb.coe = S.t + s.duration; emit({ type: 'apply', key: key, target: ti }); }
       if (ti === 1) jowProc();
@@ -702,11 +703,14 @@ export function createCombat(opts) {
     let castMult = 1;
     // Amplify Curse is used by itself with Bane of Agony whenever it is ready (as the engine does): that Bane's whole tick
     // value, after everything else, times 1.5 (sim 2a33649; it was the base value only).
-    // As a button (AMP_BTN) it is used up by the Bane of Agony cast while it is up.
-    if (key === 'baneOfAgony' && tv('amplifyCurse') && (AMP_BTN ? buff('amplifyCurse') : ready('amplifyCurse'))) {
-      castMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
-      if (AMP_BTN) delete S.buffs.amplifyCurse;
-      else { S.cds.amplifyCurse = S.t + AMP_CD; emit({ type: 'used', name: 'Amplify Curse' }); }
+    // As a button (AMP_BTN) its buff counts while it is up. Either way it stays up when that Bane misses and goes to the
+    // next Bane of Agony that lands (sim v173: S.ampUp; land() clears it, and the button's buff, when a Bane lands).
+    if (key === 'baneOfAgony' && tv('amplifyCurse')) {
+      if (AMP_BTN) { if (buff('amplifyCurse')) castMult = 1 + tv('amplifyCurse', 'boaPct') / 100; }
+      else {
+        if (!S.ampUp && ready('amplifyCurse')) { S.ampUp = true; S.cds.amplifyCurse = S.t + AMP_CD; emit({ type: 'used', name: 'Amplify Curse' }); }
+        if (S.ampUp) castMult = 1 + tv('amplifyCurse', 'boaPct') / 100;
+      }
     }
     const free = key === 'soulFire' && (startedWithDecimation || buff('decimation'));
     if (s.shards && !free) S.shards -= s.shards;

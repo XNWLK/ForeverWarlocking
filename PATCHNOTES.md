@@ -14,6 +14,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   - **Bane of Havoc now takes a global cooldown**, like any other spell. Casting it also cuts a channel short and
     starts the fight, and the review's timeline and opener count it as a cast.
   - Wrack deals 60 per tick before spell power (was 60.2), and its tooltip and Soul Siphon's are the official ones.
+- **Amplify Curse is no longer lost on a missed Bane of Agony**: it stays up and the next Bane of Agony that lands gets
+  the bonus (on your bar or used by itself).
+- Wrack DS, as in the Warlock SIM: Corruption comes before Bane of Agony, and a Shadow Trance proc is held until it has
+  8 seconds or less left, so it does not cut a Wrack short. Its Shadow Trance lesson explains this (about 689 DPS).
 
 ### 2026-11-10
 - Synced with the Warlock SIM v169 and the Forever patch of 2026-11-10 (Wrack):
