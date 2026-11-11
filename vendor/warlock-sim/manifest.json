@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "987583c",
-    "subject":  "Round 195: Forever patch of 2026-11-10 - Wrack speeds up DoT ticks, Wrack 70%, Soul Siphon counts Corruption / Agony / Siphon Life",
+    "commit":  "8798e76",
+    "subject":  "Rounds 196-197: Wrack tick timer note; Demonic Embrace instead of Master Summoner in the Demo builds",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-10 22:11",
+    "synced":  "2026-11-11 02:11",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

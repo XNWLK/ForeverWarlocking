@@ -5,6 +5,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-11
+- Shadow Demo and Fire Demo take 2 points of Demonic Embrace instead of Master Summoner, as in the Warlock SIM
+  (a little more health; as Undead, Touch of the Grave hits a little harder).
+
 ### 2026-11-10
 - Synced with the Warlock SIM v169 and the Forever patch of 2026-11-10 (Wrack):
   - **While you channel Wrack, your Corruption, Bane of Agony and Siphon Life on that target tick twice as often**
