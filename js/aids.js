@@ -151,13 +151,13 @@ export function createAids(WL, handlers) {
   // ---------- the opener trainer ----------
   // The sim's usual first casts in this fight (sim.opener, from the worker) as a row of pictures. Your own casts
   // tick them off in order: the same spell is right, another one is wrong. Which dummy it went to is not looked at.
-  // Off the global cooldown (the race's cooldown, Bane of Havoc) and casts you stopped do not count on either side.
+  // Off the global cooldown (the race's cooldown, Amplify Curse as a button) and casts you stopped do not count on either side.
   const openerBox = byId('opener'), openerIcons = byId('openerIcons'), openerText = byId('openerText');
   let openerFor = null, openerCells = [], openerShown = '', openerDone = 0, lastOpener = -1;
   function myCasts(record) {
     return record.casts.filter(function (c) { return !c.off && !(c.kind === 'cast' && c.stopped); }).map(function (c) { return c.key; });
   }
-  function simOpener(sim) { return sim && sim.opener ? sim.opener.filter(function (k) { return k !== 'baneOfHavoc'; }) : null; }
+  function simOpener(sim) { return sim && sim.opener ? sim.opener : null; }
   function spellName(key) { return character.spells[key] ? character.spells[key].name : key; }
   // What the review says: { of, right, text } or null when there is nothing to compare.
   function openerResult(sim, record) {

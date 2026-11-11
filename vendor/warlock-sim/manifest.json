@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "4804474",
-    "subject":  "Round 198: Demonic Embrace 4 in Fire Demo, 3 in Shadow Demo",
+    "commit":  "d0b9f28",
+    "subject":  "Round 199: official notes of the patch of 2026-11-10 - Wrack 60 per tick, Bane of Havoc takes a GCD",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-11 02:38",
+    "synced":  "2026-11-11 16:06",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

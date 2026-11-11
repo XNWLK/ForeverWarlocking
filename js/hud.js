@@ -491,7 +491,6 @@ export function createHud(WL, handlers) {
     if (s.leech) notes.push('What it deals comes back to you as health.');
     if (s.threatMult && lastCombat) notes.push('Causes ' + (Math.round(lastCombat.threatMult(key) * 100) / 100) + ' times its damage as threat.');
     if (e.radius) notes.push('Hits every dummy within ' + e.radius + ' yd of ' + (e.range ? 'your target.' : 'you.'));
-    if (key === 'baneOfHavoc') notes.push('Not on the global cooldown.');
     notes.push(keyLine);
     return { title: s.name, right: s.rank ? 'Rank ' + s.rank : '', rows: rows, text: spellText(s.id), notes: notes };
   }
@@ -661,7 +660,7 @@ export function createHud(WL, handlers) {
       if (!key) continue;
       // A spell that is still being cast has no cooldown yet: it starts when the cast is complete.
       const own = cast && cast.key === key ? 0 : Math.max(0, (S.cds[key] || 0) - S.t);
-      const span = key === 'racial' ? c.racial.cd : key === 'amplifyCurse' ? 180 : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'amplifyCurse' || key === 'baneOfHavoc';
+      const span = key === 'racial' ? c.racial.cd : key === 'amplifyCurse' ? 180 : c.table[key].cd || 0, offGcd = key === 'racial' || key === 'amplifyCurse';
       let frac = 0, text = '';
       if (own > gcdLeft && span) { frac = own / span; text = own >= 60 ? Math.ceil(own / 60) + 'm' : String(Math.ceil(own)); }
       else if (!offGcd && gcdLeft > 0) frac = gcdLeft / gcdSpan;

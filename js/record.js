@@ -32,7 +32,7 @@ export function createRecorder() {
     } else if (e.type === 'used' && combat.racial() && e.name === combat.racial().name) {
       casts.push({ at: at, key: 'racial', name: e.name, target: 0, len: 0, kind: 'instant', off: true });
     } else if (e.type === 'apply' && e.key === 'baneOfHavoc') {
-      casts.push({ at: at, key: 'baneOfHavoc', target: e.target || 0, len: 0, kind: 'instant', off: true });
+      casts.push({ at: at, key: 'baneOfHavoc', target: e.target || 0, len: 0, kind: 'instant', gcd: combat.gcd() });   // on the global cooldown since the patch of 2026-11-10
     }
   }
 

@@ -861,8 +861,9 @@ export function createCombat(opts) {
     return { ok: true };
   }
 
-  // Bane of Havoc: instant, not on the global cooldown, cannot miss (as the engine casts it). It sits on one target at
-  // a time and takes the place of any other Bane there.
+  // Bane of Havoc: instant, cannot miss (as the engine casts it), and since the patch of 2026-11-10 on the global
+  // cooldown like any other cast (before it was off it). It sits on one target at a time and takes the place of any
+  // other Bane there.
   function castHavoc(ctx) {
     const e = table.baneOfHavoc, ti = S.target;
     if (!e) return fail('baneOfHavoc', 'unknown');
@@ -874,10 +875,13 @@ export function createCombat(opts) {
     res.track.spent += e.cost;
     if (S.mana < res.track.minMana) res.track.minMana = S.mana;
     if (!check) { noteClip(ti, 'baneOfAgony', 'baneOfHavoc'); noteClip(ti, 'baneOfDoom', 'baneOfHavoc'); delete T[ti].dots.baneOfAgony; delete T[ti].dots.baneOfDoom; }
+    engage(ti);                                                       // the fight begins with it, as with any instant
     S.havoc = { target: ti, expires: S.t + SPELLS.baneOfHavoc.duration };
     row('baneOfHavoc').casts++;
     S.presses.push({ t: S.t, k: 'baneOfHavoc', target: ti });
+    S.gcdStart = S.t; S.gcdReady = S.t + gcd();
     emit({ type: 'apply', key: 'baneOfHavoc', target: ti });
+    S.decideSeq = order++;
     return { ok: true };
   }
 
@@ -913,6 +917,7 @@ export function createCombat(opts) {
   function tryCast(key, ctx) {
     const why = blocked(key, ctx);
     if (why) return fail(key, why);
+    if (key === 'baneOfHavoc') { if (S.channel) interrupt('clipped'); return castHavoc(ctx); }   // a cast like the others: it cuts a channel
     // Wrack over a running Wrack at the same target (patch of 2026-11-10): nothing is clipped, the new one takes over
     // the ticks the old one still had (cast between two ticks: the one under way counts as left).
     const c = S.channel;
@@ -928,7 +933,6 @@ export function createCombat(opts) {
     if (S.over) return fail(key, 'dead');
     if (key === 'racial') return useRacial();
     if (key === 'amplifyCurse') return useAmplify();
-    if (key === 'baneOfHavoc') return castHavoc(ctx);
     if (!table[key]) return fail(key, 'unknown');
     const free = readyAt();
     if (free > S.t + EPS) {

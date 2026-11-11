@@ -90,7 +90,7 @@ export function drawTimeline(d) {
   if (d.simCasts && d.simCasts.length) {
     castRow('The sim', d.simCasts.filter(function (c) { return c.t <= seconds + 0.01; }).map(function (c) {
       const m = /^x(\d+):(.+)$/.exec(c.k);
-      return { t: c.t, key: m ? m[2] : c.k, target: m ? Number(m[1]) : 1, len: c.d || 0, kind: c.ch ? 'channel' : c.d > 0 ? 'cast' : 'instant', off: c.k === 'baneOfHavoc' };
+      return { t: c.t, key: m ? m[2] : c.k, target: m ? Number(m[1]) : 1, len: c.d || 0, kind: c.ch ? 'channel' : c.d > 0 ? 'cast' : 'instant' };
     }), true);
   }
 

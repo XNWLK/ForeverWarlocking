@@ -10,6 +10,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   (a little more health; as Undead, Touch of the Grave hits a little harder).
 - Then more Demonic Embrace, as in the Warlock SIM: Fire Demo has 4 points (one less in Demonic Energies and in Demonic
   Brand), Shadow Demo 3 (one less in Demonic Energies). Damage is nearly the same; Fire Demo is still the top build.
+- From the official notes of the Forever patch of 2026-11-10, as in the Warlock SIM:
+  - **Bane of Havoc now takes a global cooldown**, like any other spell. Casting it also cuts a channel short and
+    starts the fight, and the review's timeline and opener count it as a cast.
+  - Wrack deals 60 per tick before spell power (was 60.2), and its tooltip and Soul Siphon's are the official ones.
 
 ### 2026-11-10
 - Synced with the Warlock SIM v169 and the Forever patch of 2026-11-10 (Wrack):
