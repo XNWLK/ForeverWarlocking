@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "8798e76",
-    "subject":  "Rounds 196-197: Wrack tick timer note; Demonic Embrace instead of Master Summoner in the Demo builds",
+    "commit":  "4804474",
+    "subject":  "Round 198: Demonic Embrace 4 in Fire Demo, 3 in Shadow Demo",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-11 02:11",
+    "synced":  "2026-11-11 02:38",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

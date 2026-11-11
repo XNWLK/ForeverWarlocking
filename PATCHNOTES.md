@@ -8,6 +8,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ### 2026-11-11
 - Shadow Demo and Fire Demo take 2 points of Demonic Embrace instead of Master Summoner, as in the Warlock SIM
   (a little more health; as Undead, Touch of the Grave hits a little harder).
+- Then more Demonic Embrace, as in the Warlock SIM: Fire Demo has 4 points (one less in Demonic Energies and in Demonic
+  Brand), Shadow Demo 3 (one less in Demonic Energies). Damage is nearly the same; Fire Demo is still the top build.
 
 ### 2026-11-10
 - Synced with the Warlock SIM v169 and the Forever patch of 2026-11-10 (Wrack):
