@@ -698,10 +698,9 @@ export function createCombat(opts) {
     return { castMult: castMult };
   }
 
-  // carry: ticks a Wrack you cast again over a running Wrack takes over from it (patch of 2026-11-10).
-  function startCast(key, ti, carry) {
+  function startCast(key, ti) {
     const s = SPELLS[key], e = table[key];
-    const nCh = s.kind === 'channel' ? e.ticks + (carry || 0) : 0, chDur = carry ? nCh * s.tickEvery : s.duration;
+    const nCh = s.kind === 'channel' ? e.ticks : 0, chDur = s.duration;
     const castT = castTime(key), gcdT = gcd();
     const trance = isSB(key) && buff('shadowTrance');
     // A cast bar started before the fight is a precast: the fight begins when it lands (handle, 'castEnd').
@@ -709,7 +708,7 @@ export function createCombat(opts) {
     if (key !== 'lifeTap' && !precast) engage(ti);
     S.presses.push({ t: S.t, k: key, target: ti });
     S.gcdStart = S.t; S.gcdReady = S.t + gcdT;
-    emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? chDur : 0, carry: carry || 0 });
+    emit({ type: 'cast', key: key, target: ti, castTime: castT, channel: s.kind === 'channel' ? chDur : 0 });
 
     if (key === 'lifeTap') {
       const gain = tapGain();
@@ -907,13 +906,10 @@ export function createCombat(opts) {
     const why = blocked(key, ctx);
     if (why) return fail(key, why);
     if (key === 'baneOfHavoc') { if (S.channel) interrupt('clipped'); return castHavoc(ctx); }   // a cast like the others: it cuts a channel
-    // Wrack over a running Wrack at the same target (patch of 2026-11-10): nothing is clipped, the new one takes over
-    // the ticks the old one still had (cast between two ticks: the one under way counts as left).
-    const c = S.channel;
-    const carry = c && key === 'wrack' && c.key === 'wrack' && c.target === S.target
-      ? Math.max(0, Math.floor((c.end - c.start) / SPELLS.wrack.tickEvery + 1e-6) - c.done) : 0;
-    if (c) interrupt(carry ? 'recast' : 'clipped');
-    startCast(key, S.target, carry);
+    // Any channel cuts the one running, Wrack over Wrack too (sim v176, Xn): the new one runs its own 6 ticks, the old
+    // one's leftover ticks are lost, and a resisted recast loses the old one as well.
+    if (S.channel) interrupt('clipped');
+    startCast(key, S.target);
     return { ok: true };
   }
 

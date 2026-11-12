@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "58a8d16",
-    "subject":  "Round 204: a half-way point gives its Wrack extra tick once",
+    "commit":  "4ba0127",
+    "subject":  "Rounds 205-206: Wrack cast over a running Wrack replaces it",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-12 10:01",
+    "synced":  "2026-11-12 15:54",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
