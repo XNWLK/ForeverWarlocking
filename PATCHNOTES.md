@@ -16,6 +16,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - **Casting Wrack again while it runs starts it over**, like any other channel: the new one runs its own 6 ticks and
   the old one's leftover ticks are lost (if the new one is resisted, the old one is lost too). Before, the new one kept
   the ticks the old one had left. As in the Warlock SIM; the Wrack lesson says so.
+- Fixed: for a few minutes after that update the page did not load (a typo in the Wrack lesson).
 
 ### 2026-11-11
 - Shadow Demo and Fire Demo take 2 points of Demonic Embrace instead of Master Summoner, as in the Warlock SIM
