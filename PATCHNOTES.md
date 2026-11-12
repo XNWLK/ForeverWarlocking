@@ -5,6 +5,13 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-12
+- **Wrack works differently, as in the Warlock SIM**: your Corruption, Bane of Agony and Siphon Life keep their usual
+  ticks, and every halfway point between two of them that falls while you channel Wrack at their target gives one
+  extra tick (Bane of Agony's at the strength of the moment it falls in). Stopping Wrack changes nothing else, and
+  there is no smaller last tick any more. Over a whole Wrack that is about as many ticks as before; the combat log
+  marks each extra one. Wrack DS is still about 689 DPS. Its lesson explains the new rule.
+
 ### 2026-11-11
 - Shadow Demo and Fire Demo take 2 points of Demonic Embrace instead of Master Summoner, as in the Warlock SIM
   (a little more health; as Undead, Touch of the Grave hits a little harder).

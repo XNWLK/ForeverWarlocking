@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "0b66fa0",
-    "subject":  "Round 200: Amplify Curse survives a missed Bane of Agony; Wrack DS holds Nightfall procs",
+    "commit":  "31cfa5a",
+    "subject":  "Rounds 201-203: Wrack extra ticks at the half-way points; item and enchant search",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-11 16:55",
+    "synced":  "2026-11-12 05:22",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

@@ -816,7 +816,7 @@ export function createHud(WL, handlers) {
       log(name + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.crit ? '!' : '.'), e.crit ? 'crit' : '');
       if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'tick') {
-      log(name + ' ticks ' + (c.targets > 1 ? dummy + ' ' : '') + 'for ' + whole(e.amount) + (e.crit ? ' (crit).' : '.'), e.crit ? 'crit' : '');
+      log(name + ' ticks ' + (c.targets > 1 ? dummy + ' ' : '') + 'for ' + whole(e.amount) + (e.crit ? ' (crit)' : '') + (e.extra ? ' (extra tick from Wrack).' : '.'), e.crit ? 'crit' : '');
       floatFor(e, anchor);
     } else if (e.type === 'miss') {
       log(e.immune ? dummy + ' is immune to your ' + name + '.' : name + ' misses ' + dummy + '.', 'miss');

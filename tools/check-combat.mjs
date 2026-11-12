@@ -79,6 +79,8 @@ for (const scene of SCENES) {
           combat.petCommand('attack', 1);
           combat.update(0, ctx);
         }
+        // Moments the engine cut a channel at its tick for the next cast (it decides inside the tick; see heldX in combat.js).
+        const cuts = new Set(sim.log.filter(l => l.type === 'clip' || l.type === 'recast').map(l => l.t));
         for (const entry of sim.log) {
           if (entry.type !== 'cast' && entry.type !== 'racial') continue;
           if (entry.precast != null) continue;             // the engine's own precast: it was started above
@@ -110,7 +112,7 @@ for (const scene of SCENES) {
             const before = combat.state.mana, engine = entry.mana + combat.cost(key);
             if (Math.abs(before - engine) > 1) { manaOff++; problems.push('mana before ' + entry.spell + ' at ' + entry.t + ' s: engine ' + engine.toFixed(1) + ', here ' + before.toFixed(1)); }
           }
-          const result = combat.press(key, ctx);
+          const result = combat.press(key, cuts.has(entry.t) ? Object.assign({}, ctx, { cutAtTick: true }) : ctx);
           if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');
           freeSince = Math.max(combat.readyAt(), combat.state.channel ? combat.state.channel.end : 0);
         }
