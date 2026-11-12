@@ -11,6 +11,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   extra tick (Bane of Agony's at the strength of the moment it falls in). Stopping Wrack changes nothing else, and
   there is no smaller last tick any more. Over a whole Wrack that is about as many ticks as before; the combat log
   marks each extra one. Wrack DS is still about 689 DPS. Its lesson explains the new rule.
+- **Wrack fix**: when you start Wrack again at the very moment of a halfway point, that point now gives its extra
+  tick once instead of twice, as in the Warlock SIM.
 
 ### 2026-11-11
 - Shadow Demo and Fire Demo take 2 points of Demonic Embrace instead of Master Summoner, as in the Warlock SIM

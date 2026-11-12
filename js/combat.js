@@ -439,7 +439,8 @@ export function createCombat(opts) {
   // Queue DoT d's next half-way point from now (strict: after now, right after one came), while the DoT lasts.
   function xSched(ti, key, d, strict) {
     const te = SPELLS[key].tickEvery;
-    const t = d.applied + (Math.ceil((S.t - d.applied) / te - 0.5 + (strict ? 1e-6 : -1e-6)) + 0.5) * te;
+    let t = d.applied + (Math.ceil((S.t - d.applied) / te - 0.5 + (strict ? 1e-6 : -1e-6)) + 0.5) * te;
+    if (d.xLast != null && t <= d.xLast + 1e-6) t += te;   // a point that already ticked (Wrack restarted right then) ticks once (sim v175)
     if (t < d.expires - 1e-6) push({ t: t, o: 0, type: 'wrackX', key: key, target: ti, inst: d.inst, gen: d.xg });
   }
   // Wrack started or stopped (or moved to another target): the queued extra ticks are void (d.xg), and the DoTs on its
@@ -1067,6 +1068,7 @@ export function createCombat(opts) {
       // Bane of Agony: the ramp of the 2-second slot it falls in.
       const s = SPELLS[ev.key], ri = s.ramp ? Math.min(s.ramp.length - 1, Math.max(0, Math.ceil((S.t - d.applied) / s.tickEvery - 1e-6) - 1)) : 0;
       periodicTick(ev.key, d.snap, ri, ev.target, true);
+      d.xLast = S.t;
       if (!S.over && T[ev.target].dots[ev.key] === d) xSched(ev.target, ev.key, d, true);
     } else if (ev.type === 'dmgTaken') {
       takeHit();

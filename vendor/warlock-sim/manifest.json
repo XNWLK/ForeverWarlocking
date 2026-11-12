@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "31cfa5a",
-    "subject":  "Rounds 201-203: Wrack extra ticks at the half-way points; item and enchant search",
+    "commit":  "58a8d16",
+    "subject":  "Round 204: a half-way point gives its Wrack extra tick once",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-12 05:22",
+    "synced":  "2026-11-12 10:01",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
