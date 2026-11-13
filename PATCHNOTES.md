@@ -6,6 +6,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-13
+- Brought up to date with the Warlock SIM. If you bring your gear in from its gear builder, a trinket's always-on bonus
+  (such as extra spell power) now counts here too. Trinkets you use or that proc still do nothing here, as before.
 - Brought up to date with the Warlock SIM (its item search only). Nothing changes in play.
 
 ### 2026-11-12
