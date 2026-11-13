@@ -5,6 +5,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-13
+- Brought up to date with the Warlock SIM (its item search only). Nothing changes in play.
+
 ### 2026-11-12
 - **Wrack works differently, as in the Warlock SIM**: your Corruption, Bane of Agony and Siphon Life keep their usual
   ticks, and every halfway point between two of them that falls while you channel Wrack at their target gives one
