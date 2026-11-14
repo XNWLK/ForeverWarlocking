@@ -6,6 +6,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-14
+- Brought up to date with the Warlock SIM. Nothing changes in play.
 - **Partial resists work as in the Warlock SIM's new model**: a boss with resistance resists a share of each hit in
   10% steps, and your DoT and channel ticks are resisted much less than direct hits. Curse of the Elements still takes
   its resistance away, so the builds' DPS barely moves (0.1 at most). Spell Pierce on your gear is worth about half as

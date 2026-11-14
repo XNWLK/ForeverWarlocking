@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "832cd99",
-    "subject":  "Round 210: item phases, game-style tooltips, Spell Pierce, set bonuses",
+    "commit":  "ec0b114",
+    "subject":  "Round 212: Pre-BiS / Custom gear, ideal Phase 1 buffs \u0026 consumables by default",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-14 08:44",
+    "synced":  "2026-11-14 18:02",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
