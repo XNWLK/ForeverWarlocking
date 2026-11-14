@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "ec0b114",
-    "subject":  "Round 212: Pre-BiS / Custom gear, ideal Phase 1 buffs \u0026 consumables by default",
+    "commit":  "7c7c5fc",
+    "subject":  "Round 213: Phase 1 enchants on the Pre-BiS lists, enchant phases, Obsidian Bauble",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-14 18:02",
+    "synced":  "2026-11-14 19:27",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
