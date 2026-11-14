@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "8047824",
-    "subject":  "Round 209: 20 more trinket effects, boss type and zone settings",
+    "commit":  "832cd99",
+    "subject":  "Round 210: item phases, game-style tooltips, Spell Pierce, set bonuses",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-13 22:10",
+    "synced":  "2026-11-14 08:44",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

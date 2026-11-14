@@ -327,9 +327,11 @@ export function createCombat(opts) {
   function spNow(e) { return e.sp * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
 
   let resCache = {};
-  function vulnMult(school, ti) {    // partial resists and Spell Pierce
-    const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0');
-    const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen));
+  // periodic: a DoT or channel tick (sim v179, its 'fitted' model: a tick rolls a tenth of a hit's share). Area ticks
+  // (Rain of Fire, Hellfire) roll as hits, as in the engine's aoeTick.
+  function vulnMult(school, ti, periodic) {    // partial resists and Spell Pierce
+    const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '');
+    const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen, periodic));
     let m = pr.flat;
     if (pr.dist.length > 1) {
       const x = R.vuln();
@@ -466,7 +468,7 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
-    amount *= vulnMult(s.school, ti);
+    amount *= vulnMult(s.school, ti, true);
     const crit = R.crit() * 100 < e.critPct;
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
