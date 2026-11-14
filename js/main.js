@@ -229,11 +229,12 @@ let keyCodes = ACTION_CODES.slice();
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-// The settings of the fight: the DPS sim's defaults, then an imported settings code, then the fight options.
-// Things a code switches on that you would have to press during the fight (potions, runes, explosives, Power
-// Infusion, Mana Tide, Innervate) are not playable here, so they are switched off - for you and for the sim average.
+// The settings of the fight: the DPS sim page's defaults (since its v181: each build in its own Pre-BiS gear, ideal
+// Phase 1 raid buffs and consumables), then an imported settings code, then the fight options. The Spellblasting potion,
+// mana potions and runes are used by themselves at the sim's moments (js/combat.js). Explosives, Power Infusion, Mana
+// Tide and Innervate are not playable here, so they are switched off - for you and for the sim average.
 function buildConfig() {
-  const cfg = clone(WL.DEFAULT_CONFIG), base = clone(WL.DEFAULT_CONFIG.fight);
+  const cfg = WL.pageDefaultConfig(), base = clone(cfg.fight);
   leftOut = []; codePrecast = '';
   const code = getSetting('settingsCode');
   if (code) {
@@ -249,7 +250,7 @@ function buildConfig() {
   }
   Object.keys(cfg.consumables).forEach(function (k) {
     const c = cfg.consumables[k];
-    if (c.on && (c.spPotion || c.manaRestore || c.explosive)) { c.on = false; leftOut.push(c.name); }
+    if (c.on && c.explosive) { c.on = false; leftOut.push(c.name); }
   });
   const exclusive = {};
   Object.keys(cfg.buffs).forEach(function (k) {
@@ -591,7 +592,7 @@ const panels = createPanels({
       const fail = function (text) { panels.setImport(typed.build, typed.settings, ['Share link: ' + text], true, link); };
       if (!WL.decodeShare) { fail('this copy of the sim cannot read share links.'); return; }
       WL.decodeShare(WL.shareFromHash(link) || link).then(function (p) {
-        const cfg = clone(WL.DEFAULT_CONFIG), unknown = WL.applySettings(cfg, p.s || WL.settingsMerge(p.d)), said = ['its settings'];
+        const cfg = WL.pageDefaultConfig(), unknown = WL.applySettings(cfg, p.s || WL.settingsMerge(p.d)), said = ['its settings'];
         let build = typed.build;
         if (typeof p.b === 'string') {
           if (WL.BUILDS.some(function (b) { return b.key === p.b; })) { setSetting('build', p.b); build = ''; said.push('the build ' + WL.BUILDS.filter(function (b) { return b.key === p.b; })[0].short); }
@@ -1017,7 +1018,8 @@ function startingBuild() {
 }
 
 // What you are buffed with before the fight starts, as the DPS sim's settings have it: Demonic Sacrifice, the raid
-// buffs that are switched on, and the consumables that last the whole fight (your Spellstone or Firestone, elixirs).
+// buffs that are switched on, and the consumables that last the whole fight (your Spellstone or Firestone, elixirs; not
+// the potion and the rune, which are used during the fight).
 function standingBuffs(build, stats) {
   const list = [];
   if (stats.sacrificeActive && build.sacrifice) {
@@ -1030,7 +1032,7 @@ function standingBuffs(build, stats) {
   });
   Object.keys(config.consumables).forEach(function (k) {
     const c = config.consumables[k];
-    if (c.on) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '', from: c.cat });
+    if (c.on && !c.spPotion && !c.manaRestore) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '', from: c.cat });
   });
   return list;
 }

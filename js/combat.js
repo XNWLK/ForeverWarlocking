@@ -67,7 +67,9 @@ export function rowKey(target, key) { return target > 1 ? 'x' + target + ':' + k
 // ctx (given to update, press and blocked): { moving, distances: [, d1, d2, d3] you to each target,
 //       gaps: [[..]] target to target, petDistance: the pet to its target }. Anything left out counts as "in range".
 export function createCombat(opts) {
-  const WL = opts.WL, cfg = opts.config, build = opts.build, raceKey = opts.raceKey;
+  const WL = opts.WL, build = opts.build, raceKey = opts.raceKey;
+  // gearMode 'preBis' (the sim's page default since its v181): each build in its own Pre-BiS gear, as the engine does.
+  const cfg = WL.cfgFor ? WL.cfgFor(build, opts.config) : opts.config;
   const stats = WL.computeStats(build, raceKey, cfg);
   const table = WL.buildSpellTable(build, stats, cfg);
   const SPELLS = WL.spellsFor(cfg);
@@ -324,7 +326,7 @@ export function createCombat(opts) {
     return m;
   }
   // Your spell power right now (Blood Fury counts while it is up). Ticks read it when they land: DoTs are dynamic.
-  function spNow(e) { return e.sp * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
+  function spNow(e) { return (e.sp + potSp()) * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
 
   let resCache = {};
   // periodic: a DoT or channel tick (sim v179, its 'fitted' model: a tick rolls a tenth of a hit's share). Area ticks
@@ -469,7 +471,7 @@ export function createCombat(opts) {
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
     amount *= vulnMult(s.school, ti, true);
-    const crit = R.crit() * 100 < e.critPct;
+    const crit = R.crit() * 100 < e.critPct + trCrit(key);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
     if (S.over) return;
@@ -491,7 +493,7 @@ export function createCombat(opts) {
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
       amount *= vulnMult(s.school, ti);
-      const crit = R.crit() * 100 < e.critPct;
+      const crit = R.crit() * 100 < e.critPct + trCrit(key);
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
@@ -524,9 +526,13 @@ export function createCombat(opts) {
       S.buffs.decimation = S.t + 10;
     }
     amount *= vulnMult(s.school, ti);
-    const crit = R.crit() * 100 < e.critPct;
+    // Revelation (the boss only, as in the engine): + its crit on this spell; a spell that does not crit may give it.
+    const revHad = REV && ti === 1 ? revCritBonus() : 0;
+    const crit = R.crit() * 100 < e.critPct + revHad + trCrit(key);
+    if (REV && ti === 1) revAfter(crit, revHad > 0);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, false, ti);
+    if (crit && ti === 1) trCritDone();                                // Weakness Analyzer ends on a direct crit
     // Improved Shadow Bolt: every Shadow Bolt crit applies it (Xn, 2026-10-07; there is no second hit roll for it).
     if (isSB(key) && crit && tv('improvedShadowBolt') && !t.dead) { t.deb.isb = S.t + 12; emit({ type: 'apply', key: 'isb', target: ti }); }
     if (key === 'searingPain' && tv('demonicBrand') && P && !t.dead) {  // Demonic Brand: the pet's attacks on it add damage
@@ -567,7 +573,7 @@ export function createCombat(opts) {
     if (school !== 'physical' && debuff(P.target, 'coe')) m *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
     return m;
   }
-  function warlockSpNow() { return stats.sp * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
+  function warlockSpNow() { return (stats.sp + potSp()) * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
   function petSp() { return warlockSpNow() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
 
   function petSpellHit(sp) {
@@ -816,6 +822,83 @@ export function createCombat(opts) {
     }
   }
 
+  // ---------- what the sim uses by itself (its page defaults since v181: Pre-BiS gear, Phase 1 consumables) ----------
+  // Not buttons (Xn: no potions or runes as buttons): used at the engine's moments. Before a damaging cast you can pay
+  // for: the Spellblasting potion and a use trinket, by the engine's "Pop cooldowns" rule (options.activesPolicy, the
+  // default 'doom'). Before any cast or Life Tap: a mana potion or rune once its amount is missing. Revelation on the
+  // weapon: a direct spell that does not crit may give the next one + its crit. Only the crit trinket (Weakness
+  // Analyzer) is played: no Pre-BiS list has a proc trinket or a set bonus with an effect.
+  const CONS = WL.activeConsumables(cfg);
+  const SP_POT = CONS.filter(function (c) { return c.spPotion; })[0] || null;
+  const MANA_ITEMS = CONS.filter(function (c) { return c.manaRestore; });
+  const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit'; });
+  const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};
+  const REV = (WL.equippedEnchantFx ? WL.equippedEnchantFx(cfg) : []).filter(function (x) { return x.fx.proc.kind === 'crit'; })[0] || null;
+  let revUntil = -1;
+  const ACT_POL = (cfg.options && cfg.options.activesPolicy) || 'pull';
+  const ACT_DOOM = WL.effectiveRotation(build, cfg).indexOf('bane') >= 0 || (build.timeline || []).some(function (x) { return x.k === 'baneOfDoom'; });
+  let actOpen = ACT_POL === 'pull', doomSeen = false;
+  function potSp() { return SP_POT && buff('spPotion') ? SP_POT.spPotion.sp : 0; }
+  function trUp(x) { return trUntil[x.slot] > S.t + EPS; }
+  function trCrit(k) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (trUp(x) && (!u.tree || (s && s.tree === u.tree))) c += u.pct; }); return c; }
+  function trCritDone() { TRK.forEach(function (x) { if (x.fx.use.endsOnCrit && trUp(x)) trUntil[x.slot] = -1; }); }
+  function revCritBonus() { return REV && revUntil > S.t + EPS ? REV.fx.proc.pct : 0; }
+  function revAfter(crit, had) {
+    if (had) { revUntil = -1; return; }                              // used up by this spell
+    if (!crit && R.proc() * 100 < (cb.revelationChancePct || 0) * Math.max(0, 1 - stats.critPct / 100)) {
+      revUntil = S.t + REV.fx.proc.duration;
+      emit({ type: 'used', name: REV.fx.name, proc: true });
+    }
+  }
+  function activesOk(key) {                                          // the engine's activesOk ('pull', 'execute', 'doom')
+    if (actOpen) return true;
+    if (ACT_POL === 'execute') return actOpen = executePhase(1);
+    const d = T[1].dots.baneOfDoom;
+    if (d) doomSeen = true;
+    if (!d || d.expires <= S.t + EPS) return actOpen = doomSeen || !ACT_DOOM || dotLeft('baneOfAgony', 1) > 0;
+    // The engine asks before it uses the race's cooldown; here a Berserking pressed at this very moment is already up.
+    const bz = S.buffs.berserking, fresh = bz != null && S.cds.racial != null && Math.abs(S.cds.racial - racialOf('cooldown').cd - S.t) < EPS;
+    if (fresh) delete S.buffs.berserking;
+    const toBoom = d.expires - S.t, sp = SPELLS[key], len = sp.kind === 'channel' ? sp.duration : Math.max(castTime(key), gcd());
+    if (fresh) S.buffs.berserking = bz;
+    return actOpen = toBoom > endAt() - S.t || toBoom <= len + EPS;
+  }
+  function discountedCost(key) {                                     // the price if Eureka! were popped now
+    const cd = racialOf('cooldown'); let c = table[key].cost;
+    if (cd && cd.costRedPct && (buff('eureka') || ready('racial'))) c *= 1 - cd.costRedPct / 100;
+    return c;
+  }
+  function popActives(key) {                                         // right before a damaging cast
+    TRK.forEach(function (x) {
+      const u = x.fx.use, pol = TRU[x.slot] || 'cds';
+      const when = pol === 'never' ? false : pol === 'ready' ? true : pol === 'execute' ? executePhase(1) : activesOk(key);
+      if (!when || !ready('tr:' + x.slot) || S.t >= endAt() - EPS) return;
+      S.cds['tr:' + x.slot] = S.t + u.cd;
+      if (u.duration) trUntil[x.slot] = S.t + u.duration;
+      emit({ type: 'used', name: x.fx.name });
+    });
+    if (activesOk(key) && SP_POT && ready('cd:' + SP_POT.cdGroup)) {
+      S.cds['cd:' + SP_POT.cdGroup] = S.t + SP_POT.cd; S.buffs.spPotion = S.t + SP_POT.spPotion.duration;
+      emit({ type: 'used', name: SP_POT.name });
+    }
+  }
+  function useManaItems() {                                          // a mana potion or rune, once its amount is missing
+    MANA_ITEMS.forEach(function (c) {
+      let amt = c.manaRestore.amount || stats.maxMana * c.manaRestore.pct / 100;
+      const miss = stats.maxMana - S.mana;
+      if (!ready('cd:' + c.cdGroup) || miss < amt) return;
+      if (c.healthCost) {                                            // Demonic Rune: 800 health (less with Molten Skin / Soul Link)
+        const hc = Math.round(c.healthCost * selfTakenMult());
+        if (S.health <= hc) return;
+        loseHealth(hc);
+      }
+      if (amt > miss) amt = miss;
+      S.cds['cd:' + c.cdGroup] = S.t + c.cd; S.mana += amt;
+      res.track.consumableMana = (res.track.consumableMana || 0) + amt;
+      emit({ type: 'mana', source: c.name, amount: amt });
+    });
+  }
+
   function useRacial() {
     const cd = racialOf('cooldown');
     if (!cd) return fail('racial', 'noRacial');
@@ -905,7 +988,12 @@ export function createCombat(opts) {
     // Extra Wrack ticks waiting at this moment (heldX): unless this press cuts the channel at its tick (ctx.cutAtTick: the
     // check and the hint say so), they and what follows them happen first, as in the engine, which did not cut there.
     if (!(ctx && ctx.cutAtTick)) flushHeld();
+    // The engine's decision: mana items first (not for Bane of Havoc, which it casts before them), then the cooldowns
+    // right before a damaging cast you can pay for (even when it then Life Taps first).
+    if (key !== 'baneOfHavoc') useManaItems();
     const why = blocked(key, ctx);
+    const precast = !check && S.fightStart === null && SPELLS[key].kind !== 'channel' && castTime(key) > EPS;   // as startCast decides it
+    if ((!why || why === 'mana') && !precast && key !== 'lifeTap' && key !== 'baneOfHavoc' && SPELLS[key].kind !== 'utility' && S.mana >= discountedCost(key)) popActives(key);
     if (why) return fail(key, why);
     if (key === 'baneOfHavoc') { if (S.channel) interrupt('clipped'); return castHavoc(ctx); }   // a cast like the others: it cuts a channel
     // Any channel cuts the one running, Wrack over Wrack too (sim v176, Xn): the new one runs its own 6 ticks, the old
@@ -1140,8 +1228,11 @@ export function createCombat(opts) {
   // moment (after the tick) is void when Wrack is cut there. Here you press after the tick: such an extra tick, and
   // everything after it at that moment, waits until we know. Cutting the channel then (interrupt) lets them happen,
   // in the engine's order, before the new cast; otherwise they happen once the clock moves on.
+  // A hit you take at the very moment of any channel's tick waits the same way (sim v181 sync): the engine cuts the
+  // channel first, so the hit finds nothing to push back and rolls no pushback dice (Concentration Aura gives a chance).
   function heldX(ev, limit) {
     const c = S.channel;
+    if (ev.type === 'dmgTaken') return ev.t > limit - EPS && c && c.tickAt != null && Math.abs(c.tickAt - ev.t) <= EPS;
     return ev.type === 'wrackX' && ev.t > limit - EPS && c && c.key === 'wrack' && c.target === ev.target &&
            c.tickAt != null && Math.abs(c.tickAt - ev.t) <= EPS;
   }
@@ -1182,6 +1273,11 @@ export function createCombat(opts) {
     let mana = S.mana - (c ? c.cost : 0), shards = S.shards;
     if (c && SPELLS[c.key].shards && !c.decimation) shards -= SPELLS[c.key].shards;
     if (wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false, why: 'havoc' };
+    // A mana potion or rune ready by then is used before the choice (the engine's decide), and one still to come lowers
+    // the need to Life Tap (freeManaLevel).
+    const itemReady = function (c) { return !S.cds['cd:' + c.cdGroup] || S.cds['cd:' + c.cdGroup] <= at + EPS; };
+    const itemAmt = function (c) { return c.manaRestore.amount || stats.maxMana * c.manaRestore.pct / 100; };
+    MANA_ITEMS.forEach(function (c) { if (itemReady(c) && stats.maxMana - mana >= itemAmt(c) && !(c.healthCost && S.health <= Math.round(c.healthCost * selfTakenMult()))) mana = Math.min(stats.maxMana, mana + itemAmt(c)); });
 
     const view = {
       t: at, remaining: remaining == null ? Infinity : remaining, cfg: cfg, build: build,
@@ -1201,9 +1297,10 @@ export function createCombat(opts) {
       petSpellCost: function () { return P && P.c.spell ? P.c.spell.cost : Infinity; },
       petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : Infinity; },
       // The sim's lifeTapNeed (2026-10-28): the mana the rest of the fight needs at the rate it went down so far (Life Tap's
-      // own mana left out); nothing in the first 6 s. No free mana here (no Innervate, Mana Tide, potions or trinkets).
+      // own mana left out); nothing in the first 6 s. Free mana: a mana potion or rune ready by then (no Innervate, Mana
+      // Tide or mana trinkets here).
       manaNeedLeft: function () { const f = fightTime(at); if (f < 6) return Infinity; return Math.max(0, (stats.maxMana - mana + res.track.tapMana) / f) * view.remaining; },
-      freeManaLevel: function () { return 0; },
+      freeManaLevel: function () { let lv = 0; MANA_ITEMS.forEach(function (c) { if (itemReady(c)) lv = Math.max(lv, stats.maxMana - itemAmt(c)); }); return lv; },
       // The sim's fsr condition (v161): seconds since you last spent mana. A cast bar still running spends at its end.
       lastSpend: c && c.cost > 0 ? c.end : S.lastSpend, spendAt: null
     };

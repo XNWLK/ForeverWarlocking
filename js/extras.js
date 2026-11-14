@@ -210,6 +210,11 @@ export function createExtras(WL, handlers) {
   // The items you wear, when the imported settings come from the Warlock SIM's gear builder. The numbers above
   // already hold them (the sim adds them up into the gear values); this only says what they are.
   function gearList() {
+    if (config && config.gearMode === 'preBis') {   // the sim page's default since its v181 (item names are not in the copy)
+      sheetBody.appendChild(el('h3', 'Your gear'));
+      sheetBody.appendChild(el('p', 'This build wears its own Pre-BiS gear from the Warlock SIM: Phase 1 items with their enchants. The numbers above already hold it.', 'hint'));
+      return;
+    }
     const gb = config && config.gearBuilder;
     if (!gb || !gb.on) return;
     sheetBody.appendChild(el('h3', 'Your gear'));

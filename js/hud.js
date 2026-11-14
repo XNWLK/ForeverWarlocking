@@ -828,7 +828,7 @@ export function createHud(WL, handlers) {
     } else if (e.type === 'proc') {
       log('You gain ' + AURA_INFO[e.name].name + '.', 'proc');
     } else if (e.type === 'used') {
-      log('You use ' + e.name + '.', 'proc');
+      log((e.proc ? 'You gain ' : 'You use ') + e.name + '.', 'proc');
     } else if (e.type === 'expire') {
       log(AURA_INFO[e.name].name + ' fades.');
     } else if (e.type === 'consume') {

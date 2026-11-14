@@ -3,7 +3,7 @@
     "commit":  "7c7c5fc",
     "subject":  "Round 213: Phase 1 enchants on the Pre-BiS lists, enchant phases, Obsidian Bauble",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-14 19:27",
+    "synced":  "2026-11-14 19:29",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
@@ -12,6 +12,7 @@
                   "data/races.js",
                   "data/builds.js",
                   "data/trinkets.js",
+                  "data/pre-bis-gear.js",
                   "engine/stats.js",
                   "engine/spelltable.js",
                   "engine/rng.js",

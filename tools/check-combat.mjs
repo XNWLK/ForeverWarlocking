@@ -47,12 +47,16 @@ function withFiller(build, filler) {
   return copy;
 }
 
+// Two starting points: the engine's plain defaults, and the sim page's defaults (Pre-BiS gear per build, ideal Phase 1
+// buffs and consumables: the potion, the rune, the Weakness Analyzer and Revelation, which the game uses by itself).
+const BASES = [{ name: 'plain', make: () => JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG)) }, { name: 'page', make: () => WL.pageDefaultConfig() }];
+for (const base of BASES) {
 for (const scene of SCENES) {
   for (const ready of WL.BUILDS) {
     const build = withFiller(ready, scene.filler);
     for (const raceKey of WL.RACE_KEYS) {
       for (const seed of scene.seeds) {
-        const cfg = JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG));
+        const cfg = base.make();
         cfg.fight.targets = scene.targets;
         cfg.fight.multiDot = scene.targets > 1;
         Object.assign(cfg.fight, scene.fight || {});
@@ -90,14 +94,20 @@ for (const scene of SCENES) {
           const logged = entry.t + shift;
           combat.update(logged - 0.001, ctx);
           let at = logged, off = 0.00051;
-          const candidates = [combat.readyAt()].concat(combat.eventTimes());
-          for (let j = 0; j <= 400; j++) candidates.push(freeSince + j * 0.1);
+          // Firm moments first: when you became free, a queued event, the edges of a movement phase. The 0.1 s idle steps
+          // only when none of those fits (an idle step can lie a hair closer to the rounded time than the real moment).
+          const firm = [combat.readyAt()].concat(combat.eventTimes());
           if (cfg.fight.moveEvery) {
             const k = Math.floor(entry.t / cfg.fight.moveEvery);
-            candidates.push(shift + k * cfg.fight.moveEvery, shift + k * cfg.fight.moveEvery + cfg.fight.moveDuration);
+            firm.push(shift + k * cfg.fight.moveEvery, shift + k * cfg.fight.moveEvery + cfg.fight.moveDuration);
           }
-          for (const candidate of candidates) {
-            if (Math.abs(candidate - logged) < off) { at = candidate; off = Math.abs(candidate - logged); }
+          const idle = [];
+          for (let j = 0; j <= 400; j++) idle.push(freeSince + j * 0.1);
+          for (const list of [firm, idle]) {
+            for (const candidate of list) {
+              if (Math.abs(candidate - logged) < off) { at = candidate; off = Math.abs(candidate - logged); }
+            }
+            if (at !== logged) break;
           }
           combat.update(at, ctx);
           // "x2:corruption" = Corruption on the second target; Bane of Havoc always goes on the second target.
@@ -109,7 +119,9 @@ for (const scene of SCENES) {
           // regeneration (MP5 and the 5-second rule) is the same here. Life Tap and the race's cooldown are left out
           // (they are logged after what they give).
           if (entry.type === 'cast' && key !== 'lifeTap' && combat.table[key] && entry.mana != null && manaOff < 3) {
-            const before = combat.state.mana, engine = entry.mana + combat.cost(key);
+            // A mana potion or rune the engine took in the same decision is in its logged mana; here the press takes it.
+            const items = sim.log.filter(l => l.type === 'consumable' && l.gain && Math.abs(l.t - entry.t) < 1e-9).reduce((n, l) => n + l.gain, 0);
+            const before = combat.state.mana + items, engine = entry.mana + combat.cost(key);
             if (Math.abs(before - engine) > 1) { manaOff++; problems.push('mana before ' + entry.spell + ' at ' + entry.t + ' s: engine ' + engine.toFixed(1) + ', here ' + before.toFixed(1)); }
           }
           const result = combat.press(key, cuts.has(entry.t) ? Object.assign({}, ctx, { cutAtTick: true }) : ctx);
@@ -137,12 +149,13 @@ for (const scene of SCENES) {
         fights++;
         if (problems.length) {
           failures++;
-          console.log('FAIL ' + scene.name + ' / ' + build.key + ' / ' + raceKey + ' / seed ' + seed);
+          console.log('FAIL ' + base.name + ' / ' + scene.name + ' / ' + build.key + ' / ' + raceKey + ' / seed ' + seed);
           problems.slice(0, 6).forEach(p => console.log('   ' + p));
         }
       }
     }
   }
+}
 }
 
 console.log(failures ? 'FAIL: ' + failures + ' of ' + fights + ' fights differ' : 'OK: ' + fights + ' fights, same damage, mana, health and threat as the engine in every one');

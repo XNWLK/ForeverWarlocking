@@ -6,7 +6,15 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-14
-- Brought up to date with the Warlock SIM (twice). Nothing changes in play.
+- **You now fight like the Warlock SIM's front page**: every build wears its own Pre-BiS gear (Phase 1 items with their
+  enchants), with the ideal Phase 1 raid buffs and consumables. The build list follows the SIM's new ranking, so the
+  build you start with is now Wrack DS (about 900 DPS).
+- Some of them work by themselves during the fight, at the same moments the SIM uses them: the Major Spellblasting
+  Potion and the Weakness Analyzer go off with your cooldowns, the Demonic Rune when you are down 1,200 mana, and
+  Revelation on your weapon can give your next spell extra crit. The combat log says when.
+- The hint for your next cast knows a Demonic Rune is coming, so it no longer asks for Life Tap too early.
+- The character sheet says which gear you are wearing.
+- Brought up to date with the Warlock SIM (twice).
 - **Partial resists work as in the Warlock SIM's new model**: a boss with resistance resists a share of each hit in
   10% steps, and your DoT and channel ticks are resisted much less than direct hits. Curse of the Elements still takes
   its resistance away, so the builds' DPS barely moves (0.1 at most). Spell Pierce on your gear is worth about half as
