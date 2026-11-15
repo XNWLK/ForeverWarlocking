@@ -10,6 +10,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   Wrack DS, off hand). Every build is a little stronger; Wrack DS still comes first (about 909 DPS).
 - Every Pre-BiS off hand now has its enchant (+9 Intellect), as in the Warlock SIM. Every build gains about 2 DPS;
   Wrack DS comes first at about 911.
+- Wrack DS wears new pre-raid legs and bracers, as in the Warlock SIM (Leggings of Torment and Flameweave Cuffs of
+  Shadow Wrath, both with Shadow spell power). It now does about 920 DPS; the other builds do not change.
 - Brought up to date with the Warlock SIM once more. Nothing changes in play.
 
 ### 2026-11-14
