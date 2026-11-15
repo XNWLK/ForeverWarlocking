@@ -12,6 +12,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   Incinerate Pandemic keeps the old timing. It still works by itself; it is not a button.
 - The hint for your next cast now knows when a DoT no longer pays off near the end of a timed fight, as the SIM does.
 - Wrack DS is now about 933 DPS.
+- Wrack DS and Shadow Demo wear new pre-raid bracers (Tearfall Bracers of Shadow Wrath, with Shadow spell power), as in
+  the Warlock SIM. Shadow Demo is now about 907 DPS.
 
 ### 2026-11-15
 - The Pre-BiS gear is now all blue items, as in the Warlock SIM (new neck, ring, chest, gloves and, for Shadow Demo and

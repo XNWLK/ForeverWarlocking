@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "666afda",
-    "subject":  "v191: Activate trinket (priority action, timeline rows); Shadow and Flame, Touch of the Grave, Berserking tooltips",
+    "commit":  "7684432",
+    "subject":  "v192: Tearfall Bracers of Shadow Wrath (+22) main wrist for Wrack DS and Shadow Demo",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 23:55",
+    "synced":  "2026-11-16 00:42",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

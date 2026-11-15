@@ -2,16 +2,16 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-11-15",
-  "simCommit": "666afda",
+  "simCommit": "7684432",
   "order": [
     {
       "key": "wrack_ds",
-      "dps": 932.6,
+      "dps": 933.4,
       "race": "orc"
     },
     {
       "key": "demo_pact_succ_sb",
-      "dps": 905.3,
+      "dps": 907.4,
       "race": "orc"
     },
     {
