@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "4f9b0bb",
-    "subject":  "v186: Draconic Infused Emblem 8% proc without cooldown",
+    "commit":  "f7c589f",
+    "subject":  "v187: off-hand enchant +9 Intellect on every Pre-BiS list",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 04:25",
+    "synced":  "2026-11-15 05:42",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
