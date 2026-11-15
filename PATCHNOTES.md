@@ -12,6 +12,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   Wrack DS comes first at about 911.
 - Wrack DS wears new pre-raid legs and bracers, as in the Warlock SIM (Leggings of Torment and Flameweave Cuffs of
   Shadow Wrath, both with Shadow spell power). It now does about 920 DPS; the other builds do not change.
+- Brought up to date with the Warlock SIM again. Nothing changes in play.
 - Brought up to date with the Warlock SIM once more. Nothing changes in play.
 
 ### 2026-11-14

@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e87036a",
-    "subject":  "v188: Wrack DS Leggings of Torment and Flameweave Cuffs of Shadow Wrath",
+    "commit":  "4bb34c0",
+    "subject":  "v189: Rugged Mantle of the Timbermaw in Phase 1 (pre-raid shoulder upgrade)",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 16:52",
+    "synced":  "2026-11-15 17:46",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
