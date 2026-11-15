@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "d4ea26a",
-    "subject":  "v185: all-blue Realistic Pre-BiS lists",
+    "commit":  "4f9b0bb",
+    "subject":  "v186: Draconic Infused Emblem 8% proc without cooldown",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 03:45",
+    "synced":  "2026-11-15 04:25",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

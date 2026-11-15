@@ -8,6 +8,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ### 2026-11-15
 - The Pre-BiS gear is now all blue items, as in the Warlock SIM (new neck, ring, chest, gloves and, for Shadow Demo and
   Wrack DS, off hand). Every build is a little stronger; Wrack DS still comes first (about 909 DPS).
+- Brought up to date with the Warlock SIM once more. Nothing changes in play.
 
 ### 2026-11-14
 - **You now fight like the Warlock SIM's front page**: every build wears its own Pre-BiS gear (Phase 1 items with their
