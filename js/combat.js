@@ -177,6 +177,8 @@ export function createCombat(opts) {
       shards: Infinity,                                   // Soul Shards never run out (Xn, 2026-10-07)
       gcdStart: 0, gcdReady: 0, cast: null, channel: null, ampUp: false,   // ampUp: Amplify Curse used and waiting for a Bane of Agony that lands
       wrackOn: 0,                                         // the target Wrack speeds DoTs up on (0 = none)
+      wrackTime: 0, wrackOnAt: 0,                         // seconds Wrack channelled before its current channel, when that began
+      wasBusy: false, busyEnd: 0, idleBase: null, idleNext: null,   // the engine's 0.1 s steps while you are free (idleWalkAt)
       lastSpend: -Infinity,                               // when mana was last spent (the 5-second rule)
       cds: {}, buffs: {}, togReady: -Infinity, petSent: false,
       target: 1, havoc: null,
@@ -453,6 +455,7 @@ export function createCombat(opts) {
   function syncWrack() {
     const on = wrackTarget(), was = S.wrackOn;
     if (on === was) return;
+    if (!on !== !was) { if (was) S.wrackTime += S.t - S.wrackOnAt; else S.wrackOnAt = S.t; }   // Wrack's share of the fight (dotValue)
     S.wrackOn = on;
     [was, on].forEach(function (ti) {
       if (!ti) return;
@@ -833,7 +836,33 @@ export function createCombat(opts) {
   const MANA_ITEMS = CONS.filter(function (c) { return c.manaRestore; });
   const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit'; });
   const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};
-  const REV = (WL.equippedEnchantFx ? WL.equippedEnchantFx(cfg) : []).filter(function (x) { return x.fx.proc.kind === 'crit'; })[0] || null;
+  // Sim v191 (its round 219): "Activate trinket" in the priority list uses every ready on-use trinket (not the mana ones)
+  // when the engine's walk down the list reaches it (off the global cooldown; the walk goes on). With it in the list, the
+  // trinkets are no longer popped with the cooldowns (popActives) - "never" still keeps one unused. Here the walk is done
+  // where the engine walks: at a press (tryCast, the engine's decide) and at a channel tick (aplWalk, its clip check).
+  const TRK_APL = WL.effectiveRotation(build, cfg).indexOf('activateTrinket') >= 0;
+  function trAplOk(x, at) {
+    const u = x.fx.use, cd = S.cds['tr:' + x.slot];
+    return !!u && u.kind !== 'mana' && (TRU[x.slot] || 'cds') !== 'never' && (!cd || cd <= at + EPS) && at < endAt() - EPS;
+  }
+  function useTrinketsApl() {
+    TRK.forEach(function (x) {
+      if (!trAplOk(x, S.t)) return;
+      const u = x.fx.use;
+      S.cds['tr:' + x.slot] = S.t + u.cd;
+      if (u.duration) trUntil[x.slot] = S.t + u.duration;
+      emit({ type: 'used', name: x.fx.name });
+    });
+  }
+  // The end-of-fight DoT check (simWould's dotWorth): on unless the settings switch it off, as in the engine.
+  const DOT_END = !(cfg.options && cfg.options.dotEndCheck === false), LAT = Math.max(0, (cfg.fight.latencyMs || 0) / 1000);
+  const WRACK_GAIN_X = 1 + ((SPELLS.wrack && SPELLS.wrack.dotSpeedPct) || 0) / 100, WRACK_PARTIAL = !!(cfg.options && cfg.options.wrackLastTick === 'partial');
+  let REM_GUESS = null;                                             // the page's guess of the time left in a fight on health
+  function remainingNow() { return check || timed ? Math.max(0, endAt() - S.t) : REM_GUESS ? REM_GUESS() : Infinity; }
+  // The engine's walk down the priority list (pickAction; at a channel tick only above that channel): it uses the trinkets
+  // when it gets to "Activate trinket" before an action above it picks something.
+  function aplWalk(channel) { if (TRK_APL && TRK.length && !S.over) simWould(remainingNow(), { channel: channel || null }); }
+  const REV =(WL.equippedEnchantFx ? WL.equippedEnchantFx(cfg) : []).filter(function (x) { return x.fx.proc.kind === 'crit'; })[0] || null;
   let revUntil = -1;
   const ACT_POL = (cfg.options && cfg.options.activesPolicy) || 'pull';
   const ACT_DOOM = WL.effectiveRotation(build, cfg).indexOf('bane') >= 0 || (build.timeline || []).some(function (x) { return x.k === 'baneOfDoom'; });
@@ -869,7 +898,7 @@ export function createCombat(opts) {
     return c;
   }
   function popActives(key) {                                         // right before a damaging cast
-    TRK.forEach(function (x) {
+    if (!TRK_APL) TRK.forEach(function (x) {
       const u = x.fx.use, pol = TRU[x.slot] || 'cds';
       const when = pol === 'never' ? false : pol === 'ready' ? true : pol === 'execute' ? executePhase(1) : activesOk(key);
       if (!when || !ready('tr:' + x.slot) || S.t >= endAt() - EPS) return;
@@ -991,8 +1020,9 @@ export function createCombat(opts) {
     // The engine's decision: mana items first (not for Bane of Havoc, which it casts before them), then the cooldowns
     // right before a damaging cast you can pay for (even when it then Life Taps first).
     if (key !== 'baneOfHavoc') useManaItems();
-    const why = blocked(key, ctx);
     const precast = !check && S.fightStart === null && SPELLS[key].kind !== 'channel' && castTime(key) > EPS;   // as startCast decides it
+    if (key !== 'baneOfHavoc' && !precast) aplWalk(null);        // the engine's walk ("Activate trinket"); after a precast: the next press
+    const why = blocked(key, ctx);
     if ((!why || why === 'mana') && !precast && key !== 'lifeTap' && key !== 'baneOfHavoc' && SPELLS[key].kind !== 'utility' && S.mana >= discountedCost(key)) popActives(key);
     if (why) return fail(key, why);
     if (key === 'baneOfHavoc') { if (S.channel) interrupt('clipped'); return castHavoc(ctx); }   // a cast like the others: it cuts a channel
@@ -1175,6 +1205,10 @@ export function createCombat(opts) {
         S.channel = null;
         emit({ type: 'interrupt', key: ev.key, reason: 'health', channel: true });
         S.decideSeq = order++;
+      } else if (TRK_APL && !S.over && S.channel === c && S.t >= S.gcdReady - EPS) {
+        // The engine asks the list above the channel at each tick (whether to cut it); on the way it may reach "Activate
+        // trinket" (sim v191). Cutting stays yours.
+        aplWalk(ev.key);
       }
     } else if (ev.type === 'heal') {
       const got = gainHealth(HEAL.amt);
@@ -1197,13 +1231,26 @@ export function createCombat(opts) {
   // A remembered press goes off at the exact moment you are free, not at the next picture, so no time is lost.
   // When your next action and the pet's next decision fall on the same instant, the engine takes them in the order
   // they were planned. S.decideSeq marks the place in that line your next action has (set when your last one began).
+  // While you are free and cast nothing, the engine decides again every 0.1 s from the moment you became free (it found
+  // nothing it could cast: before or during a movement phase, out of mana). Its walk can reach "Activate trinket" there,
+  // so with a trinket ready the walk is done at those moments here too (sim v191).
+  function idleWalkAt(now) {
+    const busy = !!(S.cast || S.channel);
+    if (S.wasBusy && !busy) S.busyEnd = S.t;
+    S.wasBusy = busy;
+    if (!TRK_APL || !TRK.length || busy || S.over || S.fightStart === null) return Infinity;
+    const free = Math.max(S.gcdReady, S.busyEnd);
+    if (S.idleBase !== free) { S.idleBase = free; S.idleNext = free; }
+    while (S.idleNext <= now + EPS && !TRK.some(function (x) { return trAplOk(x, S.idleNext); })) S.idleNext += 0.1;   // the engine's steps
+    return S.idleNext;
+  }
   function update(now, ctx) {
     if (ctx) lastCtx = ctx;
     syncPet(ctx);
     while (!S.over) {
       const first = events[0];
-      const queueAt = queued ? readyAt() : Infinity;
-      const limit = Math.min(now, queueAt);
+      const queueAt = queued ? readyAt() : Infinity, idleAt = idleWalkAt(now);
+      const limit = Math.min(now, queueAt, idleAt);
       const due = !!first && (first.t < limit - EPS || (first.t <= limit + EPS && (first.o < 2 || first.seq < S.decideSeq)));
       const hold = due && heldX(first, limit);
       if (hold) holdAt = first.t;
@@ -1212,11 +1259,15 @@ export function createCombat(opts) {
         if (ev.t > endAt() + EPS) { events.unshift(ev); break; }
         advance(ev.t);
         handle(ev);
-      } else if (queueAt <= now + EPS) {
+      } else if (queueAt <= now + EPS && queueAt <= idleAt + EPS) {
         const q = queued;
         queued = null;
         advance(queueAt);
         tryCast(q.key, ctx);
+      } else if (idleAt <= now + EPS && idleAt <= endAt() + EPS) {
+        advance(idleAt);
+        aplWalk(null);
+        S.idleNext = idleAt + 0.1;
       } else break;
     }
     if (!S.over && timed && now >= endAt() - EPS) { advance(endAt()); timeUp(); return; }
@@ -1252,12 +1303,18 @@ export function createCombat(opts) {
   // Returns null when the list has nothing to cast, else { key, target, action (its line in the list, or null),
   // racial (true = the sim would use the race's cooldown first), why ('havoc', 'mana' or 'moving' for a cast that
   // is not a line of the list), need (the spell the mana is for) }.
-  function simWould(remaining) {
+  // walk (inside combat.js only): { channel } = the engine's own walk at this very moment (aplWalk): it uses the trinkets at
+  // "Activate trinket" and returns what it found (no Bane of Havoc first, no mana items looked ahead).
+  function simWould(remaining, walk) {
     if (S.over) return null;
     const standing = [];
     for (let i = 1; i <= N; i++) if (!T[i].dead && (!BOSS || i === 1)) standing.push(i);   // a boss fight: the boss alone, as the sim fights it
     if (!standing.length) return null;
-    const boss = standing[0], c = S.cast, at = Math.max(S.t, readyAt());
+    const boss = standing[0], c = walk ? null : S.cast, at = walk ? S.t : Math.max(S.t, readyAt());
+    // The engine's clock starts at the pull: conditions such as "fight time gone" read t, so everything timed is counted
+    // from the fight's start here (before it: from now).
+    const off = check ? 0 : S.fightStart === null ? at : S.fightStart;
+    const shift = function (o) { const r = {}; for (const k in o) r[k] = o[k] == null ? o[k] : o[k] - off; return r; };
     const landing = c && table[c.key].ticks && SPELLS[c.key].kind !== 'channel' ? { key: c.key, target: c.target, left: SPELLS[c.key].duration } : null;
     function leftOn(ti, key) {
       if (landing && landing.key === key && landing.target === ti) return landing.left;
@@ -1272,16 +1329,16 @@ export function createCombat(opts) {
     const wantsHavoc = standing.length >= 2 && !!table.baneOfHavoc && tv('baneOfHavoc') > 0;
     let mana = S.mana - (c ? c.cost : 0), shards = S.shards;
     if (c && SPELLS[c.key].shards && !c.decimation) shards -= SPELLS[c.key].shards;
-    if (wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false, why: 'havoc' };
+    if (!walk && wantsHavoc && !havoc && mana >= table.baneOfHavoc.cost) return { key: 'baneOfHavoc', target: standing[1], action: null, racial: false, why: 'havoc' };
     // A mana potion or rune ready by then is used before the choice (the engine's decide), and one still to come lowers
     // the need to Life Tap (freeManaLevel).
     const itemReady = function (c) { return !S.cds['cd:' + c.cdGroup] || S.cds['cd:' + c.cdGroup] <= at + EPS; };
     const itemAmt = function (c) { return c.manaRestore.amount || stats.maxMana * c.manaRestore.pct / 100; };
-    MANA_ITEMS.forEach(function (c) { if (itemReady(c) && stats.maxMana - mana >= itemAmt(c) && !(c.healthCost && S.health <= Math.round(c.healthCost * selfTakenMult()))) mana = Math.min(stats.maxMana, mana + itemAmt(c)); });
+    if (!walk) MANA_ITEMS.forEach(function (c) { if (itemReady(c) && stats.maxMana - mana >= itemAmt(c) && !(c.healthCost && S.health <= Math.round(c.healthCost * selfTakenMult()))) mana = Math.min(stats.maxMana, mana + itemAmt(c)); });
 
     const view = {
-      t: at, remaining: remaining == null ? Infinity : remaining, cfg: cfg, build: build,
-      mana: mana, maxMana: stats.maxMana, shards: shards, cds: S.cds, buffs: buffs,
+      t: at - off, remaining: remaining == null ? Infinity : remaining, cfg: cfg, build: build,
+      mana: mana, maxMana: stats.maxMana, shards: shards, cds: shift(S.cds), buffs: shift(buffs),
       targetHpPct: T[boss].hpPct, brandCharges: T[boss].brandCharges,
       multiTargets: standing.length, havocTarget: havoc ? standing.indexOf(havoc) + 1 : wantsHavoc ? 2 : 0, nextTarget: 0, actionIndex: 0,
       has: function (k) { return !!table[k]; },
@@ -1302,7 +1359,8 @@ export function createCombat(opts) {
       manaNeedLeft: function () { const f = fightTime(at); if (f < 6) return Infinity; return Math.max(0, (stats.maxMana - mana + res.track.tapMana) / f) * view.remaining; },
       freeManaLevel: function () { let lv = 0; MANA_ITEMS.forEach(function (c) { if (itemReady(c)) lv = Math.max(lv, stats.maxMana - itemAmt(c)); }); return lv; },
       // The sim's fsr condition (v161): seconds since you last spent mana. A cast bar still running spends at its end.
-      lastSpend: c && c.cost > 0 ? c.end : S.lastSpend, spendAt: null
+      lastSpend: (c && c.cost > 0 ? c.end : S.lastSpend) - off, spendAt: null,
+      trinketReady: function () { return TRK.some(function (x) { return trAplOk(x, at); }); }   // "Activate trinket" (sim v191)
     };
     const made = forcedMove(at) || !!(lastCtx && lastCtx.forced), ft = fightTime(at);
     function fits(k) {                                     // made to move: only instants, and no cast that runs into the next phase
@@ -1321,16 +1379,145 @@ export function createCombat(opts) {
       return S.health + heals > selfTick(k) * table[k].ticks;
     }
     const list = WL.effectiveRotation(build, { fight: { multiDot: standing.length > 1, targets: standing.length } });
+    view.dotWorth = function (key, ti) { return dotWorth(key, ti); };
+
+    // ---- the engine's end-of-fight DoT check (its round 53; sim.js dotWorth / dotValue, ported 2026-11-16) ----
+    // A DoT that cannot run its whole duration before the end is cast only if the damage it still adds beats what the
+    // action below it (the filler) would do in the same time. Expected values at this moment. ti: 0 / 1 = the boss, 2 / 3
+    // = the other standing targets (the engine's numbering). The end is now + the time left (a fight on health: the
+    // page's guess, so it only matters in a timed fight or near the guessed end).
+    const fin = at + view.remaining, now = at;
+    function gt(ti) { return ti > 1 ? standing[ti - 1] || boss : boss; }
+    function expVuln(school, ti, periodic) {
+      const coe = debuff(gt(ti), 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '');
+      const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen, periodic));
+      return pr.flat * pr.dist.reduce(function (a, d) { return a + d.p * (1 + d.pct / 100); }, 0);
+    }
+    function expCrit(critPct, critMult) { return 1 + Math.max(0, Math.min(100, critPct)) / 100 * (critMult - 1); }
+    function hitChance() { return Math.min(100, stats.hitPct) / 100; }
+    function occupies(k) { return SPELLS[k].kind === 'channel' ? SPELLS[k].duration : Math.max(castTime(k), gcd()); }
+    function expCast(k, ti, noImmolate) {
+      const s = SPELLS[k], e = table[k];
+      let amt;
+      if (s.aoe) {
+        let sum = 0;
+        for (let tj = 1; tj <= standing.length; tj++) sum += e.ticks * (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(k, true, gt(tj)) * expVuln(s.school, tj);
+        return hitChance() * sum * expCrit(e.critPct, e.critMult);
+      }
+      if (s.kind === 'channel') {
+        amt = 0;
+        for (let i = 0; i < e.ticks; i++) amt += (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(k, true, gt(ti)) * (s.ramp ? s.ramp[i] : 1);
+      } else {
+        amt = (s.base + s.coef * spNow(e)) * e.directMult * liveMult(k, false, gt(ti));
+        if (k === 'incinerate' && !noImmolate && dotLeft('immolate', boss) > 0) amt *= 1 + s.immolateBonusPct / 100;
+        if ((isSB(k) || k === 'searingPain') && T[boss].hpPct < cfg.fight.executePct && tv('decimation')) amt *= addOp0(k, tv('decimation', 'dmgPct'));
+      }
+      return hitChance() * amt * expVuln(s.school, ti) * expCrit(e.critPct, e.critMult);
+    }
+    const NOT_ALT = { bane: 1, baneOfAgony: 1, corruption: 1, siphonLife: 1, immolate: 1, multiDot: 1, curseOfElements: 1, lifeTapPet: 1, lifeTapBelow: 1, lifeTapNeed: 1,
+                      swapToImp: 1, swapToSuccubus: 1, shadowBoltSpread: 1, isbUpkeep: 1, deathCoilFinisher: 1 };
+    function altBelow(idx) {
+      for (let i = (idx == null ? -1 : idx) + 1; i < list.length; i++) {
+        const a = WL.actionOf(list[i], build);
+        if (!a || NOT_ALT[list[i]]) continue;
+        if (a.deep) continue;
+        if (a.rule && !(SPELLS[a.rule.spell] && (SPELLS[a.rule.spell].kind === 'direct' || SPELLS[a.rule.spell].kind === 'channel'))) continue;
+        const k = a.pick(view), s = k && SPELLS[k];
+        if (s && table[k] && (s.kind === 'direct' || s.kind === 'channel')) return k;
+      }
+      return table.shadowBolt ? 'shadowBolt' : null;
+    }
+    function dotValue(key, ti) {
+      const s = SPELLS[key], e = table[key], tL = now + castTime(key);
+      const f = altBelow(view.actionIndex), fRate = f ? expCast(f, 0, key === 'immolate') / (occupies(f) + LAT) : 0;
+      const cost = (occupies(key) + LAT) * fRate;
+      const end = Math.min(fin, tL + s.duration), g = gcd();
+      let value = 0;
+      const amp = key === 'baneOfAgony' && tv('amplifyCurse') && (S.ampUp || buff('amplifyCurse') || (!AMP_BTN && ready('amplifyCurse')));
+      const castMult = amp ? 1 + tv('amplifyCurse', 'boaPct') / 100 : 1;
+      const tickAmt = (s.tickBase + s.tickCoef * spNow(e)) * castMult * e.periodicMult * liveMult(key, true, gt(ti)) * expVuln(s.school, ti, true) * expCrit(e.critPct, e.critMult);
+      // Wrack as the filler: the DoT's ticks come faster by Wrack's share of the fight so far (80% in the first 20 s).
+      const wf = f === 'wrack' && ti <= 1 && tv('wrack') && SPELLS.wrack.dotSpeedSpells.indexOf(key) >= 0;
+      const times = [];
+      let lastPart = 0;
+      if (wf) {
+        const ftn = fightTime(now), wOn = S.wrackTime + (S.wrackOn ? now - S.wrackOnAt : 0), share = ftn >= 20 ? wOn / ftn : 0.8;
+        const gain = 1 + (WRACK_GAIN_X - 1) * share, tW = Math.max(tL, now + occupies(key) + LAT), tEnd = tL + s.duration;
+        let tc = tL;
+        for (;;) {
+          let nt = tc < tW - EPS ? Math.min(tc + s.tickEvery, tW) : tc;
+          if (nt < tc + s.tickEvery - EPS) nt += (s.tickEvery - (nt - tc)) / gain;
+          if (nt > tEnd + 1e-6) {
+            if (WRACK_PARTIAL) lastPart = Math.min(1, (Math.max(0, Math.min(tW, tEnd) - tc) + Math.max(0, tEnd - Math.max(tW, tc)) * gain) / s.tickEvery);
+            break;
+          }
+          times.push(nt); tc = nt;
+        }
+      } else for (let i0 = 1; i0 <= e.ticks; i0++) times.push(tL + i0 * s.tickEvery);
+      const hit = hitChance();
+      let tConf = Infinity, keep = 1;
+      const cfx = list.indexOf('conflagrateExpire') >= 0 && list.indexOf('conflagrate') < 0;
+      if (key === 'immolate' && ti <= 1 && (list.indexOf('conflagrate') >= 0 || list.indexOf('conflagrateSnF') >= 0 || cfx) && table.conflagrate) {
+        tConf = Math.max(cfx ? tL + s.duration - WL.CONFLAG_EXPIRE_S : tL, S.cds.conflagrate || 0);
+        if (tConf < end - 1e-6 && tConf <= fin - g + EPS) {
+          keep = tv('shadowAndFlame') ? tv('shadowAndFlame', 'procPct') / 100 : 0;
+          value += hit * (expCast('conflagrate', 0) - g * fRate);
+        } else tConf = Infinity;
+      }
+      let nTicks = 0, ticks = 0;
+      for (let i = 1; i <= times.length; i++) {
+        const tt = times[i - 1];
+        if (tt > fin + EPS) break;
+        nTicks++;
+        const ri = Math.min(e.ticks - 1, Math.max(0, Math.ceil((tt - tL) / s.tickEvery - 1e-6) - 1));
+        ticks += tickAmt * (s.ramp ? s.ramp[ri] : 1) * (tt > tConf + EPS ? keep : 1);
+      }
+      if (lastPart > 1e-6 && nTicks === times.length && tL + s.duration <= fin + EPS) ticks += tickAmt * (s.ramp ? s.ramp[e.ticks - 1] : 1) * lastPart;
+      value += hit * ticks;
+      if (s.kind === 'hybrid') value += expCast(key, ti);
+      const up = Math.max(0, end - (now + occupies(key)));
+      if (key === 'immolate' && ti <= 1 && f === 'incinerate') value += hit * up / occupies('incinerate') * expCast('incinerate', 0, true) * SPELLS.incinerate.immolateBonusPct / 100;
+      const sbKey = table.shadowBolt && (list.indexOf('shadowTrance') >= 0 || (f && isSB(f))) ? 'shadowBolt' : null;
+      if (WL.NIGHTFALL_SPELLS.indexOf(key) >= 0 && tv('nightfall') && sbKey) {
+        let procTicks = 0;
+        for (let j = 1; j <= nTicks; j++) if (times[j - 1] <= fin - g + EPS) procTicks++;
+        const sbNow = expCast(sbKey, 0), sbCast = table[sbKey].cast / hasteFactor();
+        value += hit * procTicks * tv('nightfall', 'procPct') / 100 * Math.max(0, sbNow - g * (sbKey === f ? sbNow / Math.max(sbCast, g) : fRate));
+      }
+      if (f && SPELLS[f].drain && tv('soulSiphon') && ti <= 1 && WL.SOUL_SIPHON_EFFECTS.indexOf(key) >= 0) {
+        let others = 0;
+        const per = tv('soulSiphon', 'perEffectPct'), cap = tv('soulSiphon', 'maxPct');
+        WL.SOUL_SIPHON_EFFECTS.forEach(function (x) { if (x !== key && (x === 'curseOfElements' ? debuff(boss, 'coe') : dotLeft(x, boss) > 0)) others++; });
+        const nowM = 1 + Math.min((others + (dotLeft(key, boss) > 0 ? 1 : 0)) * per, cap) / 100;
+        const gain = (Math.min((others + 1) * per, cap) - Math.min(others * per, cap)) / 100;
+        value += hit * up * fRate / nowM * gain;
+      }
+      return value >= cost;
+    }
+    function dotWorth(key, ti) {
+      if (!DOT_END) return null;                           // the check switched off: the rotation's older rule
+      if (!table[key] || now + castTime(key) + SPELLS[key].duration <= fin + EPS) return true;
+      return dotValue(key, ti || 0);
+    }
+
     let found = null;
-    for (let i = 0; i < list.length && !found; i++) {
+    let stop = list.length;                               // the engine's walk at a channel tick: only what is above the channel
+    if (walk && walk.channel) {
+      stop = list.indexOf(walk.channel);
+      if (stop < 0) stop = list.findIndex(function (a) { return actionSpells(build, a).indexOf(walk.channel) >= 0; });
+      if (stop < 0) stop = list.length;
+    }
+    for (let i = 0; i < stop && !found; i++) {
       const a = WL.actionOf(list[i], build);               // a built-in action or one of the build's own rules
       if (!a) continue;
       view.nextTarget = 0; view.actionIndex = i;
       const k = a.pick(view);
+      if (k === 'trinket:use') { if (walk) useTrinketsApl(); continue; }   // "Activate trinket": off the GCD, the list goes on
       if (k === 'lifeTap' && !canTap()) continue;          // a Life Tap the list would like but has no health for
       if (k && table[k] && needsTarget(k) && immuneTo(standing[(view.nextTarget || 1) - 1] || boss, SPELLS[k].school)) continue;   // nothing she is immune to
       if (k && table[k] && fits(k) && affordable(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
     }
+    if (walk) return found;
     const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false, why: found ? 'mana' : 'moving', need: found ? found.key : null };
     if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS && canTap() ? tap : null;
     if (found.key === 'lifeTap') return found;
@@ -1345,7 +1532,9 @@ export function createCombat(opts) {
   reset(opts.seed);
 
   return {
-    simWould: simWould,
+    simWould: function (remaining) { return simWould(remaining); },
+    // The page's guess of the time left in a fight on health (the engine's walk reads it, as the hint does).
+    setRemaining: function (fn) { REM_GUESS = fn; },
     // You take one hit now (a scripted fight's own hits; the same rule as config.fight.hitEvery).
     hit: function () { if (!S.over && S.fightStart !== null) takeHit(); },
     stats: stats, table: table, spells: SPELLS, build: build, raceKey: raceKey, targetCount: N,

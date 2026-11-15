@@ -1059,6 +1059,15 @@ function newCharacter() {
                           healths: challenge && challenge.healths, absent: challenge && challenge.absent,   // a scripted fight with adds
                           seed: challenge && challenge.seeded ? challenge.seed : undefined,   // a seeded fight rolls the same dice every time
                           boss: !!bossId, healthCurve: bossId ? challenge.curve : null, immune: bossId ? challenge.immune : null });
+  // A fight on health: about how long the dummies still last at the sim's pace (the hint's guess too). The engine's walk
+  // down the priority list reads it ("Activate trinket", the end-of-fight DoT check).
+  const made = combat;
+  combat.setRemaining(function () {
+    if (made.endless || !simResult || !(simResult.dps > 0)) return Infinity;
+    let health = 0;
+    for (let i = 1; i <= made.targetCount; i++) if (made.alive(i)) health += made.state.targets[i].health;
+    return health / simResult.dps;
+  });
   pet.setKind(build.pet === 'imp' ? 'imp' : build.pet ? 'succubus' : null);   // other demons borrow the Succubus's shape
   const bar = layoutBar(build, combat.table, WL.RACES[raceKey]);
   combat.setAmplifyButton(bar.indexOf('amplifyCurse') >= 0);   // on the bar: you press it; off: it goes by itself

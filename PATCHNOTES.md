@@ -5,6 +5,14 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-16
+- The Weakness Analyzer is now used the way the Warlock SIM uses it: by its new "Activate trinket" line in the
+  priority list. For Shadow Demo, Wrack DS and Incinerate DS it goes off as soon as nothing more important is due
+  (also during a Wrack channel or while you wait out a movement phase); for Fire Demo once the fight is a minute old.
+  Incinerate Pandemic keeps the old timing. It still works by itself; it is not a button.
+- The hint for your next cast now knows when a DoT no longer pays off near the end of a timed fight, as the SIM does.
+- Wrack DS is now about 933 DPS.
+
 ### 2026-11-15
 - The Pre-BiS gear is now all blue items, as in the Warlock SIM (new neck, ring, chest, gloves and, for Shadow Demo and
   Wrack DS, off hand). Every build is a little stronger; Wrack DS still comes first (about 909 DPS).

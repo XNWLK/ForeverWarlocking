@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "a4174c8",
-    "subject":  "v190: priority check at Pre-BiS defaults; Shadow Demo without Immolate; Wrack DS Shadow Wrath boots and belt",
+    "commit":  "666afda",
+    "subject":  "v191: Activate trinket (priority action, timeline rows); Shadow and Flame, Touch of the Grave, Berserking tooltips",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 22:50",
+    "synced":  "2026-11-15 23:55",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
