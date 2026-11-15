@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "4bb34c0",
-    "subject":  "v189: Rugged Mantle of the Timbermaw in Phase 1 (pre-raid shoulder upgrade)",
+    "commit":  "a4174c8",
+    "subject":  "v190: priority check at Pre-BiS defaults; Shadow Demo without Immolate; Wrack DS Shadow Wrath boots and belt",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-15 17:46",
+    "synced":  "2026-11-15 22:50",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

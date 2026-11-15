@@ -13,6 +13,10 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - Wrack DS wears new pre-raid legs and bracers, as in the Warlock SIM (Leggings of Torment and Flameweave Cuffs of
   Shadow Wrath, both with Shadow spell power). It now does about 920 DPS; the other builds do not change.
 - Brought up to date with the Warlock SIM again. Nothing changes in play.
+- Shadow Demo no longer casts Immolate, as in the Warlock SIM: its priority list, the hint for your next cast and the
+  lessons leave it out. It is still in your spellbook if you want it.
+- Wrack DS wears new pre-raid boots and belt (Master's Boots and Belt of Shadow Wrath, both with Shadow spell power)
+  and now does about 931 DPS.
 - Brought up to date with the Warlock SIM once more. Nothing changes in play.
 
 ### 2026-11-14
