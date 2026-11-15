@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "7c7c5fc",
-    "subject":  "Round 213: Phase 1 enchants on the Pre-BiS lists, enchant phases, Obsidian Bauble",
+    "commit":  "d4ea26a",
+    "subject":  "v185: all-blue Realistic Pre-BiS lists",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-14 19:29",
+    "synced":  "2026-11-15 03:45",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
