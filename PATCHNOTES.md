@@ -14,6 +14,7 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 - Wrack DS is now about 933 DPS.
 - Wrack DS and Shadow Demo wear new pre-raid bracers (Tearfall Bracers of Shadow Wrath, with Shadow spell power), as in
   the Warlock SIM. Shadow Demo is now about 907 DPS.
+- Brought up to date with the Warlock SIM again. Nothing changes in play.
 
 ### 2026-11-15
 - The Pre-BiS gear is now all blue items, as in the Warlock SIM (new neck, ring, chest, gloves and, for Shadow Demo and
