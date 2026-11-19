@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "dfd0d09",
-    "subject":  "v197: +65 SP 2H, +8 arcanums, +4 stats chest, +9 Int bracer enchants in Phase 1",
+    "commit":  "433436e",
+    "subject":  "v202: Blade of Eternal Darkness proc",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-16 18:15",
+    "synced":  "2026-11-19 17:42",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

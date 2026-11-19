@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-19
+- Spells now carry their level-60 bonus from the game's data, as in the Warlock SIM: Searing Pain, Shadowburn, Soul
+  Fire, Death Coil, Hellfire (also what it does to you), Rain of Fire and the Imp's Firebolt hit a little harder, and
+  Life Tap gives 424 mana for 424 health (was 430). Fire Demo is now about 887 DPS; Wrack DS still comes first (about 934).
+
 ### 2026-11-16
 - The Weakness Analyzer is now used the way the Warlock SIM uses it: by its new "Activate trinket" line in the
   priority list. For Shadow Demo, Wrack DS and Incinerate DS it goes off as soon as nothing more important is due
