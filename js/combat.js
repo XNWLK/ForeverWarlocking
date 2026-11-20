@@ -832,7 +832,7 @@ export function createCombat(opts) {
   // weapon: a direct spell that does not crit may give the next one + its crit. Only the crit trinket (Weakness
   // Analyzer) is played: no Pre-BiS list has a proc trinket or a set bonus with an effect.
   const CONS = WL.activeConsumables(cfg);
-  const SP_POT = CONS.filter(function (c) { return c.spPotion; })[0] || null;
+  const SP_POT = CONS.filter(function (c) { return c.spPotion && WL.consumableHolds(cfg, c); })[0] || null;
   const MANA_ITEMS = CONS.filter(function (c) { return c.manaRestore; });
   const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit'; });
   const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};

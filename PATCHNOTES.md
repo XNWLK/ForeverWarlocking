@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-20
+- Your food is now Baked Salmon / Lobster Stew (+28 spell damage, was Nightfin Soup +22), as in the Warlock SIM. Every
+  build gains about 5 DPS; Wrack DS comes first at about 938.
+- An imported settings code with Nightfin Soup or Runn Tum Tuber Surprise turns on the new food in their place.
+
 ### 2026-11-19
 - Spells now carry their level-60 bonus from the game's data, as in the Warlock SIM: Searing Pain, Shadowburn, Soul
   Fire, Death Coil, Hellfire (also what it does to you), Rain of Fire and the Imp's Firebolt hit a little harder, and

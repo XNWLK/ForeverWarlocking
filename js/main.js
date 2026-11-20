@@ -1032,7 +1032,7 @@ function standingBuffs(build, stats) {
   });
   Object.keys(config.consumables).forEach(function (k) {
     const c = config.consumables[k];
-    if (c.on && !c.spPotion && !c.manaRestore) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '', from: c.cat });
+    if (c.on && !c.spPotion && !c.manaRestore && WL.consumableHolds(config, c)) list.push({ key: 'con_' + k, icon: 'consumable_' + k, name: k === 'buildOil' && stats.oilName ? stats.oilName : c.name, desc: c.desc || '', from: c.cat });
   });
   return list;
 }
