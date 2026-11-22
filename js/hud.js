@@ -786,7 +786,7 @@ export function createHud(WL, handlers) {
 
   // The number that floats up for a hit, a tick or a miss.
   function floatFor(e, anchor) {
-    if (e.type === 'miss') { if (!e.pet || e.immune) float(e.immune ? 'Immune' : 'Miss', 'miss', anchor); return; }
+    if (e.type === 'miss') { if (!e.pet || e.immune || e.resisted) float(e.immune ? 'Immune' : e.resisted ? 'Resist' : 'Miss', 'miss', anchor); return; }
     float(whole(e.amount), (e.pet ? 'pet' : e.type === 'tick' ? 'small' : '') + (e.crit ? ' crit' : ''), anchor);
   }
 
@@ -799,7 +799,7 @@ export function createHud(WL, handlers) {
       const petName = getName(c.build.pet), attack = PET_ATTACK[e.key];
       const who = e.key === 'pet:brand' ? 'Demonic Brand' : e.key === 'pet:melee' ? petName : petName + "'s " + attack;
       if (e.type === 'miss') {
-        log(e.immune ? dummy + ' is immune to ' + who + '.' : e.dodge ? dummy + ' dodges ' + petName + '.' : who + ' misses ' + dummy + '.', 'miss');
+        log(e.immune ? dummy + ' is immune to ' + who + '.' : e.dodge ? dummy + ' dodges ' + petName + '.' : e.resisted ? dummy + ' resists ' + who + '.' : who + ' misses ' + dummy + '.', 'miss');
       } else {
         log(who + (e.crit ? ' crits ' : ' hits ') + dummy + ' for ' + whole(e.amount) + (e.glance ? ' (glancing).' : e.crit ? '!' : '.'), e.crit ? 'crit' : '');
         if (!quiet) floatFor(e, anchor);
@@ -819,7 +819,7 @@ export function createHud(WL, handlers) {
       log(name + ' ticks ' + (c.targets > 1 ? dummy + ' ' : '') + 'for ' + whole(e.amount) + (e.crit ? ' (crit)' : '') + (e.extra ? ' (extra tick from Wrack).' : '.'), e.crit ? 'crit' : '');
       floatFor(e, anchor);
     } else if (e.type === 'miss') {
-      log(e.immune ? dummy + ' is immune to your ' + name + '.' : name + ' misses ' + dummy + '.', 'miss');
+      log(e.immune ? dummy + ' is immune to your ' + name + '.' : e.resisted ? dummy + ' resists your ' + name + '.' : name + ' misses ' + dummy + '.', 'miss');
       if (!quiet) floatFor(e, anchor);
     } else if (e.type === 'apply') {
       log(dummy + ' is afflicted by ' + (e.key === 'brand' ? 'Demonic Brand' : name) + '.');

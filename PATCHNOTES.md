@@ -5,6 +5,15 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-22
+- Resists now follow each spell's own rule, as in the Warlock SIM. Immolate, Incinerate, Shadowburn, Death Coil, Bane of
+  Agony and Drain Soul land whole or are resisted whole (the log says "resists" and the dummy shows "Resist"); Shadow
+  Bolt, Searing Pain, Soul Fire, Conflagrate, Hellfire and Rain of Fire can be partly resisted; DoT and channel ticks
+  are only rarely partly resisted. Spell Pierce adds damage to direct hits only. Your demon's spells can now be resisted
+  too (the Imp's Firebolt whole, Lash of Pain and Demonic Brand partly). With Curse of the Elements up this almost never
+  happens, so the numbers barely move.
+- Shadow Demo wears Leggings of Torment as its pre-raid legs, as in the Warlock SIM (about 912 DPS).
+
 ### 2026-11-20
 - Your food is now Baked Salmon / Lobster Stew (+28 spell damage, was Nightfin Soup +22), as in the Warlock SIM. Every
   build gains about 5 DPS; Wrack DS comes first at about 938.

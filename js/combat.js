@@ -333,9 +333,21 @@ export function createCombat(opts) {
   let resCache = {};
   // periodic: a DoT or channel tick (sim v179, its 'fitted' model: a tick rolls a tenth of a hit's share). Area ticks
   // (Rain of Fire, Hellfire) roll as hits, as in the engine's aoeTick.
-  function vulnMult(school, ti, periodic) {    // partial resists and Spell Pierce
-    const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '');
-    const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen, periodic));
+  // Sim v205 (its round 239, A128): each spell's own rule (WL.RESIST_RULES: binary / hit / tick; WL.spellResist).
+  function resProf(school, ti, periodic, sk) {
+    const rl = WL.RESIST_RULES[sk], g = rl ? (rl.binary ? 'b' : rl.noBonus ? 'n' : '') : '';
+    const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '') + g;
+    return resCache[id] || (resCache[id] = WL.spellResist(cfg, stats.pierce, school, coe, stats.spellPen, sk, periodic));
+  }
+  // A binary spell that hit: fully resisted while the target has resistance left (one R.vuln roll, only then).
+  function binResisted(key, ti) {
+    const rl = WL.RESIST_RULES[key];
+    if (!rl || !rl.binary) return false;
+    const pr = resProf(SPELLS[key].school, ti, false, key);
+    return pr.landP < 1 && R.vuln() >= pr.landP;
+  }
+  function vulnMult(school, ti, periodic, sk) {    // partial resists and Spell Pierce; sk: the spell (its resist rule)
+    const pr = resProf(school, ti, periodic, sk);
     let m = pr.flat;
     if (pr.dist.length > 1) {
       const x = R.vuln();
@@ -473,7 +485,7 @@ export function createCombat(opts) {
     const s = SPELLS[key], e = table[key];
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
-    amount *= vulnMult(s.school, ti, true);
+    amount *= vulnMult(s.school, ti, true, key);
     const crit = R.crit() * 100 < e.critPct + trCrit(key);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
@@ -495,7 +507,7 @@ export function createCombat(opts) {
       const r = row(rowKey(ti, key));
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
-      amount *= vulnMult(s.school, ti);
+      amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus)
       const crit = R.crit() * 100 < e.critPct + trCrit(key);
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
@@ -507,6 +519,7 @@ export function createCombat(opts) {
   function land(key, castMult, ti, eureka) {   // eureka: the cast finished inside Eureka!
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
+    if (binResisted(key, ti)) { r.misses++; r.resisted = (r.resisted || 0) + 1; emit({ type: 'miss', key: key, target: ti, resisted: true }); return false; }   // sim v205
     r.landed++;
     if (key === 'baneOfAgony') { S.ampUp = false; if (AMP_BTN) delete S.buffs.amplifyCurse; }   // Amplify Curse spent on a Bane that landed
     if (s.kind === 'utility') {
@@ -528,7 +541,7 @@ export function createCombat(opts) {
       if (!buff('decimation')) emit({ type: 'proc', name: 'decimation' });
       S.buffs.decimation = S.t + 10;
     }
-    amount *= vulnMult(s.school, ti);
+    amount *= vulnMult(s.school, ti, false, key);
     // Revelation (the boss only, as in the engine): + its crit on this spell; a spell that does not crit may give it.
     const revHad = REV && ti === 1 ? revCritBonus() : 0;
     const crit = R.crit() * 100 < e.critPct + revHad + trCrit(key);
@@ -579,17 +592,30 @@ export function createCombat(opts) {
   function warlockSpNow() { return (stats.sp + potSp()) * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
   function petSp() { return warlockSpNow() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
 
+  // Sim v205: a demon's spell against the target's resistance after Curse of the Elements (none of your Pierce /
+  // Penetration). R.pet rolls only while resistance is left. Firebolt binary; Lash of Pain and Demonic Brand partial.
+  const petResCache = {};
+  function petRes(school, pk, ti) { const coe = debuff(ti, 'coe'), k = school + (coe ? 1 : 0) + pk; return petResCache[k] || (petResCache[k] = WL.petResist(cfg, school, coe, pk)); }
+  function petResRoll(pr) {
+    if (pr.dist.length < 2) return 1;
+    const x = R.pet(); let acc = 0;
+    for (let i = 0; i < pr.dist.length; i++) { acc += pr.dist[i].p; if (x < acc || i === pr.dist.length - 1) return 1 + pr.dist[i].pct / 100; }
+    return 1;
+  }
   function petSpellHit(sp) {
     const key = 'pet:' + sp.key, ti = P.target, r = row(rowKey(ti, key));
     P.casting = null;
     r.casts++;
     if (immuneTo(ti, sp.school)) { emit({ type: 'miss', key: key, target: ti, pet: true, immune: true }); return; }   // the Imp's Firebolt at Onyxia
     if (R.pet() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, pet: true }); return; }
+    const ppr = petRes(sp.school, sp.key, ti);
+    if (ppr.landP < 1 && R.pet() >= ppr.landP) { r.misses++; r.resisted = (r.resisted || 0) + 1; emit({ type: 'miss', key: key, target: ti, pet: true, resisted: true }); return; }   // Firebolt is binary
     r.landed++;
     if (ti === 1) jowProc(true);
     const base = sp.base * (sp.key === 'lashOfPain' ? 1 + tv('improvedSayaad', 'lashPct') / 100 : 1);
     let amount = (base + sp.coef * petSp()) * petMult(sp.school);
     if (sp.key === 'firebolt') amount *= 1 + tv('improvedImp', 'firebolt') / 100;
+    amount *= petResRoll(ppr);                                         // Lash of Pain: partial resists
     const crit = R.pet() * 100 < stats.critPct;
     if (crit) amount *= cb.critMultiplier;
     deal(key, amount, crit, false, ti, { pet: true, school: sp.school });
@@ -601,7 +627,7 @@ export function createCombat(opts) {
     if (!debuff(ti, 'brand') || !(t.brandCharges > 0)) return;
     t.brandCharges--;
     const db = cfg.demonicBrand, school = petSchool();
-    const amount = ((db.baseMin + db.baseMax) / 2 + db.shadowSpCoef * (warlockSpNow() + (stats.schoolSp.shadow || 0))) * petMult(school);
+    const amount = ((db.baseMin + db.baseMax) / 2 + db.shadowSpCoef * (warlockSpNow() + (stats.schoolSp.shadow || 0))) * petMult(school) * petResRoll(petRes(school, 'brand', ti));
     row(rowKey(ti, 'pet:brand')).casts++;
     deal('pet:brand', amount, false, false, ti, { pet: true, school: school });
   }
@@ -744,8 +770,9 @@ export function createCombat(opts) {
     if (s.kind === 'channel') {
       const spent = commit(key), r = row(rowKey(ti, key));
       if (e.cd) S.cds[key] = S.t + e.cd;
-      if (!s.aoe && R.hit() * 100 >= stats.hitPct) {       // area channels always start; their ticks roll per target
-        r.misses++; emit({ type: 'miss', key: key, target: ti });
+      const chMiss = !s.aoe && R.hit() * 100 >= stats.hitPct, chRes = !s.aoe && !chMiss && binResisted(key, ti);   // Drain Soul is binary (sim v205)
+      if (chMiss || chRes) {                               // area channels always start; their ticks roll per target
+        r.misses++; if (chRes) r.resisted = (r.resisted || 0) + 1; emit(Object.assign({ type: 'miss', key: key, target: ti }, chRes ? { resisted: true } : {}));
         syncWrack();                                       // a Wrack cast again that missed: the old one is gone too
         S.decideSeq = order++;
         return;
@@ -1388,10 +1415,9 @@ export function createCombat(opts) {
     // page's guess, so it only matters in a timed fight or near the guessed end).
     const fin = at + view.remaining, now = at;
     function gt(ti) { return ti > 1 ? standing[ti - 1] || boss : boss; }
-    function expVuln(school, ti, periodic) {
-      const coe = debuff(gt(ti), 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '');
-      const pr = resCache[id] || (resCache[id] = WL.resistProfile(cfg, stats.pierce, school, coe, stats.spellPen, periodic));
-      return pr.flat * pr.dist.reduce(function (a, d) { return a + d.p * (1 + d.pct / 100); }, 0);
+    function expVuln(school, ti, periodic, sk) {     // with the spell's resist rule (a binary spell's land chance), sim v205
+      const pr = resProf(school, gt(ti), periodic, sk);
+      return pr.landP * pr.flat * pr.dist.reduce(function (a, d) { return a + d.p * (1 + d.pct / 100); }, 0);
     }
     function expCrit(critPct, critMult) { return 1 + Math.max(0, Math.min(100, critPct)) / 100 * (critMult - 1); }
     function hitChance() { return Math.min(100, stats.hitPct) / 100; }
@@ -1401,7 +1427,7 @@ export function createCombat(opts) {
       let amt;
       if (s.aoe) {
         let sum = 0;
-        for (let tj = 1; tj <= standing.length; tj++) sum += e.ticks * (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(k, true, gt(tj)) * expVuln(s.school, tj);
+        for (let tj = 1; tj <= standing.length; tj++) sum += e.ticks * (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(k, true, gt(tj)) * expVuln(s.school, tj, false, k);
         return hitChance() * sum * expCrit(e.critPct, e.critMult);
       }
       if (s.kind === 'channel') {
@@ -1412,7 +1438,7 @@ export function createCombat(opts) {
         if (k === 'incinerate' && !noImmolate && dotLeft('immolate', boss) > 0) amt *= 1 + s.immolateBonusPct / 100;
         if ((isSB(k) || k === 'searingPain') && T[boss].hpPct < cfg.fight.executePct && tv('decimation')) amt *= addOp0(k, tv('decimation', 'dmgPct'));
       }
-      return hitChance() * amt * expVuln(s.school, ti) * expCrit(e.critPct, e.critMult);
+      return hitChance() * amt * expVuln(s.school, ti, s.kind === 'channel', k) * expCrit(e.critPct, e.critMult);
     }
     const NOT_ALT = { bane: 1, baneOfAgony: 1, corruption: 1, siphonLife: 1, immolate: 1, multiDot: 1, curseOfElements: 1, lifeTapPet: 1, lifeTapBelow: 1, lifeTapNeed: 1,
                       swapToImp: 1, swapToSuccubus: 1, shadowBoltSpread: 1, isbUpkeep: 1, deathCoilFinisher: 1 };
@@ -1435,7 +1461,7 @@ export function createCombat(opts) {
       let value = 0;
       const amp = key === 'baneOfAgony' && tv('amplifyCurse') && (S.ampUp || buff('amplifyCurse') || (!AMP_BTN && ready('amplifyCurse')));
       const castMult = amp ? 1 + tv('amplifyCurse', 'boaPct') / 100 : 1;
-      const tickAmt = (s.tickBase + s.tickCoef * spNow(e)) * castMult * e.periodicMult * liveMult(key, true, gt(ti)) * expVuln(s.school, ti, true) * expCrit(e.critPct, e.critMult);
+      const tickAmt = (s.tickBase + s.tickCoef * spNow(e)) * castMult * e.periodicMult * liveMult(key, true, gt(ti)) * expVuln(s.school, ti, true, key) * expCrit(e.critPct, e.critMult);
       // Wrack as the filler: the DoT's ticks come faster by Wrack's share of the fight so far (80% in the first 20 s).
       const wf = f === 'wrack' && ti <= 1 && tv('wrack') && SPELLS.wrack.dotSpeedSpells.indexOf(key) >= 0;
       const times = [];

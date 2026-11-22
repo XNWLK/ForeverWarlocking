@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "fc59180",
-    "subject":  "v203: Baked Salmon, Elemental Purging, Blessed Wizard Oil; Rugged Mantle not in the game",
+    "commit":  "1594dfb",
+    "subject":  "v206: Shadow Demo pre-raid legs Leggings of Torment",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-20 18:01",
+    "synced":  "2026-11-22 01:58",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
