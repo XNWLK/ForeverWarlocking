@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e842b3d",
-    "subject":  "v207: four trinkets and Dismantle, Rain of Fire tick resists, 75% partial cap, item sync, unique-equipped categories",
+    "commit":  "7beff74",
+    "subject":  "v208: multi-DoT goes above Life Tap when needed on 2-3 targets, for all builds",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-22 18:34",
+    "synced":  "2026-11-22 19:07",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

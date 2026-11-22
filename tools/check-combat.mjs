@@ -106,8 +106,12 @@ for (const scene of SCENES) {
           }
           const idle = [];
           for (let j = 0; j <= 400; j++) idle.push(freeSince + j * 0.1);
+          // Never a moment before you are free: a heal landing at exactly 80 s must not beat a cast bar that ends at
+          // 80.0002 s (both log as 80; sim v208, Shadow Demo, 2 targets Hellfire, troll).
+          const free = combat.readyAt() - 1e-9;
           for (const list of [firm, idle]) {
             for (const candidate of list) {
+              if (candidate < free) continue;
               if (Math.abs(candidate - logged) < off) { at = candidate; off = Math.abs(candidate - logged); }
             }
             if (at !== logged) break;
