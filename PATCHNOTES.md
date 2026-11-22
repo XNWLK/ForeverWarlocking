@@ -13,6 +13,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   too (the Imp's Firebolt whole, Lash of Pain and Demonic Brand partly). With Curse of the Elements up this almost never
   happens, so the numbers barely move.
 - Shadow Demo wears Leggings of Torment as its pre-raid legs, as in the Warlock SIM (about 912 DPS).
+- Rain of Fire's ticks are now only rarely partly resisted, like DoT ticks (Hellfire's stay as before), and a partial
+  resist never takes more than 75% of a hit, as in the Warlock SIM. With Curse of the Elements up the numbers don't move.
 
 ### 2026-11-20
 - Your food is now Baked Salmon / Lobster Stew (+28 spell damage, was Nightfin Soup +22), as in the Warlock SIM. Every

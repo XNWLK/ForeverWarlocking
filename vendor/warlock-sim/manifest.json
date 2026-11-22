@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "1594dfb",
-    "subject":  "v206: Shadow Demo pre-raid legs Leggings of Torment",
+    "commit":  "e842b3d",
+    "subject":  "v207: four trinkets and Dismantle, Rain of Fire tick resists, 75% partial cap, item sync, unique-equipped categories",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-22 01:58",
+    "synced":  "2026-11-22 18:34",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

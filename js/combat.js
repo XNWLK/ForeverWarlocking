@@ -332,10 +332,12 @@ export function createCombat(opts) {
 
   let resCache = {};
   // periodic: a DoT or channel tick (sim v179, its 'fitted' model: a tick rolls a tenth of a hit's share). Area ticks
-  // (Rain of Fire, Hellfire) roll as hits, as in the engine's aoeTick.
+  // (Hellfire) roll as hits, as in the engine's aoeTick.
   // Sim v205 (its round 239, A128): each spell's own rule (WL.RESIST_RULES: binary / hit / tick; WL.spellResist).
+  // Sim v207 (its round 241, A130): Rain of Fire's ticks roll at a tenth of the share (tickShare); resisted steps above 75%
+  // are 75% partials, so a single step left can still be a resist.
   function resProf(school, ti, periodic, sk) {
-    const rl = WL.RESIST_RULES[sk], g = rl ? (rl.binary ? 'b' : rl.noBonus ? 'n' : '') : '';
+    const rl = WL.RESIST_RULES[sk], g = rl ? (rl.binary ? 'b' : (rl.noBonus ? 'n' : '') + (rl.tickShare ? 's' : '')) : '';
     const coe = debuff(ti, 'coe'), id = school + (coe ? '1' : '0') + (periodic ? 't' : '') + g;
     return resCache[id] || (resCache[id] = WL.spellResist(cfg, stats.pierce, school, coe, stats.spellPen, sk, periodic));
   }
@@ -349,7 +351,7 @@ export function createCombat(opts) {
   function vulnMult(school, ti, periodic, sk) {    // partial resists and Spell Pierce; sk: the spell (its resist rule)
     const pr = resProf(school, ti, periodic, sk);
     let m = pr.flat;
-    if (pr.dist.length > 1) {
+    if (pr.dist.length > 1 || pr.dist[0].pct) {   // sim v207: one step left is all 75% when the share is 90%+
       const x = R.vuln();
       let acc = 0;
       for (let i = 0; i < pr.dist.length; i++) {
@@ -486,7 +488,7 @@ export function createCombat(opts) {
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
     amount *= vulnMult(s.school, ti, true, key);
-    const crit = R.crit() * 100 < e.critPct + trCrit(key);
+    const crit = R.crit() * 100 < e.critPct + trCrit(key, ti);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
     if (S.over) return;
@@ -507,8 +509,8 @@ export function createCombat(opts) {
       const r = row(rowKey(ti, key));
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
-      amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus)
-      const crit = R.crit() * 100 < e.critPct + trCrit(key);
+      amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus, a tenth of the share)
+      const crit = R.crit() * 100 < e.critPct + trCrit(key, ti);
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
@@ -544,7 +546,7 @@ export function createCombat(opts) {
     amount *= vulnMult(s.school, ti, false, key);
     // Revelation (the boss only, as in the engine): + its crit on this spell; a spell that does not crit may give it.
     const revHad = REV && ti === 1 ? revCritBonus() : 0;
-    const crit = R.crit() * 100 < e.critPct + revHad + trCrit(key);
+    const crit = R.crit() * 100 < e.critPct + revHad + trCrit(key, ti);
     if (REV && ti === 1) revAfter(crit, revHad > 0);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, false, ti);
@@ -597,7 +599,7 @@ export function createCombat(opts) {
   const petResCache = {};
   function petRes(school, pk, ti) { const coe = debuff(ti, 'coe'), k = school + (coe ? 1 : 0) + pk; return petResCache[k] || (petResCache[k] = WL.petResist(cfg, school, coe, pk)); }
   function petResRoll(pr) {
-    if (pr.dist.length < 2) return 1;
+    if (pr.dist.length < 2 && !pr.dist[0].pct) return 1;   // sim v207: a single 75% step still counts
     const x = R.pet(); let acc = 0;
     for (let i = 0; i < pr.dist.length; i++) { acc += pr.dist[i].p; if (x < acc || i === pr.dist.length - 1) return 1 + pr.dist[i].pct / 100; }
     return 1;
@@ -861,7 +863,7 @@ export function createCombat(opts) {
   const CONS = WL.activeConsumables(cfg);
   const SP_POT = CONS.filter(function (c) { return c.spPotion && WL.consumableHolds(cfg, c); })[0] || null;
   const MANA_ITEMS = CONS.filter(function (c) { return c.manaRestore; });
-  const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit'; });
+  const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit' && WL.fxOn(cfg, x.fx.use); });   // sim v207: an onlyVs effect is never used where it does nothing
   const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};
   // Sim v191 (its round 219): "Activate trinket" in the priority list uses every ready on-use trinket (not the mana ones)
   // when the engine's walk down the list reaches it (off the global cooldown; the walk goes on). With it in the list, the
@@ -896,7 +898,8 @@ export function createCombat(opts) {
   let actOpen = ACT_POL === 'pull', doomSeen = false;
   function potSp() { return SP_POT && buff('spPotion') ? SP_POT.spPotion.sp : 0; }
   function trUp(x) { return trUntil[x.slot] > S.t + EPS; }
-  function trCrit(k) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (trUp(x) && (!u.tree || (s && s.tree === u.tree))) c += u.pct; }); return c; }
+  // Sim v207: × the boss type (vs); a target debuff (u.target) counts on your target only, not on extra targets.
+  function trCrit(k, ti) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (trUp(x) && (!u.tree || (s && s.tree === u.tree)) && !(u.target && ti > 1)) c += u.pct * WL.fxMult(cfg, u); }); return c; }
   function trCritDone() { TRK.forEach(function (x) { if (x.fx.use.endsOnCrit && trUp(x)) trUntil[x.slot] = -1; }); }
   function revCritBonus() { return REV && revUntil > S.t + EPS ? REV.fx.proc.pct : 0; }
   function revAfter(crit, had) {

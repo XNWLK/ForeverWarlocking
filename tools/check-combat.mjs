@@ -7,7 +7,8 @@
 // Fights checked: one target (three seeds), two and three targets with DoTs kept on all of them (Bane of Havoc
 // included where the build has it), Rain of Fire and Hellfire as the filler on several targets, taking a hit every
 // two seconds (pushback), movement phases, and a boss with resistances fought with Spell Penetration and Spell
-// Pierce. The Shaman totems' scenes went with the patch of 2026-10-16 (Windfury and Flametongue Totem only affect
+// Pierce, Rain of Fire on a fire-resistant boss (its ticks at a tenth of the share, sim v207), and a boss whose
+// resistances reach the 75% partial-resist cap (sim v207). The Shaman totems' scenes went with the patch of 2026-10-16 (Windfury and Flametongue Totem only affect
 // players since, Tranquil Air Totem is gone), the Salvation scene with the patch of 2026-11-03 (Salvation is gone).
 //
 // Precast scenes: the engine starts the fight with a spell that completes at 0 s (fight.precast). Here the same
@@ -31,6 +32,8 @@ const SCENES = [
   { name: 'hit every 2 s (pushback)', targets: 1, seeds: [8], fight: { hitEvery: 2 } },
   { name: 'moving 4 s every 20 s', targets: 1, seeds: [9], fight: { moveEvery: 20, moveDuration: 4 } },
   { name: 'resistances, Spell Penetration and Pierce', targets: 2, seeds: [17], gear: { spellPen: 30, pierce: 10 }, combat: { targetResist: { shadow: 75, fire: 40 } } },
+  { name: '3 targets, Rain of Fire, fire resistance', targets: 3, seeds: [18], filler: 'rainOfFire', combat: { targetResist: { fire: 150 } } },
+  { name: 'very high resistances (75% partial cap)', targets: 1, seeds: [19], combat: { targetResist: { shadow: 900, fire: 5000 } } },
   { name: 'precast Shadow Bolt', targets: 1, seeds: [12], precast: 'shadowBolt' },
   { name: 'precast Immolate', targets: 1, seeds: [13], precast: 'immolate' },
   { name: 'precast Soul Fire', targets: 1, seeds: [14], precast: 'soulFire' },
