@@ -25,6 +25,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   Shadow Demo is now about 901 DPS.
 - Hellfire's cast no longer triggers Touch of the Grave or Judgement of Wisdom, and Rain of Fire's cast no longer
   triggers Touch of the Grave.
+- The Weakness Analyzer's cooldown is now 6 minutes (was 90 seconds), as in the game and the Warlock SIM, so it is used
+  less often (every build loses a few DPS; Wrack DS about 935).
 
 ### 2026-11-20
 - Your food is now Baked Salmon / Lobster Stew (+28 spell damage, was Nightfin Soup +22), as in the Warlock SIM. Every

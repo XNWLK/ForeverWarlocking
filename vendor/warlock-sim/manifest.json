@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "3b8b272",
-    "subject":  "v209: Revelation as measured, demon regen and crit, proc fixes from public combat-log studies",
+    "commit":  "e5957fa",
+    "subject":  "v210: Weakness Analyzer 6 min cooldown, Deathmist set 1681, +30 Spell Power not Phase 1",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-22 21:19",
+    "synced":  "2026-11-22 22:30",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
