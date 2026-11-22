@@ -38,7 +38,9 @@ const SCENES = [
   { name: 'precast Immolate', targets: 1, seeds: [13], precast: 'immolate' },
   { name: 'precast Soul Fire', targets: 1, seeds: [14], precast: 'soulFire' },
   { name: 'precast Corruption', targets: 1, seeds: [15], precast: 'corruption' },
-  { name: 'precast Searing Pain, hit every 2 s', targets: 1, seeds: [16], precast: 'searingPain', fight: { hitEvery: 2 } }
+  { name: 'precast Searing Pain, hit every 2 s', targets: 1, seeds: [16], precast: 'searingPain', fight: { hitEvery: 2 } },
+  // Sim v209: the Voidwalker's melee is halved (dmgPct) and it regenerates from your Intellect; builds with a demon only.
+  { name: 'Voidwalker', targets: 1, seeds: [20], pet: 'voidwalker' }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
@@ -50,13 +52,21 @@ function withFiller(build, filler) {
   return copy;
 }
 
+function withPet(build, pet) {
+  if (!pet) return build;
+  const copy = JSON.parse(JSON.stringify(build));
+  copy.pet = pet;
+  return copy;
+}
+
 // Two starting points: the engine's plain defaults, and the sim page's defaults (Pre-BiS gear per build, ideal Phase 1
 // buffs and consumables: the potion, the rune, the Weakness Analyzer and Revelation, which the game uses by itself).
 const BASES = [{ name: 'plain', make: () => JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG)) }, { name: 'page', make: () => WL.pageDefaultConfig() }];
 for (const base of BASES) {
 for (const scene of SCENES) {
   for (const ready of WL.BUILDS) {
-    const build = withFiller(ready, scene.filler);
+    if (scene.pet && !ready.pet) continue;                // a demon swap: only builds that keep a demon
+    const build = withPet(withFiller(ready, scene.filler), scene.pet);
     for (const raceKey of WL.RACE_KEYS) {
       for (const seed of scene.seeds) {
         const cfg = base.make();

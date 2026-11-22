@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "7beff74",
-    "subject":  "v208: multi-DoT goes above Life Tap when needed on 2-3 targets, for all builds",
+    "commit":  "3b8b272",
+    "subject":  "v209: Revelation as measured, demon regen and crit, proc fixes from public combat-log studies",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-22 19:07",
+    "synced":  "2026-11-22 21:19",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

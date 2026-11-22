@@ -17,6 +17,14 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   resist never takes more than 75% of a hit, as in the Warlock SIM. With Curse of the Elements up the numbers don't move.
 - With two or three dummies, the hints now ask for your DoTs on the other dummies before a Life Tap for mana, as in the
   Warlock SIM (a little more damage for every build; one dummy is unchanged).
+- Revelation works as measured in the game, as in the Warlock SIM: it comes a little less often (less with more crit),
+  but now also from Hellfire and Rain of Fire ticks and from hits on any dummy. Your next direct spell uses it when its
+  cast finishes, and while it is up every tick of a channel crits.
+- Your demon now crits much less (its own small crit plus the crit on your gear, not your whole spell crit), takes more
+  spell power from your Shadow or Fire spell power, and its mana comes back from your Intellect (the Imp the most).
+  Shadow Demo is now about 901 DPS.
+- Hellfire's cast no longer triggers Touch of the Grave or Judgement of Wisdom, and Rain of Fire's cast no longer
+  triggers Touch of the Grave.
 
 ### 2026-11-20
 - Your food is now Baked Salmon / Lobster Stew (+28 spell damage, was Nightfin Soup +22), as in the Warlock SIM. Every

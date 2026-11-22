@@ -431,7 +431,9 @@ export function createCombat(opts) {
   // Touch of the Grave (Undead; patch of 2026-10-16, as in the engine): a 30% chance, then its icd (15 s since 2026-10-27) before it can come
   // again (no roll meanwhile). 5% of your maximum health - so it grows with Stamina - and nothing multiplies it: no
   // auras, no Curse of the Elements, no Improved Shadow Bolt, no Shadow and Flame. No spell power, no crit, no resist.
-  function touchOfTheGrave(ti) {
+  // key: the landing spell - Rain of Fire's cast never procs it (castNoTog; sim v209, its round 244).
+  function touchOfTheGrave(ti, key) {
+    if (key && SPELLS[key].castNoTog) return;
     if (TOG && !(S.togReady > S.t + EPS) && R.proc() * 100 < TOG.chancePct) {
       S.togReady = S.t + (TOG.icd || 0);
       const amount = stats.maxHealth * TOG.maxHealthPct / 100;
@@ -483,12 +485,13 @@ export function createCombat(opts) {
     });
   }
 
-  function periodicTick(key, snap, i, ti, extra) {   // extra: an extra tick from Wrack (the log says so)
+  function periodicTick(key, snap, i, ti, extra, chan) {   // extra: an extra tick from Wrack (the log says so); chan: a channel's tick
     const s = SPELLS[key], e = table[key];
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
     amount *= vulnMult(s.school, ti, true, key);
-    const crit = R.crit() * 100 < e.critPct + trCrit(key, ti);
+    const rvc = chan && REV ? revChan() : 0;             // sim v209 (its round 243): a channel tick crits while Revelation is up
+    const crit = R.crit() * 100 < e.critPct + rvc + trCrit(key, ti);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
     if (S.over) return;
@@ -510,7 +513,9 @@ export function createCombat(opts) {
       if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
       amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus, a tenth of the share)
-      const crit = R.crit() * 100 < e.critPct + trCrit(key, ti);
+      const rvc = REV ? revChan() : 0;                // sim v209 (its round 243): crits while Revelation is up;
+      const crit = R.crit() * 100 < e.critPct + rvc + trCrit(key, ti);
+      if (REV && !rvc) revRoll(crit, true);           // a tick that does not crit may give it (each target)
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
@@ -518,7 +523,8 @@ export function createCombat(opts) {
   }
 
   // A finished or instant cast arrives at its target. Returns true when it hit.
-  function land(key, castMult, ti, eureka) {   // eureka: the cast finished inside Eureka!
+  // rev: this cast took Revelation when it completed (revTake; sim v209, its round 243).
+  function land(key, castMult, ti, eureka, rev) {   // eureka: the cast finished inside Eureka!
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
     if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
     if (binResisted(key, ti)) { r.misses++; r.resisted = (r.resisted || 0) + 1; emit({ type: 'miss', key: key, target: ti, resisted: true }); return false; }   // sim v205
@@ -532,7 +538,7 @@ export function createCombat(opts) {
     if (s.kind === 'dot') {
       applyDot(ti, key, { castMult: castMult || 1 });
       emit({ type: 'apply', key: key, target: ti });
-      touchOfTheGrave(ti);
+      touchOfTheGrave(ti, key);
       if (ti === 1 && !S.over) jowProc();
       return true;
     }
@@ -544,10 +550,10 @@ export function createCombat(opts) {
       S.buffs.decimation = S.t + 10;
     }
     amount *= vulnMult(s.school, ti, false, key);
-    // Revelation (the boss only, as in the engine): + its crit on this spell; a spell that does not crit may give it.
-    const revHad = REV && ti === 1 ? revCritBonus() : 0;
-    const crit = R.crit() * 100 < e.critPct + revHad + trCrit(key, ti);
-    if (REV && ti === 1) revAfter(crit, revHad > 0);
+    // Revelation (sim v209, its round 243; any target): taken at the cast, it adds its crit here; a hit that took
+    // none and does not crit may give it.
+    const crit = R.crit() * 100 < e.critPct + (rev ? REV.fx.proc.pct : 0) + trCrit(key, ti);
+    if (REV && !rev) revRoll(crit);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, false, ti);
     if (crit && ti === 1) trCritDone();                                // Weakness Analyzer ends on a direct crit
@@ -568,7 +574,7 @@ export function createCombat(opts) {
     }
     if (S.over) return true;
     if (s.kind === 'hybrid' && !t.dead) applyDot(ti, key, { castMult: castMult || 1 });
-    touchOfTheGrave(ti);
+    touchOfTheGrave(ti, key);
     if (ti === 1 && !S.over) jowProc();
     return true;
   }
@@ -578,11 +584,15 @@ export function createCombat(opts) {
   function makePet(key) {
     if (!key || !cfg.options.includePetDamage) return null;
     const pc = cfg.pets[key], maxMana = pc.mana * (1 + tv('felVitality', 'manaPct') / 100);
-    return { key: key, c: pc, maxMana: maxMana, mana: maxMana, lastRegen: 0, lashReady: 0, swingReady: 0, gen: 0,
+    // Sim v209 (its round 244): mana a second = mp5PerOwnerInt x your Intellect / 5 (MP5, all the time; Imp 30%, the others
+    // 10%), or manaRegen where the data has no share (Felhunter); plus an equipped item's pet MP5 (Pimgib's Collar).
+    const regenAdd = (WL.trinketEquipFx ? WL.trinketEquipFx(cfg) : []).reduce(function (a, q) { return a + (q.petMp5 && (!q.pet || q.pet === key) ? q.petMp5 / 5 : 0); }, 0);
+    const regen = (pc.mp5PerOwnerInt != null ? pc.mp5PerOwnerInt * stats.int / 5 : pc.manaRegen || 0) + regenAdd;
+    return { key: key, c: pc, maxMana: maxMana, mana: maxMana, regen: regen, lastRegen: 0, lashReady: 0, swingReady: 0, gen: 0,
              mode: 'follow', active: false, casting: null, target: 1,
              range: pc.melee ? petMeleeRange : pc.spell.range };
   }
-  function petRegen() { P.mana = Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)); P.lastRegen = S.t; }
+  function petRegen() { P.mana = Math.min(P.maxMana, P.mana + P.regen * (S.t - P.lastRegen)); P.lastRegen = S.t; }   // sim v209: P.regen (makePet)
   function petSchool() { return build.pet === 'imp' ? 'fire' : 'shadow'; }
   function petMult(school) {
     let m = (1 + tv('unholyPower', 'petDmgPct') / 100) * stats.mult.all;
@@ -592,7 +602,18 @@ export function createCombat(opts) {
     return m;
   }
   function warlockSpNow() { return (stats.sp + potSp()) * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1); }
-  function petSp() { return warlockSpNow() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
+  // Sim v209 (its round 244): a demon takes its share of spell power (and its attack power) from your school total -
+  // generic + the better of your Shadow / Fire spell power (cfg.petSchoolSp; false = generic only), live.
+  function petOwnerSp() {
+    if (cfg.petSchoolSp === false) return warlockSpNow();
+    const best = Math.max(0, stats.schoolSp.shadow || 0, stats.schoolSp.fire || 0);
+    return (stats.sp + best + potSp()) * (buff('bloodFury') ? 1 + racialOf('cooldown').spPct / 100 : 1);
+  }
+  function petSp() { return petOwnerSp() * (cfg.petSpPct != null ? cfg.petSpPct : 100) / 100 + (stats.dkSp || 0); }
+  // Sim v209 (its round 244): a demon's crit = cfg.petCrit - live (fromOwner false): its own (melee / spell) + your gear's
+  // crit (stats.gearCritPct); fromOwner true: your spell crit.
+  const PCRIT = cfg.petCrit || { fromOwner: true, ownMeleePct: 0, ownSpellPct: 0 };
+  function petCritPct(melee) { return PCRIT.fromOwner ? stats.critPct : (melee ? PCRIT.ownMeleePct : PCRIT.ownSpellPct) + (stats.gearCritPct || 0); }
 
   // Sim v205: a demon's spell against the target's resistance after Curse of the Elements (none of your Pierce /
   // Penetration). R.pet rolls only while resistance is left. Firebolt binary; Lash of Pain and Demonic Brand partial.
@@ -618,7 +639,7 @@ export function createCombat(opts) {
     let amount = (base + sp.coef * petSp()) * petMult(sp.school);
     if (sp.key === 'firebolt') amount *= 1 + tv('improvedImp', 'firebolt') / 100;
     amount *= petResRoll(ppr);                                         // Lash of Pain: partial resists
-    const crit = R.pet() * 100 < stats.critPct;
+    const crit = R.pet() * 100 < petCritPct(false);                   // the demon's spell crit (sim v209)
     if (crit) amount *= cb.critMultiplier;
     deal(key, amount, crit, false, ti, { pet: true, school: sp.school });
     if (!S.over && alive(ti)) brandProc(ti);
@@ -639,7 +660,7 @@ export function createCombat(opts) {
     petRegen();
     const sp = P.c.spell;
     if (sp.cd && P.lashReady > S.t + EPS) { petEvent(P.lashReady, 2, 'petAct'); return; }
-    if (P.mana < sp.cost) { petEvent(S.t + Math.max(0.1, (sp.cost - P.mana) / P.c.manaRegen), 2, 'petAct'); return; }
+    if (P.mana < sp.cost) { if (P.regen > 0) petEvent(S.t + Math.max(0.1, (sp.cost - P.mana) / P.regen), 2, 'petAct'); return; }   // its own regen (sim v209)
     P.mana -= sp.cost;
     if (sp.cd) P.lashReady = S.t + sp.cd;
     if (sp.cast) {
@@ -667,12 +688,12 @@ export function createCombat(opts) {
     r.casts++;
     const hitBonus = WL.petMeleeHit(stats, cb);   // 8/17 of your spell hit above the base, not capped, nothing ignored (sim, 2026-10-21)
     const miss = Math.max(0, tb.missPct - hitBonus);
-    const critChance = Math.max(0, (m.critPct || 0) + (m.inheritSpellCrit ? stats.critPct : 0) - tb.critSuppressionPct);   // your spell crit only (sim, 2026-10-17)
+    const critChance = Math.max(0, (m.critPct || 0) + (m.inheritSpellCrit ? petCritPct(true) : 0) - tb.critSuppressionPct);   // the demon's crit (sim v209)
     if (roll >= miss + tb.dodgePct) {
       r.landed++;
       if (ti === 1) jowProc(true);
-      const dps = m.baseDps + m.apPerSp * warlockSpNow() / m.apPerDps;
-      let amount = dps * m.swing * (1 - armorRed) * petMult('physical');
+      const dps = m.baseDps + m.apPerSp * petOwnerSp() / m.apPerDps;   // your school total (sim v209)
+      let amount = dps * m.swing * (1 - armorRed) * petMult('physical') * (m.dmgPct != null ? m.dmgPct / 100 : 1);   // the Voidwalker's melee halved (sim v209)
       const glance = roll < miss + tb.dodgePct + tb.glancePct;
       const crit = !glance && roll < miss + tb.dodgePct + tb.glancePct + critChance;
       if (glance) amount *= tb.glanceDmgPct / 100;
@@ -780,11 +801,14 @@ export function createCombat(opts) {
         return;
       }
       r.landed++;
-      touchOfTheGrave(ti);
+      // Sim v209 (its round 244): Hellfire's cast targets you and rolls no procs (castOnSelf: no Touch of the Grave, no
+      // Judgement of Wisdom); Rain of Fire's cast rolls them, except Touch of the Grave (castNoTog, in touchOfTheGrave).
+      if (!s.castOnSelf) touchOfTheGrave(ti, key);
       if (!S.over) {
-        if (ti === 1 || s.aoe) jowProc();
+        if ((ti === 1 || s.aoe) && !s.castOnSelf) jowProc();
         const id = ++inst;
         S.channel = { key: key, inst: id, target: ti, snap: { castMult: 1 }, start: S.t, end: S.t + chDur, ticks: nCh, done: 0 };
+        if (REV) revChan();                                // sim v209: a channel started while Revelation is up holds it until it ends
         for (let i = 1; i <= nCh; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
         syncWrack();
       }
@@ -801,7 +825,8 @@ export function createCombat(opts) {
       if (trance) delete S.buffs.shadowTrance;
       if (e.cd) S.cds[key] = S.t + e.cd;
       const spent = commit(key, undefined, price);
-      land(key, spent.castMult, ti, eurekaAt(key, S.t));
+      const rvt = REV ? revTake(key) : false;              // sim v209: an instant takes Revelation when cast
+      land(key, spent.castMult, ti, eurekaAt(key, S.t), rvt);
     }
     S.decideSeq = order++;
   }
@@ -901,13 +926,34 @@ export function createCombat(opts) {
   // Sim v207: × the boss type (vs); a target debuff (u.target) counts on your target only, not on extra targets.
   function trCrit(k, ti) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (trUp(x) && (!u.tree || (s && s.tree === u.tree)) && !(u.target && ti > 1)) c += u.pct * WL.fxMult(cfg, u); }); return c; }
   function trCritDone() { TRK.forEach(function (x) { if (x.fx.use.endsOnCrit && trUp(x)) trUntil[x.slot] = -1; }); }
-  function revCritBonus() { return REV && revUntil > S.t + EPS ? REV.fx.proc.pct : 0; }
-  function revAfter(crit, had) {
-    if (had) { revUntil = -1; return; }                              // used up by this spell
-    if (!crit && R.proc() * 100 < (cb.revelationChancePct || 0) * Math.max(0, 1 - stats.critPct / 100)) {
-      revUntil = S.t + REV.fx.proc.duration;
-      emit({ type: 'used', name: REV.fx.name, proc: true });
-    }
+  // Revelation, sim v209 (its round 243): + pct % crit for 15 s (a new trigger while it is up starts the 15 s again).
+  //  * Trigger: a landed direct hit that does not crit (any target) and each landed Hellfire / Rain of Fire tick that does
+  //    not crit (each target) roll WL.revelationChancePct (11% x (1 - 2 x your sheet crit)). Never DoT or drain ticks.
+  //  * A direct spell (or Immolate's direct part) takes it when its cast completes (an instant: when cast) and crits when
+  //    it lands - or not at all if it misses. DoTs, curses and Life Tap neither use nor spend it.
+  //  * While it is up every tick of a channel crits; the channel holds it (revCh) and it is spent when that channel ends.
+  let revCh = null;
+  function revUp() {                                                 // is it up now (a holding channel that ended spent it)
+    if (revCh != null && !(S.channel && S.channel.inst === revCh)) { revUntil = -1; revCh = null; }
+    return revUntil > S.t + EPS;
+  }
+  function revRoll(crit, tick) {                                     // a landed direct hit / area tick (tick: of the running channel)
+    if (crit || R.proc() * 100 >= WL.revelationChancePct(cb, stats.critPct)) return;
+    revUp();                                                         // a channel that held the old one and has ended: spent first
+    revUntil = S.t + REV.fx.proc.duration;
+    emit({ type: 'used', name: REV.fx.name, proc: true });
+    if (tick && S.channel) revCh = S.channel.inst;                   // that channel keeps it (spent when it ends)
+  }
+  function revTake(key) {                                            // the cast of key completes now: does it use (and spend) it?
+    if (!REV) return false;
+    const k = SPELLS[key].kind;
+    if ((k !== 'direct' && k !== 'hybrid') || !revUp()) return false;
+    revUntil = -1;
+    return true;
+  }
+  function revChan() {                                               // a channel tick now: + pct while it is up (the channel holds it)
+    if (!REV || !S.channel || !revUp()) return 0;
+    revCh = S.channel.inst; return REV.fx.proc.pct;
   }
   function activesOk(key) {                                          // the engine's activesOk ('pull', 'execute', 'doom')
     if (actOpen) return true;
@@ -1202,7 +1248,8 @@ export function createCombat(opts) {
         syncPet(lastCtx);
       }
       const spent = commit(c.key, c.decimation, c.cost);
-      land(c.key, spent.castMult, c.target, eurekaAt(c.key, S.t));   // finished now: inside Eureka! or not
+      const rvl = REV ? revTake(c.key) : false;            // sim v209: Revelation is taken when the cast completes (no travel time here)
+      land(c.key, spent.castMult, c.target, eurekaAt(c.key, S.t), rvl);   // finished now: inside Eureka! or not
     } else if (ev.type === 'dotTick') {
       const d = T[ev.target].dots[ev.key];
       if (!d || d.inst !== ev.inst) return;              // refreshed, consumed, or the target is dead
@@ -1228,7 +1275,7 @@ export function createCombat(opts) {
       const c = S.channel;
       if (!c || c.inst !== ev.inst) return;              // stopped
       if (ev.t > c.end + EPS) return;                    // cut off by a hit; the channel's end closes it
-      if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target);
+      if (SPELLS[ev.key].aoe) aoeTick(ev.key, ev.i, c.target); else periodicTick(ev.key, c.snap, ev.i, c.target, false, true);
       c.done = ev.i + 1; c.tickAt = S.t;
       if (!S.over && S.channel === c && ev.i === (c.ticks || table[ev.key].ticks) - 1) { S.channel = null; syncWrack(); }
       else if (!S.over && S.channel === c && SPELLS[ev.key].selfDamage && S.health <= selfTick(ev.key)) {   // the next tick would kill you
@@ -1382,7 +1429,7 @@ export function createCombat(opts) {
       canSwap: function () { return false; },
       tapGain: function () { return (SPELLS.lifeTap.manaBase + stats.spi) * (1 + tv('improvedLifeTap', 'manaPct') / 100); },
       petSpellCost: function () { return P && P.c.spell ? P.c.spell.cost : Infinity; },
-      petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : Infinity; },
+      petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.regen * (S.t - P.lastRegen)) : Infinity; },
       // The sim's lifeTapNeed (2026-10-28): the mana the rest of the fight needs at the rate it went down so far (Life Tap's
       // own mana left out); nothing in the first 6 s. Free mana: a mana potion or rune ready by then (no Innervate, Mana
       // Tide or mana trinkets here).
@@ -1572,7 +1619,7 @@ export function createCombat(opts) {
     get queuedKey() { return queued ? queued.key : null; },
     get pet() { return P; },
     get current() { return T[S.target]; },
-    petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.c.manaRegen * (S.t - P.lastRegen)) : 0; },
+    petMana: function () { return P ? Math.min(P.maxMana, P.mana + P.regen * (S.t - P.lastRegen)) : 0; },
     petCommand: petCommand, setTarget: setTarget, spawn: spawn, pull: pull, tapGain: tapGain,
     press: press, update: update, reset: reset, blocked: blocked, readyAt: readyAt,
     eventTimes: function () { return events.map(function (ev) { return ev.t; }); },   // for the check script
