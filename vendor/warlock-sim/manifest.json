@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "e5957fa",
-    "subject":  "v210: Weakness Analyzer 6 min cooldown, Deathmist set 1681, +30 Spell Power not Phase 1",
+    "commit":  "54358b6",
+    "subject":  "v211: Wrack DS weapon enchant +22 Intellect instead of Revelation",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-22 22:30",
+    "synced":  "2026-11-23 18:16",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

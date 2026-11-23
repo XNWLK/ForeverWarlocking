@@ -5,6 +5,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-23
+- Wrack DS's weapon now has +22 Intellect instead of Revelation, as in the Warlock SIM (about 938 DPS).
+
 ### 2026-11-22
 - Resists now follow each spell's own rule, as in the Warlock SIM. Immolate, Incinerate, Shadowburn, Death Coil, Bane of
   Agony and Drain Soul land whole or are resisted whole (the log says "resists" and the dummy shows "Resist"); Shadow
