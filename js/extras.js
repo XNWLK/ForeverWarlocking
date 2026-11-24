@@ -1,6 +1,7 @@
 // The bar on the right and what it switches on or opens:
 //   - the rotation panel (what the sim plays), the race against the sim, mistake callouts;
-//   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM;
+//   - the character, talents and buffs sheets - read-only, because all of it comes from the Warlock SIM - and the gear
+//     choice (Realistic or Max Pre-BiS, both the sim's own lists);
 //   - latency, fight presets, the volume, a link to share, and copying the combat log.
 // Challenges (today's fight, drills, scripted encounters and the seeded fight), Lessons and Progress have windows of
 // their own, opened by the buttons on the left.
@@ -129,7 +130,7 @@ function copyText(text, button) {
   else fallback();
 }
 
-// handlers: onChallenge(challenge or null), onPreset(preset), onLatency(ms), onVolume(0..1), shareLink() -> address,
+// handlers: onChallenge(challenge or null), onPreset(preset), onGear('preBis' | 'maxBis'), onLatency(ms), onVolume(0..1), shareLink() -> address,
 //           fullLog() -> text, log(text, kind), onRobe(key), onUiScale(0.8..1.4)
 export function createExtras(WL, handlers) {
   let character = null, config = null, leftOut = [], challenge = null;
@@ -210,9 +211,12 @@ export function createExtras(WL, handlers) {
   // The items you wear, when the imported settings come from the Warlock SIM's gear builder. The numbers above
   // already hold them (the sim adds them up into the gear values); this only says what they are.
   function gearList() {
-    if (config && config.gearMode === 'preBis') {   // the sim page's default since its v181 (item names are not in the copy)
+    if (config && (config.gearMode === 'preBis' || config.gearMode === 'maxBis')) {   // the gear choice (item names are not in the copy)
       sheetBody.appendChild(el('h3', 'Your gear'));
-      sheetBody.appendChild(el('p', 'This build wears its own Pre-BiS gear from the Warlock SIM: Phase 1 items with their enchants. The numbers above already hold it.', 'hint'));
+      sheetBody.appendChild(el('p', config.gearMode === 'maxBis'
+        ? 'This build wears its own Max Pre-BiS gear from the Warlock SIM: the best Phase 1 items for it, whatever reputation or gold they take, with their enchants. The numbers above already hold it.'
+        : 'This build wears its own Realistic Pre-BiS gear from the Warlock SIM: blue Phase 1 items within reach, with their enchants. The numbers above already hold it.', 'hint'));
+      sheetBody.appendChild(el('p', 'Realistic or Max Pre-BiS: the gear choice under Your character in the bar on the right.', 'hint'));
       return;
     }
     const gb = config && config.gearBuilder;
@@ -304,6 +308,28 @@ export function createExtras(WL, handlers) {
   byId('btnBuffs').addEventListener('click', function () { showSheet('buffs'); });
   byId('sheetClose').addEventListener('click', function () { sheet.hidden = true; });
   byId('sheetNote').textContent = FROM_SIM;
+
+  // ---------- gear: Realistic or Max Pre-BiS (setting gearPreset; main.js rebuilds the character) ----------
+  const gearButtons = Array.prototype.slice.call(document.querySelectorAll('#gearChoice button[data-gear]'));
+  gearButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      button.blur();
+      if (character && button.dataset.gear === character.gearChoice) return;   // already worn: no new fight
+      handlers.onGear(button.dataset.gear);
+    });
+  });
+  // The choice kept is lit; while an imported settings code brings its own gear the choice is not in use (a note says so).
+  function showGear() {
+    if (!character) return;
+    gearButtons.forEach(function (button) {
+      const on = button.dataset.gear === character.gearChoice;
+      button.classList.toggle('on', on && !character.gearCustom);
+      button.setAttribute('aria-pressed', String(on && !character.gearCustom));
+    });
+    const note = byId('gearNote');
+    note.hidden = !character.gearCustom;
+    note.textContent = character.gearCustom ? 'Not in use: your imported settings code brings its own gear. Remove it under Import to wear one of these.' : '';
+  }
 
   // ---------- latency, presets ----------
   const latency = byId('latency');
@@ -673,6 +699,7 @@ export function createExtras(WL, handlers) {
       tag.hidden = !challenge;
       if (challenge) byId('challengeText').textContent = (challenge.boss ? 'Boss: ' : challenge.encounter ? 'Encounter: ' : challenge.drill ? 'Drill: ' : '') + challenge.name + ' · ' + challenge.text;
       latency.value = String(getSetting('latency') || 0);
+      showGear();
       if (!sheet.hidden && openTab) showSheet(openTab);
       lastRace = '';
     },

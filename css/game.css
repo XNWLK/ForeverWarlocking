@@ -96,6 +96,8 @@ button.wide { display: block; width: 100%; margin-top: 8px; }
 #buildLabel { max-width: 186px; margin-right: 6px; font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: flex; gap: 2px; }
 .seg button { min-width: 24px; padding: 4px 0; font-weight: 600; }
+#buildGearNote { margin-top: 6px; }
+#gearChoice button { flex: 1; padding: 4px 6px; white-space: nowrap; }   /* the gear choice in the bar on the right: two halves */
 
 .picker { width: 340px; }
 .options { display: grid; gap: 2px; }

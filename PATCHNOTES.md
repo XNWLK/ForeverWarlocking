@@ -11,6 +11,13 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
   943 DPS).
 - Reset now starts a clean fight: the cooldown timing, a trinket's buff and Revelation no longer carry over from the
   fight before.
+- New gear choice under Your character in the bar on the right: Realistic Pre-BiS (as before) or Max Pre-BiS, the best
+  Phase 1 gear for each build regardless of reputation or gold, as in the Warlock SIM. The sim average, your bests and
+  the share link follow the choice; the build list's numbers stay the Realistic ones.
+- Max Pre-BiS plays its trinkets: Zarla's Snack Pouch summons a whelp that casts five Fireballs at your target, and Eye
+  of the Beast adds spell hit while it is up.
+- A mana potion or rune is now used the moment its mana is missing while you stand idle, as the Warlock SIM does, not
+  only at your next cast.
 
 ### 2026-11-23
 - Wrack DS's weapon now has +22 Intellect instead of Revelation, as in the Warlock SIM (about 938 DPS).

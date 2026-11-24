@@ -214,6 +214,9 @@ export function createHud(WL, handlers) {
     // Listed in the order of their DPS in the DPS sim (data/build-order.js); a build the list does not know comes last.
     const ranking = (window.FW_BUILD_ORDER && window.FW_BUILD_ORDER.order) || [], rank = {};
     ranking.forEach(function (r, i) { rank[r.key] = { place: i, dps: r.dps, race: r.race }; });
+    // Those numbers are the sim's default results, in Realistic Pre-BiS gear: said so when Max Pre-BiS is worn.
+    const maxGear = !!character && character.gearMode === 'maxBis';
+    byId('buildGearNote').hidden = !maxGear;
     function place(b) { return b.custom ? -1 : rank[b.key] ? rank[b.key].place : 999; }      // an imported build comes first
     const listed = (character ? character.builds : WL.BUILDS).slice().sort(function (a, b) { return place(a) - place(b); });
     listed.forEach(function (b) {
@@ -225,7 +228,7 @@ export function createHud(WL, handlers) {
       const dps = document.createElement('small'), r = b.custom ? null : rank[b.key];
       dps.textContent = b.custom ? 'imported' : r ? Math.round(r.dps) + ' DPS' : '';
       const notes = b.notes ? [].concat(b.notes).join(' ').replace(/\s*\[A\d+\]/g, '') : '';
-      if (r || notes) button.title = (r ? 'In the Warlock SIM: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs.' : '') +
+      if (r || notes) button.title = (r ? 'In the Warlock SIM: ' + r.dps + ' DPS as ' + WL.RACES[r.race].name + ' (its best race), on a boss with raid buffs' + (maxGear ? ', in Realistic Pre-BiS gear.' : '.') : '') +
         (notes ? (r ? '\n\n' : '') + 'Its notes on this build: ' + notes : '');
       button.appendChild(dps);
       if (character && b.key === character.build.key) button.className = 'on';
@@ -721,6 +724,8 @@ export function createHud(WL, handlers) {
   function label(key) {
     if (key === 'touchOfTheGrave') return 'Touch of the Grave';
     if (key === 'pet:brand') return 'Demonic Brand';
+    const tr = /^trinket:(\d+)$/.exec(key);                       // a trinket's own hits (Zarla's Snack Pouch)
+    if (tr && WL.TRINKET_FX && WL.TRINKET_FX[tr[1]]) return WL.TRINKET_FX[tr[1]].name;
     if (PET_ATTACK[key]) return getName(character.build.pet) + ': ' + PET_ATTACK[key].charAt(0).toUpperCase() + PET_ATTACK[key].slice(1);
     return key;
   }

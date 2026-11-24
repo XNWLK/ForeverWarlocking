@@ -1,11 +1,12 @@
-// A link that opens this page with a fight already set up: build, race, dummies, fight options, latency, the
+// A link that opens this page with a fight already set up: build, race, gear, dummies, fight options, latency, the
 // codes imported from the Warlock SIM, and the drill, encounter or seeded fight that was running.
 // Everything sits after the # of the address, so nothing is sent anywhere: the page reads it and removes it.
 
 const NUMBER = /^\d+(\.\d+)?$/;
 
 // state: { build, race, dummies, health, fight: { timed, seconds, endless, moveEvery, moveDuration, hitEvery }, latency,
-//          buildCode, settingsCode, challenge ('drill:opener' | 'encounter:fireDance' | 'seed:word' | '') }
+//          buildCode, settingsCode, challenge ('drill:opener' | 'encounter:fireDance' | 'seed:word' | ''),
+//          gear ('preBis' | 'maxBis': the gear choice; carried as gear=max only for Max Pre-BiS) }
 export function makeLink(state) {
   const p = new URLSearchParams(), f = state.fight || {};
   p.set('v', '1');
@@ -19,6 +20,7 @@ export function makeLink(state) {
   if (state.buildCode) p.set('bc', state.buildCode);
   if (state.settingsCode) p.set('sc', state.settingsCode);
   if (state.challenge) p.set('play', state.challenge);
+  if (state.gear === 'maxBis') p.set('gear', 'max');      // no gear in the link = Realistic Pre-BiS (links made before the choice)
   return window.location.origin + window.location.pathname + '#' + p.toString();
 }
 
@@ -31,7 +33,8 @@ export function readLink() {
   try { p = new URLSearchParams(hash); } catch (e) { return null; }
   if (p.get('v') !== '1') return null;
   try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) { /* the link then stays in the address bar */ }
-  const out = { build: p.get('build') || '', race: p.get('race') || '', buildCode: p.get('bc') || '', settingsCode: p.get('sc') || '', challenge: p.get('play') || '' };
+  const out = { build: p.get('build') || '', race: p.get('race') || '', buildCode: p.get('bc') || '', settingsCode: p.get('sc') || '', challenge: p.get('play') || '',
+                gear: p.get('gear') === 'max' ? 'maxBis' : 'preBis' };
   const dummies = Number(p.get('dummies'));
   if (dummies >= 1 && dummies <= 3) out.dummies = Math.round(dummies);
   const fight = p.get('fight') || '', amount = fight.slice(1), endless = fight === 'e' ? 'full' : fight === 'x' ? 'execute' : '';

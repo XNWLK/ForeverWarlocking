@@ -203,6 +203,7 @@ let config = null, combat = null, character = null, rings = null, targets = 1, s
 let simResults = {};
 let customBuild = null, leftOut = [];                     // an imported build; what an imported settings code has that is not playable here
 let codePrecast = '';                                      // the precast an imported settings code names (not taken over)
+let gearCustom = false;                                    // an imported settings code brings gear of its own: the gear choice is not in use
 // The pull timer: pull = the countdown that is running ({ at: the fight clock at zero, seconds, beep }); pullInfo =
 // how the last countdown ended, for the review; pullNote = what the banner says for a moment afterwards.
 let pull = null, pullInfo = null, pullNote = null;
@@ -229,7 +230,8 @@ let keyCodes = ACTION_CODES.slice();
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-// The settings of the fight: the DPS sim page's defaults (since its v181: each build in its own Pre-BiS gear, ideal
+// The settings of the fight: the DPS sim page's defaults (since its v181: each build in its own Pre-BiS gear - here
+// Realistic or Max, as chosen in the bar on the right -, ideal
 // Phase 1 raid buffs and consumables), then an imported settings code, then the fight options. The Spellblasting potion,
 // mana potions and runes are used by themselves at the sim's moments (js/combat.js). Explosives, Power Infusion, Mana
 // Tide and Innervate are not playable here, so they are switched off - for you and for the sim average.
@@ -248,6 +250,11 @@ function buildConfig() {
        'hitEvery', 'latencyMs', 'travelMs', 'lifeTapWhileMoving'].forEach(function (k) { cfg.fight[k] = base[k]; });
     } catch (e) { /* a code that no longer decodes is ignored */ }
   }
+  // The gear choice (bar on the right): every build in its own Realistic or Max Pre-BiS list (the vendored WL.cfgFor
+  // applies it, here and in the sim-average worker, which gets a copy of this config). A code with gear of its own
+  // (gearMode null after WL.applySettings: the sim's Custom gear) keeps it, and the choice is not in use.
+  gearCustom = !(cfg.gearMode === 'preBis' || cfg.gearMode === 'maxBis');
+  if (!gearCustom) cfg.gearMode = gearPreset();
   Object.keys(cfg.consumables).forEach(function (k) {
     const c = cfg.consumables[k];
     if (c.on && c.explosive) { c.on = false; leftOut.push(c.name); }
@@ -271,6 +278,10 @@ function buildConfig() {
   cfg.fight.hitEvery = fight.hitEvery;
   return cfg;
 }
+// The gear choice as it is kept, and whether the fight that is set up wears Max Pre-BiS (keys of bests and history).
+function gearPreset() { return getSetting('gearPreset') === 'maxBis' ? 'maxBis' : 'preBis'; }
+function gearName(mode) { return mode === 'maxBis' ? 'Max Pre-BiS' : 'Realistic Pre-BiS'; }
+function maxGear() { return !!config && config.gearMode === 'maxBis'; }
 function fightOptions() {
   const none = { timed: false, seconds: 180, endless: '', moveEvery: 0, moveDuration: 0, hitEvery: 0 };
   const f = challenge ? Object.assign(none, challenge.fight) : Object.assign(none, getSetting('fight') || {});
@@ -368,6 +379,11 @@ const extras = createExtras(WL, {
     newCharacter();
     hud.log('Fight: ' + p.name + '.', 'proc');
   },
+  onGear: function (mode) {
+    setSetting('gearPreset', mode === 'maxBis' ? 'maxBis' : 'preBis');
+    newCharacter();
+    hud.log('Gear: ' + gearName(gearPreset()) + '.' + (gearCustom ? ' Not in use while your imported settings code brings its own gear (Import, Remove both, to go back).' : ''), 'proc');
+  },
   onLatency: function (ms) {
     setSetting('latency', ms);
     newCharacter();
@@ -460,7 +476,7 @@ function shareLink() {
   const custom = !!character.build.custom;
   return makeLink({ build: custom ? 'custom' : character.build.key, race: character.raceKey, dummies: getSetting('dummies'), health: getSetting('dummyHealth'),
                     fight: getSetting('fight'), latency: getSetting('latency'), buildCode: custom ? getSetting('buildCode') : '',
-                    settingsCode: getSetting('settingsCode'), challenge: challenge ? challenge.share : '' });
+                    settingsCode: getSetting('settingsCode'), challenge: challenge ? challenge.share : '', gear: gearPreset() });
 }
 
 // ---------- your best per fight ----------
@@ -472,13 +488,16 @@ function fightKey() {
   return [b.custom ? 'c' + hash(getSetting('buildCode')) : b.key, character.raceKey, targets, f.endless ? 'e' + f.endless : f.timed ? 't' + f.seconds : 'h' + character.dummyHealth,
           f.moveEvery > 0 && f.moveDuration > 0 ? 'm' + f.moveEvery + '-' + f.moveDuration : '', f.hitEvery > 0 ? 'x' + f.hitEvery : '',
           code ? 's' + hash(code) : '', late ? 'l' + late : '',
-          combat.state.precastKey ? 'p' + combat.state.precastKey : ''].join('|');   // a fight opened with a precast has its own best
+          combat.state.precastKey ? 'p' + combat.state.precastKey : ''].concat(maxGear() ? ['gmax'] : []).join('|');   // a fight opened with a precast has its own best
 }
+// Max Pre-BiS gear adds a part to the names of bests, curves and history ('gmax'), so those fights are never compared
+// with ones in Realistic Pre-BiS; Realistic (and an imported code's own gear) keeps the names it always had.
+function gearPart() { return maxGear() ? '|gmax' : ''; }
 // The name your results in this fight are kept under (the progress chart in the review, the curve of your best):
 // a fight you set up yourself by everything that changes its numbers, a challenge by itself, the build and the race.
 function resultKey() {
   const b = character.build;
-  return challenge ? 'ch:' + challenge.share + '|' + (b.custom ? 'c' + hash(getSetting('buildCode')) : b.key) + '|' + character.raceKey : fightKey();
+  return challenge ? 'ch:' + challenge.share + '|' + (b.custom ? 'c' + hash(getSetting('buildCode')) : b.key) + '|' + character.raceKey + gearPart() : fightKey();
 }
 // A fight that ran to its end goes on the list of your results in this fight: [when, DPS], the last 30 of them.
 function noteResult() {
@@ -511,7 +530,7 @@ function noteProgressNow() {
 }
 // The name the curve of your best is kept under: the fight you set up, or the drill (whatever build you played it with,
 // like the drill's best itself). A seeded fight keeps no best.
-function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share : null) : combat.endless ? null : fightKey(); }
+function bestKey() { return challenge ? (challenge.drill ? 'ch:' + challenge.share + gearPart() : null) : combat.endless ? null : fightKey(); }
 // Keeps the damage curve of a new best (at most 150 points, 80 fights), so that later runs can race it.
 function saveBestCurve() {
   const key = bestKey(), seconds = combat.fightSeconds();
@@ -527,7 +546,7 @@ function showBest() {
   const curveKey = bestKey(), curve = curveKey ? getStore('curves')[curveKey] || null : null;
   if (challenge) {
     const d = challenge.drill ? (getSetting('drills') || {})[challenge.id] : null;
-    raceBest = d ? curve || { pace: d.dps } : null;
+    raceBest = d ? curve || (!d.g === !maxGear() ? { pace: d.dps } : null) : null;   // a best's average pace only in the same gear (d.g: set in Max Pre-BiS)
   } else {
     const mine = (getSetting('bests') || {})[fightKey()];
     raceBest = mine ? curve || { pace: mine.dps } : null;   // a best from before curves were kept: its average pace
@@ -607,9 +626,13 @@ const panels = createPanels({
       return;
     }
     const lines = first || [];
-    let bad = false, settingsInfo = null;
+    let bad = false, settingsInfo = null, codeGear = null;
     if (settingsCode) {
-      try { settingsInfo = WL.describeSettings(WL.decodeSettings(settingsCode)); }
+      try {
+        const decoded = WL.decodeSettings(settingsCode);
+        settingsInfo = WL.describeSettings(decoded);
+        codeGear = decoded.gm === 'preBis' || decoded.gm === 'maxBis' ? decoded.gm : null;   // a code made with one of the sim's two Pre-BiS presets sets the gear choice
+      }
       catch (e) { lines.push('Settings: ' + e.message + '.'); bad = true; settingsCode = getSetting('settingsCode'); }
     }
     const before = getSetting('buildCode');
@@ -627,8 +650,11 @@ const panels = createPanels({
     }
     else if (getSetting('build') === 'custom') setSetting('build', null);
     setSetting('settingsCode', settingsCode);
+    if (codeGear) setSetting('gearPreset', codeGear);
     newCharacter();
     if (settingsInfo) lines.push('Settings imported: ' + settingsInfo.replace(/ · \d+ s · \d+ fights$/, '') + '.');
+    if (settingsCode && codeGear) lines.push('Gear: ' + gearName(codeGear) + ', as in the code (the gear choice under Your character in the bar on the right changes it).');
+    else if (settingsCode && gearCustom) lines.push('Gear: the items of the code itself. The gear choice under Your character is not in use while this code is imported.');
     if (codePrecast) lines.push('The precast in the code (' + codePrecast + ') is not taken over: here you precast by starting the cast yourself before the fight, and the sim average then does the same.');
     if (leftOut.length) lines.push('Not playable here yet, so switched off (also for the sim average): ' + leftOut.join(', ') + '.');
     if (!buildCode && !settingsCode) lines.push('Nothing imported: the ready builds with the default gear and buffs.');
@@ -644,10 +670,10 @@ function challengeResult() {
   const seconds = combat.fightSeconds(), dps = seconds > 0 ? combat.result.total / seconds : 0, pct = Math.round(100 * dps / simResult.dps);
   const out = { name: challenge.name, grade: diedOf ? 'D' : gradeFor(pct), pct: pct, dps: dps };   // dying in a boss fight is never better than a D
   out.line = 'Forever Warlocking · ' + challenge.name + ' · ' + character.build.short + ' · ' + WL.RACES[character.raceKey].name + ' · ' +
-    Math.round(dps).toLocaleString('en-US') + ' DPS · ' + pct + '% of the sim (' + out.grade + ')';
+    Math.round(dps).toLocaleString('en-US') + ' DPS · ' + pct + '% of the sim (' + out.grade + ')' + (maxGear() ? ' · Max Pre-BiS' : '');
   if (challenge.drill) {
     const all = Object.assign({}, getSetting('drills')), old = all[challenge.id];
-    if (!old || pct > old.pct) { all[challenge.id] = { grade: out.grade, pct: pct, dps: Math.round(dps) }; setSetting('drills', all); out.record = true; extras.refreshDrills(); saveBestCurve(); }
+    if (!old || pct > old.pct) { all[challenge.id] = Object.assign({ grade: out.grade, pct: pct, dps: Math.round(dps) }, maxGear() ? { g: 'max' } : {}); setSetting('drills', all); out.record = true; extras.refreshDrills(); saveBestCurve(); }
     out.best = all[challenge.id];
     showBest();
   }
@@ -711,7 +737,8 @@ function resultPicture(how, button) {
   Object.keys(res.bySpell).forEach(function (k) { const base = k.replace(/^x\d+:/, ''); if (res.bySpell[k].dmg > 0) sums[base] = (sums[base] || 0) + res.bySpell[k].dmg; });
   const spells = Object.keys(sums).sort(function (a, b) { return sums[b] - sums[a]; }).slice(0, 3).map(function (k) {
     const pet = k.indexOf('pet:') === 0;
-    return { name: combat.spells[k] ? combat.spells[k].name : CARD_NAMES[k] || k, pct: 100 * sums[k] / res.total,
+    const tr = /^trinket:(\d+)$/.exec(k), trName = tr && WL.TRINKET_FX && WL.TRINKET_FX[tr[1]] ? WL.TRINKET_FX[tr[1]].name : null;   // a trinket's own hits
+    return { name: combat.spells[k] ? combat.spells[k].name : CARD_NAMES[k] || trName || k, pct: 100 * sums[k] / res.total,
              icon: WL.ICONS[CARD_ICONS[k]] || (pet ? WL.ICONS['pet_' + character.build.pet] : iconFor(k)) || '' };
   });
   const say = function (text) { const was = button.textContent; button.textContent = text; window.setTimeout(function () { button.textContent = was; }, 1800); };
@@ -762,12 +789,13 @@ function showReview() {
 // ---------- the fight history: your last fights, to open again later (js/fights.js) ----------
 // What the fight was, in a few words: a challenge by its name, your own fight by its dummies, length or health and options.
 function fightTitle() {
-  if (challenge) return challenge.name;
+  if (challenge) return challenge.name + (maxGear() ? ', Max Pre-BiS' : '');
   const f = fightOptions(), parts = [targets + (targets === 1 ? ' dummy' : ' dummies')];
   parts.push(f.endless ? (f.endless === 'execute' ? 'infinite health in execute range' : 'infinite health')
     : f.timed ? Math.round(f.seconds) + ' s' : Number(getSetting('dummyHealth') || 0).toLocaleString('en-US') + ' health');
   if (f.moveEvery > 0) parts.push('moving ' + f.moveDuration + ' s every ' + f.moveEvery + ' s');
   if (f.hitEvery > 0) parts.push('a hit every ' + f.hitEvery + ' s');
+  if (maxGear()) parts.push('Max Pre-BiS');
   return parts.join(', ');
 }
 // Keeps the fight that just ended: once the sim's number is in, or without it when the fight is left before (force).
@@ -1078,6 +1106,7 @@ function newCharacter() {
     build: build, raceKey: raceKey, stats: combat.stats, table: combat.table, spells: combat.spells, bar: bar,
     racial: combat.racial(), dummyHealth: dummyHealth, executePct: config.fight.executePct, targets: targets,
     builds: allBuilds(), timed: fight.timed, endless: fight.endless,
+    gearMode: config.gearMode, gearChoice: gearPreset(), gearCustom: gearCustom,   // the gear worn ('preBis' | 'maxBis' | an imported code's own), the choice kept, whether that choice is in use
     maxRange: Math.max.apply(null, ranges.concat([0])),
     lessonKey: build.custom ? 'c' + hash(getSetting('buildCode')) : build.key,  // lessons and progress are kept per build
     // A boss fight names its targets and sums the adds in the meter.
@@ -1410,6 +1439,7 @@ if (shared) {
   if (shared.fight) setSetting('fight', shared.fight);
   if (shared.latency != null || shared.fight) setSetting('latency', shared.latency || 0);
   if (shared.fight) setSetting('settingsCode', shared.settingsCode || '');
+  setSetting('gearPreset', shared.gear);                  // a link without gear= is Realistic Pre-BiS
 }
 // A share link pasted into the address bar while the page is open only changes the part after the #: load it properly.
 window.addEventListener('hashchange', function () { if (/(^#|&)v=1(&|$)/.test(window.location.hash)) window.location.reload(); });

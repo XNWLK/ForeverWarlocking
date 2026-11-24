@@ -59,9 +59,12 @@ function withPet(build, pet) {
   return copy;
 }
 
-// Two starting points: the engine's plain defaults, and the sim page's defaults (Pre-BiS gear per build, ideal Phase 1
+// Three starting points: the engine's plain defaults, and the sim page's defaults (Pre-BiS gear per build, ideal Phase 1
 // buffs and consumables: the potion, the rune, the Weakness Analyzer and Revelation, which the game uses by itself).
-const BASES = [{ name: 'plain', make: () => JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG)) }, { name: 'page', make: () => WL.pageDefaultConfig() }];
+// A third: the sim's Max Pre-BiS gear (gearMode 'maxBis', sim 2026-11-24), with Zarla's Snack Pouch (a summoned whelp's
+// five hits) on every build and Eye of the Beast (+ spell hit while up) on Incinerate Pandemic.
+const BASES = [{ name: 'plain', make: () => JSON.parse(JSON.stringify(WL.DEFAULT_CONFIG)) }, { name: 'page', make: () => WL.pageDefaultConfig() },
+               { name: 'max', make: () => { const c = WL.pageDefaultConfig(); c.gearMode = 'maxBis'; return c; } }];
 for (const base of BASES) {
 for (const scene of SCENES) {
   for (const ready of WL.BUILDS) {
@@ -99,7 +102,7 @@ for (const scene of SCENES) {
         // Moments the engine cut a channel at its tick for the next cast (it decides inside the tick; see heldX in combat.js).
         const cuts = new Set(sim.log.filter(l => l.type === 'clip' || l.type === 'recast').map(l => l.t));
         const presses = sim.log.filter(l => (l.type === 'cast' || l.type === 'racial') && l.precast == null);
-        let racialOff = 0;
+        let racialOff = 0, itemsT = null, itemsNow = 0;
         for (let n = 0; n < presses.length; n++) {
           const entry = presses[n];
           // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when
@@ -127,7 +130,13 @@ for (const scene of SCENES) {
             }
             if (at !== logged) break;
           }
+          // A mana item the game took at the engine's decide at this very moment (an idle step right when you became free,
+          // maybe while moving the clock for a race cooldown logged at the same time) is already in its mana; the engine
+          // logs it at the cast's time (see below).
+          const itemsBefore = combat.result.track.consumableMana || 0;
           combat.update(at, ctx);
+          if (entry.t !== itemsT) { itemsT = entry.t; itemsNow = 0; }
+          itemsNow += (combat.result.track.consumableMana || 0) - itemsBefore;
           // "x2:corruption" = Corruption on the second target; Bane of Havoc always goes on the second target.
           const extra = /^x(\d):(.+)$/.exec(entry.spell || '');
           const key = entry.type === 'racial' ? 'racial' : extra ? extra[2] : entry.spell;
@@ -139,7 +148,7 @@ for (const scene of SCENES) {
           if (entry.type === 'cast' && key !== 'lifeTap' && combat.table[key] && entry.mana != null && manaOff < 3) {
             // A mana potion or rune the engine took in the same decision is in its logged mana; here the press takes it.
             const items = sim.log.filter(l => l.type === 'consumable' && l.gain && Math.abs(l.t - entry.t) < 1e-9).reduce((n, l) => n + l.gain, 0);
-            const before = combat.state.mana + items, engine = entry.mana + combat.cost(key);
+            const before = combat.state.mana + items - itemsNow, engine = entry.mana + combat.cost(key);
             if (Math.abs(before - engine) > 1) { manaOff++; problems.push('mana before ' + entry.spell + ' at ' + entry.t + ' s: engine ' + engine.toFixed(1) + ', here ' + before.toFixed(1)); }
           }
           // The race's cooldown: the engine uses it right before a damaging cast by its rule (activesPolicy; sim v212: after

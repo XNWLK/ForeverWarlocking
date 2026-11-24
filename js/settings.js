@@ -1,4 +1,4 @@
-// The choices that are kept in this browser between visits: build, race, the dummies' health and number, range rings.
+// The choices that are kept in this browser between visits: build, race, gear, the dummies' health and number, range rings.
 
 const STORE_KEY = 'forever-warlocking.settings';
 const DEFAULTS = {
@@ -18,7 +18,8 @@ const DEFAULTS = {
   robe: 'violet', robesSeen: null,     // the robe you wear, and the robes you were already told you earned
   bosses: {},                          // per boss fight: { best: { pct, dps, grade } (a run you lived through), beat: true once you had 100% of the sim }
   demonLook: 'usual', rewardsSeen: [], // the Succubus's look (a boss reward), and the rewards you were already told about
-  uiScale: 1, colorBlind: false        // the interface's size (0.8 to 1.4), and colours that do not lean on red against green
+  uiScale: 1, colorBlind: false,       // the interface's size (0.8 to 1.4), and colours that do not lean on red against green
+  gearPreset: 'preBis'                 // the gear every build wears: 'preBis' (Realistic Pre-BiS) | 'maxBis' (Max Pre-BiS); an imported code with gear of its own wins
 };
 
 let saved = {};

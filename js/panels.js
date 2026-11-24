@@ -335,6 +335,8 @@ export function createPanels(handlers) {
     function label(key) {
       if (d.spells[key]) return d.spells[key].name;
       if (key === 'touchOfTheGrave') return 'Touch of the Grave';
+      const tr = /^trinket:(\d+)$/.exec(key), TFX = globalThis.WL && globalThis.WL.TRINKET_FX;   // a trinket's own hits (Zarla's Snack Pouch)
+      if (tr && TFX && TFX[tr[1]]) return TFX[tr[1]].name;
       if (PET_ATTACK[key]) return key === 'pet:brand' ? PET_ATTACK[key] : d.petName + ': ' + PET_ATTACK[key];
       return key;
     }

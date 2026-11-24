@@ -375,7 +375,7 @@ export function createCombat(opts) {
   function deal(key, amount, crit, isTick, ti, extra) {
     if (BOSS && shielded(ti)) { emit({ type: 'miss', key: key, target: ti, immune: true, pet: key.indexOf('pet:') === 0 }); return; }   // a shield takes it all
     if (OUT_MULT !== 1 && key.indexOf('pet:') !== 0) amount = Math.round(amount * OUT_MULT);   // a boss's curse on you
-    const rk = key === 'touchOfTheGrave' ? key : rowKey(ti, key), r = row(rk);   // the Undead proc has one row for all targets (as in the engine)
+    const rk = key === 'touchOfTheGrave' || key.indexOf('trinket:') === 0 ? key : rowKey(ti, key), r = row(rk);   // the Undead proc and a trinket's hits have one row for all targets (as in the engine)
     r.dmg += amount; res.total += amount;
     if (isTick) { r.ticks++; if (crit) r.tickCrits++; } else { r.hits++; if (crit) r.crits++; }
     hurt(ti, amount);
@@ -512,7 +512,7 @@ export function createCombat(opts) {
       if (!alive(ti) || immuneTo(ti, s.school)) continue;     // a boss immune to fire takes nothing from Rain of Fire or Hellfire
       if (!check && (s.range ? gap(aimed, ti) : distanceTo(ti)) > e.radius + EPS) continue;
       const r = row(rowKey(ti, key));
-      if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
+      if (R.hit() * 100 >= hitNow()) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
       amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus, a tenth of the share)
       const rvc = REV ? revChan() : 0;                // sim v209 (its round 243): crits while Revelation is up;
@@ -528,7 +528,7 @@ export function createCombat(opts) {
   // rev: this cast took Revelation when it completed (revTake; sim v209, its round 243).
   function land(key, castMult, ti, eureka, rev) {   // eureka: the cast finished inside Eureka!
     const s = SPELLS[key], e = table[key], r = row(rowKey(ti, key)), t = T[ti];
-    if (R.hit() * 100 >= stats.hitPct) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }
+    if (R.hit() * 100 >= hitNow()) { r.misses++; emit({ type: 'miss', key: key, target: ti }); return false; }   // + a hit trinket (the engine's missRoll)
     if (binResisted(key, ti)) { r.misses++; r.resisted = (r.resisted || 0) + 1; emit({ type: 'miss', key: key, target: ti, resisted: true }); return false; }   // sim v205
     r.landed++;
     if (key === 'baneOfAgony') { S.ampUp = false; if (AMP_BTN) delete S.buffs.amplifyCurse; }   // Amplify Curse spent on a Bane that landed
@@ -795,7 +795,7 @@ export function createCombat(opts) {
     if (s.kind === 'channel') {
       const spent = commit(key), r = row(rowKey(ti, key));
       if (e.cd) S.cds[key] = S.t + e.cd;
-      const chMiss = !s.aoe && R.hit() * 100 >= stats.hitPct, chRes = !s.aoe && !chMiss && binResisted(key, ti);   // Drain Soul is binary (sim v205)
+      const chMiss = !s.aoe && R.hit() * 100 >= hitNow(), chRes = !s.aoe && !chMiss && binResisted(key, ti);   // Drain Soul is binary (sim v205)
       if (chMiss || chRes) {                               // area channels always start; their ticks roll per target
         r.misses++; if (chRes) r.resisted = (r.resisted || 0) + 1; emit(Object.assign({ type: 'miss', key: key, target: ti }, chRes ? { resisted: true } : {}));
         syncWrack();                                       // a Wrack cast again that missed: the old one is gone too
@@ -885,13 +885,29 @@ export function createCombat(opts) {
   // Not buttons (Xn: no potions or runes as buttons): used at the engine's moments. Before a damaging cast you can pay
   // for: the Spellblasting potion and a use trinket, by the engine's "Pop cooldowns" rule (options.activesPolicy, the
   // default 'doom'). Before any cast or Life Tap: a mana potion or rune once its amount is missing. Revelation on the
-  // weapon: a direct spell that does not crit may give the next one + its crit. Only the crit trinket (Weakness
-  // Analyzer) is played: no Pre-BiS list has a proc trinket or a set bonus with an effect.
+  // weapon: a direct spell that does not crit may give the next one + its crit. Use trinkets of the kinds the Pre-BiS lists
+  // hold are played (crit: Weakness Analyzer; since the sim's Max Pre-BiS, 2026-11-24: dmgOver, Zarla's Snack Pouch, and
+  // hit, Eye of the Beast): no Pre-BiS list has a proc trinket or a set bonus with an effect.
   const CONS = WL.activeConsumables(cfg);
   const SP_POT = CONS.filter(function (c) { return c.spPotion && WL.consumableHolds(cfg, c); })[0] || null;
   const MANA_ITEMS = CONS.filter(function (c) { return c.manaRestore; });
-  const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && x.fx.use.kind === 'crit' && WL.fxOn(cfg, x.fx.use); });   // sim v207: an onlyVs effect is never used where it does nothing
+  // Sim (Max Pre-BiS, 2026-11-24): its lists also hold 'dmgOver' (Zarla's Snack Pouch: a summoned whelp's hits) and 'hit'
+  // (Eye of the Beast: + spell hit while up), so those use kinds are played too. Other kinds are in no Pre-BiS list.
+  const TR_KINDS = { crit: 1, hit: 1, dmgOver: 1 };
+  const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && TR_KINDS[x.fx.use.kind] && WL.fxOn(cfg, x.fx.use); });   // sim v207: an onlyVs effect is never used where it does nothing
   const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};
+  // The engine's trUse, once ready and allowed: its cooldown, its buff (Golden Banana's durZones kept for the form), and
+  // for 'dmgOver' its shots, one every `every` s from the use (trShot events, handled by trHit).
+  function trUse(x) {
+    const u = x.fx.use;
+    S.cds['tr:' + x.slot] = S.t + u.cd;
+    if (u.duration) trUntil[x.slot] = S.t + u.duration * (u.durZones ? WL.fxMult(cfg, { zones: u.durZones }) : 1);
+    emit({ type: 'used', name: x.fx.name });
+    if (u.kind === 'dmgOver') {
+      row('trinket:' + x.id).casts++;
+      for (let si = 1; si <= u.shots; si++) push({ t: S.t + si * u.every, o: 0, type: 'trShot', slot: x.slot });
+    }
+  }
   // Sim v191 (its round 219): "Activate trinket" in the priority list uses every ready on-use trinket (not the mana ones)
   // when the engine's walk down the list reaches it (off the global cooldown; the walk goes on). With it in the list, the
   // trinkets are no longer popped with the cooldowns (popActives) - "never" still keeps one unused. Here the walk is done
@@ -903,11 +919,7 @@ export function createCombat(opts) {
   }
   function useTrinketsApl() {
     TRK.forEach(function (x) {
-      if (!trAplOk(x, S.t)) return;
-      const u = x.fx.use;
-      S.cds['tr:' + x.slot] = S.t + u.cd;
-      if (u.duration) trUntil[x.slot] = S.t + u.duration;
-      emit({ type: 'used', name: x.fx.name });
+      if (trAplOk(x, S.t)) trUse(x);
     });
   }
   // The end-of-fight DoT check (simWould's dotWorth): on unless the settings switch it off, as in the engine.
@@ -969,8 +981,33 @@ export function createCombat(opts) {
   function potSp() { return SP_POT && buff('spPotion') ? SP_POT.spPotion.sp : 0; }
   function trUp(x) { return trUntil[x.slot] > S.t + EPS; }
   // Sim v207: × the boss type (vs); a target debuff (u.target) counts on your target only, not on extra targets.
-  function trCrit(k, ti) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (trUp(x) && (!u.tree || (s && s.tree === u.tree)) && !(u.target && ti > 1)) c += u.pct * WL.fxMult(cfg, u); }); return c; }
+  function trCrit(k, ti) { let c = 0; const s = SPELLS[k]; TRK.forEach(function (x) { const u = x.fx.use; if (u.kind === 'crit' && trUp(x) && (!u.tree || (s && s.tree === u.tree)) && !(u.target && ti > 1)) c += u.pct * WL.fxMult(cfg, u); }); return c; }
   function trCritDone() { TRK.forEach(function (x) { if (x.fx.use.endsOnCrit && trUp(x)) trUntil[x.slot] = -1; }); }
+  // Sim (Max Pre-BiS, 2026-11-24), the engine's trHitPct / hitNow: a 'hit' trinket while up adds its pct to your uncapped
+  // spell hit, up to the cap. Your hit rolls (land, area ticks, a channel's start) read it; your demon's do not.
+  function hitNow() {
+    let h = 0;
+    TRK.forEach(function (x) { const u = x.fx.use; if (u.kind === 'hit' && trUp(x)) h += u.pct; });
+    return h ? Math.min(cb.maxHitPct, stats.hitPctUncapped + h) : stats.hitPct;
+  }
+  // The engine's trHit: one shot of a summoned helper (Zarla's Snack Pouch's whelp, 'dmgOver'). No spell power: min..max
+  // (× boss type / zone), your spell hit (hitNow) and sheet crit (× critMultiplier), Curse of the Elements on Shadow / Fire
+  // / Arcane / Frost. It hits the engine's boss: dummy 1, or the first one standing once it fell. One row for all targets.
+  const COE_SCHOOLS = { shadow: 1, fire: 1, arcane: 1, frost: 1 };
+  function trHit(x, u) {
+    let ti = 0;
+    for (let i = 1; i <= N && !ti; i++) if (alive(i)) ti = i;
+    if (!ti) return;
+    const key = 'trinket:' + x.id, r = row(key), school = u.school || 'fire', look = { school: school, name: x.fx.name, trinket: true };
+    if (immuneTo(ti, school)) { emit(Object.assign({ type: 'miss', key: key, target: ti, immune: true }, look)); return; }   // boss fights only
+    if (R.hit() * 100 >= hitNow()) { r.misses++; emit(Object.assign({ type: 'miss', key: key, target: ti }, look)); return; }
+    r.landed++;
+    let amt = (u.min + (u.max - u.min) * R.proc()) * WL.fxMult(cfg, u);
+    if (debuff(ti, 'coe') && COE_SCHOOLS[school]) amt *= 1 + SPELLS.curseOfElements.dmgTakenPct / 100;
+    const crit = R.crit() * 100 < stats.critPct;
+    if (crit) amt *= cb.critMultiplier;
+    deal(key, amt, crit, false, ti, look);
+  }
   // Revelation, sim v209 (its round 243): + pct % crit for 15 s (a new trigger while it is up starts the 15 s again).
   //  * Trigger: a landed direct hit that does not crit (any target) and each landed Hellfire / Rain of Fire tick that does
   //    not crit (each target) roll WL.revelationChancePct (11% x (1 - 2 x your sheet crit)). Never DoT or drain ticks.
@@ -1025,12 +1062,10 @@ export function createCombat(opts) {
   }
   function popActives(key) {                                         // right before a damaging cast
     if (!TRK_APL) TRK.forEach(function (x) {
-      const u = x.fx.use, pol = TRU[x.slot] || 'cds';
+      const pol = TRU[x.slot] || 'cds';
       const when = pol === 'never' ? false : pol === 'ready' ? true : pol === 'execute' ? executePhase(1) : activesOk(key);
       if (!when || !ready('tr:' + x.slot) || S.t >= endAt() - EPS) return;
-      S.cds['tr:' + x.slot] = S.t + u.cd;
-      if (u.duration) trUntil[x.slot] = S.t + u.duration;
-      emit({ type: 'used', name: x.fx.name });
+      trUse(x);
     });
     if (activesOk(key) && SP_POT && ready('cd:' + SP_POT.cdGroup)) {
       S.cds['cd:' + SP_POT.cdGroup] = S.t + SP_POT.cd; S.buffs.spPotion = S.t + SP_POT.spPotion.duration;
@@ -1313,6 +1348,9 @@ export function createCombat(opts) {
       periodicTick(ev.key, d.snap, ri, ev.target, true);
       d.xLast = S.t;
       if (!S.over && T[ev.target].dots[ev.key] === d) xSched(ev.target, ev.key, d, true);
+    } else if (ev.type === 'trShot') {                   // one shot of a summoned helper (sim, Max Pre-BiS, 2026-11-24: Zarla's whelp)
+      const tx = TRK.filter(function (q) { return q.slot === ev.slot; })[0];
+      if (tx) trHit(tx, tx.fx.use);
     } else if (ev.type === 'dmgTaken') {
       takeHit();
       push({ t: S.t + HIT, o: 1, type: 'dmgTaken' });
@@ -1361,14 +1399,24 @@ export function createCombat(opts) {
   // While you are free and cast nothing, the engine decides again every 0.1 s from the moment you became free (it found
   // nothing it could cast: before or during a movement phase, out of mana). Its walk can reach "Activate trinket" there,
   // so with a trinket ready the walk is done at those moments here too (sim v191).
+  // Each such step also uses a mana potion or rune once its amount is missing (the engine's decide calls useManaItems
+  // before its walk): with the Max Pre-BiS lists (sim, 2026-11-24) the engine drank a rune the moment a Wrack ended and
+  // cast 0.2 s later. While you are free your mana only rises, so a step can matter only when the amount is missing now.
+  function itemMaybe(at) {
+    return MANA_ITEMS.some(function (c) {
+      const cd = S.cds['cd:' + c.cdGroup];
+      return (!cd || cd <= at + EPS) && stats.maxMana - S.mana >= (c.manaRestore.amount || stats.maxMana * c.manaRestore.pct / 100);
+    });
+  }
   function idleWalkAt(now) {
     const busy = !!(S.cast || S.channel);
     if (S.wasBusy && !busy) S.busyEnd = S.t;
     S.wasBusy = busy;
-    if (!TRK_APL || !TRK.length || busy || S.over || S.fightStart === null) return Infinity;
+    const walk = TRK_APL && TRK.length > 0;
+    if ((!walk && !MANA_ITEMS.length) || busy || S.over || S.fightStart === null) return Infinity;
     const free = Math.max(S.gcdReady, S.busyEnd);
     if (S.idleBase !== free) { S.idleBase = free; S.idleNext = free; }
-    while (S.idleNext <= now + EPS && !TRK.some(function (x) { return trAplOk(x, S.idleNext); })) S.idleNext += 0.1;   // the engine's steps
+    while (S.idleNext <= now + EPS && !(walk && TRK.some(function (x) { return trAplOk(x, S.idleNext); })) && !itemMaybe(S.idleNext)) S.idleNext += 0.1;   // the engine's steps
     return S.idleNext;
   }
   function update(now, ctx) {
@@ -1393,6 +1441,7 @@ export function createCombat(opts) {
         tryCast(q.key, ctx);
       } else if (idleAt <= now + EPS && idleAt <= endAt() + EPS) {
         advance(idleAt);
+        if (S.t < endAt() - EPS) useManaItems();         // the engine's decide: mana items, then the walk
         aplWalk(null);
         S.idleNext = idleAt + 0.1;
       } else break;
