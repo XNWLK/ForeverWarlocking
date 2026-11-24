@@ -6,6 +6,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-24
+- Elixirs no longer add up, as in the Warlock SIM: of your elixirs only the biggest amount of each stat counts, and
+  Arcane Intellect, Divine Spirit and Power Word: Fortitude replace that stat of the elixirs. Spell Pierce gives no bonus
+  damage below 6 points. Every build loses 7 to 9 DPS (Wrack DS about 935).
 - Wrack DS times its cooldowns as in the Warlock SIM: the Spellblasting potion comes at your first Wrack instead of on
   the pull, and the hint asks for Blood Fury once the Amplify Curse Bane of Agony has 17 seconds or less left (about
   943 DPS).

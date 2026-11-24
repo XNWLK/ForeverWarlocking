@@ -130,6 +130,9 @@ for (const scene of SCENES) {
             }
             if (at !== logged) break;
           }
+          // No candidate fitted and the logged time lies just before you are free (the replay drifted a fraction of a
+          // millisecond, sim v213, Shadow Demo, 2 targets Hellfire, gnome): the press is at the moment you are free.
+          if (at < combat.readyAt() && combat.readyAt() - at < 0.002) at = combat.readyAt();
           // A mana item the game took at the engine's decide at this very moment (an idle step right when you became free,
           // maybe while moving the clock for a race cooldown logged at the same time) is already in its mana; the engine
           // logs it at the cast's time (see below).

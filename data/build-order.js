@@ -2,31 +2,31 @@
 // (default settings, best race of each build).
 window.FW_BUILD_ORDER = {
   "generated": "2026-11-24",
-  "simCommit": "74cd184",
+  "simCommit": "3622837",
   "order": [
     {
       "key": "wrack_ds",
-      "dps": 942.7,
+      "dps": 934.5,
       "race": "orc"
     },
     {
       "key": "demo_pact_succ_sb",
-      "dps": 899.2,
-      "race": "orc"
-    },
-    {
-      "key": "demo_pact_fire",
       "dps": 891,
       "race": "orc"
     },
     {
+      "key": "demo_pact_fire",
+      "dps": 884.1,
+      "race": "orc"
+    },
+    {
       "key": "destro_incin_succ",
-      "dps": 865.4,
+      "dps": 857.5,
       "race": "orc"
     },
     {
       "key": "destro_incin_ds",
-      "dps": 849,
+      "dps": 840.1,
       "race": "undead"
     }
   ]
