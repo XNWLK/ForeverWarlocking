@@ -6,6 +6,9 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-24
+- Revelation follows the live hotfix, as in the Warlock SIM: a channel tick that comes while it is up uses it - that one
+  tick crits (Hellfire and Rain of Fire on every target they hit), the rest of the channel does not. Hellfire and Rain
+  of Fire get one chance per tick to trigger it, not one per target hit.
 - Elixirs no longer add up, as in the Warlock SIM: of your elixirs only the biggest amount of each stat counts, and
   Arcane Intellect, Divine Spirit and Power Word: Fortitude replace that stat of the elixirs. Spell Pierce gives no bonus
   damage below 6 points. Every build loses 7 to 9 DPS (Wrack DS about 935).

@@ -199,7 +199,7 @@ export function createCombat(opts) {
                      first: null, spent: 0, tapMana: 0, tapLost: 0, tapsMoving: 0, minMana: stats.maxMana, noMana: 0, clips: [] } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
     actOpen = ACT_POL === 'pull'; doomSeen = false;                  // each fight's cooldowns wait for its own opener / Doom
-    Object.keys(trUntil).forEach(function (k) { delete trUntil[k]; }); revUntil = -1; revCh = null;   // no trinket buff or Revelation carried over
+    Object.keys(trUntil).forEach(function (k) { delete trUntil[k]; }); revUntil = -1;   // no trinket buff or Revelation carried over
     P = makePet(build.pet);
     S.decideSeq = order++;
   }
@@ -492,7 +492,7 @@ export function createCombat(opts) {
     let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti) * (snap.castMult || 1);
     if (s.ramp) amount *= s.ramp[i];
     amount *= vulnMult(s.school, ti, true, key);
-    const rvc = chan && REV ? revChan() : 0;             // sim v209 (its round 243): a channel tick crits while Revelation is up
+    const rvc = chan && REV ? revTick() : 0;             // sim v214 (its round 250): a channel tick takes Revelation (crits) and spends it
     const crit = R.crit() * 100 < e.critPct + rvc + trCrit(key, ti);
     if (crit) amount *= e.critMult;
     deal(key, amount, crit, true, ti, extra ? { extra: true } : null);
@@ -507,6 +507,8 @@ export function createCombat(opts) {
   // you, Rain of Fire around the target it was aimed at.
   function aoeTick(key, i, aimed) {
     const s = SPELLS[key], e = table[key];
+    const rvc = REV ? revTick() : 0;                  // sim v214 (its round 250): the tick takes Revelation once, before its targets
+    let plain = false;                                // a landed hit of this tick that did not crit
     for (let ti = 1; ti <= N; ti++) {
       if (S.over) return;
       if (!alive(ti) || immuneTo(ti, s.school)) continue;     // a boss immune to fire takes nothing from Rain of Fire or Hellfire
@@ -515,12 +517,12 @@ export function createCombat(opts) {
       if (R.hit() * 100 >= hitNow()) { r.misses++; emit({ type: 'miss', key: key, target: ti, tick: true }); continue; }
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
       amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus, a tenth of the share)
-      const rvc = REV ? revChan() : 0;                // sim v209 (its round 243): crits while Revelation is up;
       const crit = R.crit() * 100 < e.critPct + rvc + trCrit(key, ti);
-      if (REV && !rvc) revRoll(crit, true);           // a tick that does not crit may give it (each target)
+      if (!crit) plain = true;
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
+    if (REV && !rvc && plain && !S.over) revRoll(false);   // sim v214: one trigger roll per tick, after its targets
     if (s.selfDamage && !S.over) { const hurtYou = selfTick(key); loseHealth(hurtYou); emit({ type: 'selfHit', key: key, amount: hurtYou }); }
   }
 
@@ -810,7 +812,6 @@ export function createCombat(opts) {
         if ((ti === 1 || s.aoe) && !s.castOnSelf) jowProc();
         const id = ++inst;
         S.channel = { key: key, inst: id, target: ti, snap: { castMult: 1 }, start: S.t, end: S.t + chDur, ticks: nCh, done: 0 };
-        if (REV) revChan();                                // sim v209: a channel started while Revelation is up holds it until it ends
         for (let i = 1; i <= nCh; i++) push({ t: S.t + i * s.tickEvery, o: 0, type: 'chanTick', key: key, inst: id, i: i - 1 });
         syncWrack();
       }
@@ -1013,18 +1014,15 @@ export function createCombat(opts) {
   //    not crit (each target) roll WL.revelationChancePct (11% x (1 - 2 x your sheet crit)). Never DoT or drain ticks.
   //  * A direct spell (or Immolate's direct part) takes it when its cast completes (an instant: when cast) and crits when
   //    it lands - or not at all if it misses. DoTs, curses and Life Tap neither use nor spend it.
-  //  * While it is up every tick of a channel crits; the channel holds it (revCh) and it is spent when that channel ends.
-  let revCh = null;
-  function revUp() {                                                 // is it up now (a holding channel that ended spent it)
-    if (revCh != null && !(S.channel && S.channel.inst === revCh)) { revUntil = -1; revCh = null; }
-    return revUntil > S.t + EPS;
-  }
-  function revRoll(crit, tick) {                                     // a landed direct hit / area tick (tick: of the running channel)
+  //  * Sim v214 (its round 250, a live hotfix): a channel tick (Hellfire, Rain of Fire, Drain Life, Drain Soul, Wrack) that
+  //    comes while it is up takes it and spends it (revTick): that one tick crits - an area tick on every target. An area
+  //    tick rolls the trigger once (not per target), after its targets, when one of them took a landed hit that did not
+  //    crit; a tick that took it never rolls. No channel holds it any more (v209-v213: every tick crit until it ended).
+  function revUp() { return revUntil > S.t + EPS; }                  // is it up now
+  function revRoll(crit) {                                           // a landed direct hit / an area tick
     if (crit || R.proc() * 100 >= WL.revelationChancePct(cb, stats.critPct)) return;
-    revUp();                                                         // a channel that held the old one and has ended: spent first
     revUntil = S.t + REV.fx.proc.duration;
     emit({ type: 'used', name: REV.fx.name, proc: true });
-    if (tick && S.channel) revCh = S.channel.inst;                   // that channel keeps it (spent when it ends)
   }
   function revTake(key) {                                            // the cast of key completes now: does it use (and spend) it?
     if (!REV) return false;
@@ -1033,9 +1031,9 @@ export function createCombat(opts) {
     revUntil = -1;
     return true;
   }
-  function revChan() {                                               // a channel tick now: + pct while it is up (the channel holds it)
-    if (!REV || !S.channel || !revUp()) return 0;
-    revCh = S.channel.inst; return REV.fx.proc.pct;
+  function revTick() {                                               // sim v214: a channel tick now: + pct and spent, while it is up
+    if (!REV || !revUp()) return 0;
+    revUntil = -1; return REV.fx.proc.pct;
   }
   // fill: the press's popFill (undefined: worked out by fillOf when needed); peek: only asked, the first use stays open.
   function activesOk(key, fill, peek) {                              // the engine's activesOk ('pull', 'execute', 'doom')
