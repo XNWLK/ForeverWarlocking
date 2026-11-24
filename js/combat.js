@@ -198,6 +198,8 @@ export function createCombat(opts) {
                      // for the review: when your first spell took effect (seconds into the fight), your mana, and DoTs cast over
                      first: null, spent: 0, tapMana: 0, tapLost: 0, tapsMoving: 0, minMana: stats.maxMana, noMana: 0, clips: [] } };
     events = []; order = 0; inst = 0; queued = null; resCache = {};
+    actOpen = ACT_POL === 'pull'; doomSeen = false;                  // each fight's cooldowns wait for its own opener / Doom
+    Object.keys(trUntil).forEach(function (k) { delete trUntil[k]; }); revUntil = -1; revCh = null;   // no trinket buff or Revelation carried over
     P = makePet(build.pet);
     S.decideSeq = order++;
   }
@@ -921,6 +923,49 @@ export function createCombat(opts) {
   const ACT_POL = (cfg.options && cfg.options.activesPolicy) || 'pull';
   const ACT_DOOM = WL.effectiveRotation(build, cfg).indexOf('bane') >= 0 || (build.timeline || []).some(function (x) { return x.k === 'baneOfDoom'; });
   let actOpen = ACT_POL === 'pull', doomSeen = false;
+  // Sim v212 (its round 248): under 'doom' a build that never casts Bane of Doom (Wrack DS) no longer pops its cooldowns on
+  // the pull. The first use waits for the opener: right before the first cast of a filler (or conditional filler) of the
+  // priority (the engine's popFill; a priority without one: the pull, as before). Blood Fury (and Power Infusion, not
+  // played here) also wait while an Amplify Curse Bane of Agony is coming or is up with more than activesAmpLeft s left.
+  // Berserking stays on the pull. The engine knows the action it chose; a press is matched to one by fillOf.
+  const ACT_HASFILL = WL.effectiveRotation(build, cfg).some(function (k) { const a = WL.actionOf(k, build); return !!(a && (a.filler || a.preFiller)); });
+  const ACT_AMP = cfg.options && cfg.options.activesAmpLeft != null ? +cfg.options.activesAmpLeft : 17;
+  function fillOf(key) {                                             // the engine's popFill for a press of key now
+    if (!ACT_HASFILL) return null;
+    const a = WL.actionOf(simWould(remainingNow(), { pick: key }) || '', build);
+    return !!(a && (a.filler || a.preFiller));
+  }
+  function ampHold() {                                               // hold Blood Fury for the Amplify Curse Bane of Agony?
+    if (!(ACT_AMP > 0) || ACT_DOOM || ACT_POL === 'pull' || ACT_POL === 'execute' || !tv('amplifyCurse') || !table.baneOfAgony) return false;
+    if (S.ampUp || (AMP_BTN && buff('amplifyCurse'))) return true;   // taken, its Bane of Agony has not landed yet
+    const d = T[1].dots.baneOfAgony;
+    if (d && d.expires > S.t + EPS && d.snap && d.snap.castMult > 1) return d.expires - S.t > ACT_AMP + EPS;
+    return ready('amplifyCurse') && remainingNow() > SPELLS.baneOfAgony.duration;   // the next Bane of Agony takes it
+  }
+  function racialOk(key, fill) {                                     // the engine's racial rule (no lock: asked, not used)
+    const cd = racialOf('cooldown');
+    if (activesOk(key, fill, true)) return !(cd && cd.spPct && ampHold());
+    return !!(cd && cd.hastePct) && !ACT_DOOM;                       // Berserking: still on the pull
+  }
+  function eurekaPopOk(key) {                                        // the engine's: Eureka! only before a long direct cast or channel
+    const s = SPELLS[key], len = s.kind === 'channel' ? s.duration : castTime(key);
+    return (s.kind === 'direct' || s.kind === 'channel') && len >= 1.4;
+  }
+  // Would the engine use the race's cooldown right before this press now (the check compares it with the engine's log;
+  // the hint shows it)? fill: the press's popFill when known.
+  function racialDue(key, fill) {
+    const cd = racialOf('cooldown');
+    if (!cd || !ready('racial') || !table[key] || key === 'lifeTap' || key === 'baneOfHavoc' || SPELLS[key].kind === 'utility') return false;
+    if (cd === EUREKA && !eurekaPopOk(key)) return false;
+    let mana = S.mana, health = S.health;                            // after the mana items the press would use (useManaItems)
+    MANA_ITEMS.forEach(function (c) {
+      const amt = c.manaRestore.amount || stats.maxMana * c.manaRestore.pct / 100, miss = stats.maxMana - mana;
+      if (!ready('cd:' + c.cdGroup) || miss < amt) return;
+      if (c.healthCost) { const hc = Math.round(c.healthCost * selfTakenMult()); if (health <= hc) return; health -= hc; }
+      mana += Math.min(amt, miss);
+    });
+    return mana >= discountedCost(key) && racialOk(key, fill);
+  }
   function potSp() { return SP_POT && buff('spPotion') ? SP_POT.spPotion.sp : 0; }
   function trUp(x) { return trUntil[x.slot] > S.t + EPS; }
   // Sim v207: × the boss type (vs); a target debuff (u.target) counts on your target only, not on extra targets.
@@ -955,18 +1000,23 @@ export function createCombat(opts) {
     if (!REV || !S.channel || !revUp()) return 0;
     revCh = S.channel.inst; return REV.fx.proc.pct;
   }
-  function activesOk(key) {                                          // the engine's activesOk ('pull', 'execute', 'doom')
+  // fill: the press's popFill (undefined: worked out by fillOf when needed); peek: only asked, the first use stays open.
+  function activesOk(key, fill, peek) {                              // the engine's activesOk ('pull', 'execute', 'doom')
     if (actOpen) return true;
-    if (ACT_POL === 'execute') return actOpen = executePhase(1);
+    if (ACT_POL === 'execute') return peek ? executePhase(1) : actOpen = executePhase(1);
     const d = T[1].dots.baneOfDoom;
     if (d) doomSeen = true;
-    if (!d || d.expires <= S.t + EPS) return actOpen = doomSeen || !ACT_DOOM || dotLeft('baneOfAgony', 1) > 0;
+    if (!d || d.expires <= S.t + EPS) {                              // sim v212 (its round 248): no Doom -> after the opener
+      const open = doomSeen || (ACT_DOOM ? dotLeft('baneOfAgony', 1) > 0 : (fill === undefined ? fillOf(key) : fill) !== false);
+      return peek ? open : actOpen = open;
+    }
     // The engine asks before it uses the race's cooldown; here a Berserking pressed at this very moment is already up.
     const bz = S.buffs.berserking, fresh = bz != null && S.cds.racial != null && Math.abs(S.cds.racial - racialOf('cooldown').cd - S.t) < EPS;
     if (fresh) delete S.buffs.berserking;
     const toBoom = d.expires - S.t, sp = SPELLS[key], len = sp.kind === 'channel' ? sp.duration : Math.max(castTime(key), gcd());
     if (fresh) S.buffs.berserking = bz;
-    return actOpen = toBoom > endAt() - S.t || toBoom <= len + EPS;
+    const open = toBoom > endAt() - S.t || toBoom <= len + EPS;
+    return peek ? open : actOpen = open;
   }
   function discountedCost(key) {                                     // the price if Eureka! were popped now
     const cd = racialOf('cooldown'); let c = table[key].cost;
@@ -1588,18 +1638,32 @@ export function createCombat(opts) {
       if (!a) continue;
       view.nextTarget = 0; view.actionIndex = i;
       const k = a.pick(view);
-      if (k === 'trinket:use') { if (walk) useTrinketsApl(); continue; }   // "Activate trinket": off the GCD, the list goes on
+      if (k === 'trinket:use') { if (walk && !walk.pick) useTrinketsApl(); continue; }   // "Activate trinket": off the GCD, the list goes on
       if (k === 'lifeTap' && !canTap()) continue;          // a Life Tap the list would like but has no health for
       if (k && table[k] && needsTarget(k) && immuneTo(standing[(view.nextTarget || 1) - 1] || boss, SPELLS[k].school)) continue;   // nothing she is immune to
       if (k && table[k] && fits(k) && affordable(k)) found = { key: k, target: standing[(view.nextTarget || 1) - 1] || boss, action: list[i], racial: false };
+    }
+    if (walk && walk.pick) {                              // fillOf (sim v212): the line of the list this press casts
+      if (found && found.key === walk.pick) return found.action;   // the one the engine's walk chooses now
+      for (let i = 0; i < list.length; i++) {             // else the first line that would cast it, then the first that names it
+        const a = WL.actionOf(list[i], build);
+        if (!a) continue;
+        view.nextTarget = 0; view.actionIndex = i;
+        if (a.pick(view) === walk.pick) return list[i];
+      }
+      for (let i = 0; i < list.length; i++) if (actionSpells(build, list[i]).indexOf(walk.pick) >= 0) return list[i];
+      return null;
     }
     if (walk) return found;
     const tap = { key: 'lifeTap', target: boss, action: found ? found.action : null, racial: false, why: found ? 'mana' : 'moving', need: found ? found.key : null };
     if (!found) return made && cfg.fight.lifeTapWhileMoving && mana < stats.maxMana - EPS && canTap() ? tap : null;
     if (found.key === 'lifeTap') return found;
     if (mana < effectiveCost(found.key) - 1e-6) return stats.maxMana < effectiveCost(found.key) || !canTap() ? null : tap;   // no health for the tap: it waits for a heal
-    const open = list.indexOf('bane') < 0 || leftOn(boss, 'baneOfDoom') > 0 || leftOn(boss, 'baneOfAgony') > 0;
-    found.racial = !!racialOf('cooldown') && view.ready('racial') && SPELLS[found.key].kind !== 'utility' && open;
+    // The race's cooldown by the engine's rule (sim v212, its round 248: without Bane of Doom after the opener, Blood Fury
+    // also after an Amplify Curse Bane's strongest ticks begin; Eureka! only before a long direct cast or channel).
+    const fa = WL.actionOf(found.action, build), rc = racialOf('cooldown');
+    found.racial = !!rc && view.ready('racial') && SPELLS[found.key].kind !== 'utility' && (rc !== EUREKA || eurekaPopOk(found.key)) &&
+      racialOk(found.key, ACT_HASFILL ? !!(fa && (fa.filler || fa.preFiller)) : null);
     // Amplify Curse as a button: press it before the Bane of Agony (the sim uses it on every one while it is ready).
     found.amplify = AMP_BTN && found.key === 'baneOfAgony' && !!tv('amplifyCurse') && view.ready('amplifyCurse') && !view.buff('amplifyCurse');
     return found;
@@ -1609,6 +1673,8 @@ export function createCombat(opts) {
 
   return {
     simWould: function (remaining) { return simWould(remaining); },
+    // Would the engine use the race's cooldown right before a press of key now (sim v212's rules; tools/check-combat.mjs)?
+    racialDue: function (key) { return racialDue(key); },
     // The page's guess of the time left in a fight on health (the engine's walk reads it, as the hint does).
     setRemaining: function (fn) { REM_GUESS = fn; },
     // You take one hit now (a scripted fight's own hits; the same rule as config.fight.hitEvery).

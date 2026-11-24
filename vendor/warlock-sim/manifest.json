@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "54358b6",
-    "subject":  "v211: Wrack DS weapon enchant +22 Intellect instead of Revelation",
+    "commit":  "74cd184",
+    "subject":  "v212: Max Pre-BiS gear preset, Wrack DS cooldown timing",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-23 18:16",
+    "synced":  "2026-11-24 16:39",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

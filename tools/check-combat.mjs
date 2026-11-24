@@ -98,9 +98,10 @@ for (const scene of SCENES) {
         }
         // Moments the engine cut a channel at its tick for the next cast (it decides inside the tick; see heldX in combat.js).
         const cuts = new Set(sim.log.filter(l => l.type === 'clip' || l.type === 'recast').map(l => l.t));
-        for (const entry of sim.log) {
-          if (entry.type !== 'cast' && entry.type !== 'racial') continue;
-          if (entry.precast != null) continue;             // the engine's own precast: it was started above
+        const presses = sim.log.filter(l => (l.type === 'cast' || l.type === 'racial') && l.precast == null);
+        let racialOff = 0;
+        for (let n = 0; n < presses.length; n++) {
+          const entry = presses[n];
           // The engine's log rounds times to a millisecond. The exact moment is when the caster became free, or (when
           // a channel was cut short for this cast) the channel tick it was cut at, or the end of a movement phase, or
           // a tenth of a second later each time the engine found nothing to cast - whichever lies at the logged time.
@@ -140,6 +141,14 @@ for (const scene of SCENES) {
             const items = sim.log.filter(l => l.type === 'consumable' && l.gain && Math.abs(l.t - entry.t) < 1e-9).reduce((n, l) => n + l.gain, 0);
             const before = combat.state.mana + items, engine = entry.mana + combat.cost(key);
             if (Math.abs(before - engine) > 1) { manaOff++; problems.push('mana before ' + entry.spell + ' at ' + entry.t + ' s: engine ' + engine.toFixed(1) + ', here ' + before.toFixed(1)); }
+          }
+          // The race's cooldown: the engine uses it right before a damaging cast by its rule (activesPolicy; sim v212: after
+          // the opener without Bane of Doom, Blood Fury after an Amplify Curse Bane's strongest ticks begin). Here it is a
+          // button the check presses where the engine did, so combat.racialDue (the hint's rule) must say the same.
+          const prev = presses[n - 1], after = presses[n + 1];
+          if (entry.type === 'racial' ? after && after.type === 'cast' && after.t === entry.t : !(prev && prev.type === 'racial' && prev.t === entry.t)) {
+            const castKey = entry.type === 'racial' ? (/^x\d:(.+)$/.exec(after.spell) || [0, after.spell])[1] : key;
+            if (combat.racialDue(castKey) !== (entry.type === 'racial') && racialOff < 3) { racialOff++; problems.push('race cooldown before ' + castKey + ' at ' + entry.t + ' s: engine ' + (entry.type === 'racial' ? 'used' : 'did not use') + ' it, here ' + (entry.type === 'racial' ? 'not' : 'used')); }
           }
           const result = combat.press(key, cuts.has(entry.t) ? Object.assign({}, ctx, { cutAtTick: true }) : ctx);
           if (!result.ok) problems.push('refused ' + entry.spell + ' at ' + entry.t + ' s (' + result.reason + ')');

@@ -5,6 +5,13 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-24
+- Wrack DS times its cooldowns as in the Warlock SIM: the Spellblasting potion comes at your first Wrack instead of on
+  the pull, and the hint asks for Blood Fury once the Amplify Curse Bane of Agony has 17 seconds or less left (about
+  943 DPS).
+- Reset now starts a clean fight: the cooldown timing, a trinket's buff and Revelation no longer carry over from the
+  fight before.
+
 ### 2026-11-23
 - Wrack DS's weapon now has +22 Intellect instead of Revelation, as in the Warlock SIM (about 938 DPS).
 
