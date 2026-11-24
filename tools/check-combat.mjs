@@ -40,7 +40,12 @@ const SCENES = [
   { name: 'precast Corruption', targets: 1, seeds: [15], precast: 'corruption' },
   { name: 'precast Searing Pain, hit every 2 s', targets: 1, seeds: [16], precast: 'searingPain', fight: { hitEvery: 2 } },
   // Sim v209: the Voidwalker's melee is halved (dmgPct) and it regenerates from your Intellect; builds with a demon only.
-  { name: 'Voidwalker', targets: 1, seeds: [20], pet: 'voidwalker' }
+  { name: 'Voidwalker', targets: 1, seeds: [20], pet: 'voidwalker' },
+  // Sim v215: no gear list wears Revelation any more (staffs with +65 Spell Power), but an imported settings code can. These
+  // two scenes put it on the weapon (own gear, not a list) so its rules stay checked: direct hits and channel ticks, and
+  // Hellfire's area ticks (one roll per tick, sim v214). Plain and page bases only (the max base would be the same).
+  { name: 'Revelation', targets: 1, seeds: [21], revelation: true, bases: ['plain', 'page'] },
+  { name: 'Revelation, 2 targets, Hellfire', targets: 2, seeds: [22], filler: 'hellfire', revelation: true, bases: ['plain', 'page'] }
 ];
 const ctx = { moving: false, petDistance: 0 };
 let fights = 0, failures = 0;
@@ -67,6 +72,7 @@ const BASES = [{ name: 'plain', make: () => JSON.parse(JSON.stringify(WL.DEFAULT
                { name: 'max', make: () => { const c = WL.pageDefaultConfig(); c.gearMode = 'maxBis'; return c; } }];
 for (const base of BASES) {
 for (const scene of SCENES) {
+  if (scene.bases && scene.bases.indexOf(base.name) < 0) continue;
   for (const ready of WL.BUILDS) {
     if (scene.pet && !ready.pet) continue;                // a demon swap: only builds that keep a demon
     const build = withPet(withFiller(ready, scene.filler), scene.pet);
@@ -79,6 +85,10 @@ for (const scene of SCENES) {
         (scene.buffs || []).forEach(k => { cfg.buffs[k].on = true; });
         Object.assign(cfg.gear, scene.gear || {});
         Object.assign(cfg.combat, scene.combat || {});
+        if (scene.revelation) {                            // own gear: a staff with Revelation (8217), no Pre-BiS list
+          cfg.gearMode = null;
+          cfg.gearBuilder = { on: true, slots: { mainHand: { id: 13937 } }, enchants: { mainHand: { id: 8217 } }, manual: {} };
+        }
         if (scene.precast) cfg.fight.precast = scene.precast;
         const sim = WL.simulateOnce(build, raceKey, cfg, { seed: seed, duration: DURATION, log: true });
         // The spell this build really precasts (null: it cannot, and the engine starts as usual).

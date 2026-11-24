@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "735c4b3",
-    "subject":  "v214: Revelation hotfix - one channel tick takes the charge, one roll per AoE tick",
+    "commit":  "34df9f8",
+    "subject":  "v215: staffs only - Headmaster\u0027s Charge / Elemental Mage Staff with +65 SP",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-24 23:01",
+    "synced":  "2026-11-25 00:29",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
