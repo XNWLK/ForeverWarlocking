@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "34df9f8",
-    "subject":  "v215: staffs only - Headmaster\u0027s Charge / Elemental Mage Staff with +65 SP",
+    "commit":  "7268609",
+    "subject":  "v216: gear builder puts +65 Spell Power on every two-hander",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-25 00:29",
+    "synced":  "2026-11-25 00:43",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
