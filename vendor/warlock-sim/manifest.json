@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "723e684",
-    "subject":  "v217: Revelation AoE tick rolls only when its first landed hit did not crit",
+    "commit":  "1575695",
+    "subject":  "v218: Magician\u0027s Cord usable by Warlocks (added; BiS waist alternative)",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-25 15:16",
+    "synced":  "2026-11-26 00:05",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
