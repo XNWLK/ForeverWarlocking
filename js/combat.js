@@ -508,7 +508,7 @@ export function createCombat(opts) {
   function aoeTick(key, i, aimed) {
     const s = SPELLS[key], e = table[key];
     const rvc = REV ? revTick() : 0;                  // sim v214 (its round 250): the tick takes Revelation once, before its targets
-    let plain = false;                                // a landed hit of this tick that did not crit
+    let first = null;                                 // sim v217 (its round 253): the crit result of the tick's first landed hit
     for (let ti = 1; ti <= N; ti++) {
       if (S.over) return;
       if (!alive(ti) || immuneTo(ti, s.school)) continue;     // a boss immune to fire takes nothing from Rain of Fire or Hellfire
@@ -518,11 +518,11 @@ export function createCombat(opts) {
       let amount = (s.tickBase + s.tickCoef * spNow(e)) * e.periodicMult * liveMult(key, true, ti);
       amount *= vulnMult(s.school, ti, false, key);   // area ticks roll as hits (Rain of Fire: no Pierce bonus, a tenth of the share)
       const crit = R.crit() * 100 < e.critPct + rvc + trCrit(key, ti);
-      if (!crit) plain = true;
+      if (first === null) first = crit;
       if (crit) amount *= e.critMult;
       deal(key, amount, crit, true, ti);
     }
-    if (REV && !rvc && plain && !S.over) revRoll(false);   // sim v214: one trigger roll per tick, after its targets
+    if (REV && !rvc && first === false && !S.over) revRoll(false);   // one trigger roll per tick (v214), only if its first landed hit did not crit (v217)
     if (s.selfDamage && !S.over) { const hurtYou = selfTick(key); loseHealth(hurtYou); emit({ type: 'selfHit', key: key, amount: hurtYou }); }
   }
 

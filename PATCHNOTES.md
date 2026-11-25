@@ -6,6 +6,8 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 ## Since v0.9.0
 
 ### 2026-11-25
+- Revelation, as in the Warlock SIM: a Hellfire or Rain of Fire tick can only trigger it when the first target it lands
+  on does not take a crit.
 - Every build now carries a staff instead of a one-hander and off hand, as in the Warlock SIM: Realistic Pre-BiS wears
   Headmaster's Charge (Incinerate DS: Elemental Mage Staff), Max Pre-BiS the Ironbark Staff, both with +65 Spell Power
   instead of Revelation. Wrack DS about 961, Fire Demo 908, Shadow Demo 892, Incinerate Pandemic 877, Incinerate DS 859.

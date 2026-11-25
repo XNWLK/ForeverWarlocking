@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "7268609",
-    "subject":  "v216: gear builder puts +65 Spell Power on every two-hander",
+    "commit":  "723e684",
+    "subject":  "v217: Revelation AoE tick rolls only when its first landed hit did not crit",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-25 00:43",
+    "synced":  "2026-11-25 15:16",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
