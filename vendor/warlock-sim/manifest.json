@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "9fddeef",
-    "subject":  "v220: vendor items say \"Vendor: \u003cname\u003e\" instead of \"Drop: \u003cname\u003e\"",
+    "commit":  "710d346",
+    "subject":  "v221: Magician\u0027s Cord is the BiS waist alternative for Wrack DS too",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-26 02:23",
+    "synced":  "2026-11-26 02:38",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
