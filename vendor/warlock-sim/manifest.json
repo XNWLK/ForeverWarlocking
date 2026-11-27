@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "710d346",
-    "subject":  "v221: Magician\u0027s Cord is the BiS waist alternative for Wrack DS too",
+    "commit":  "16d11c9",
+    "subject":  "v223: new talents (Incinerate Pandemic, Incinerate DS, Fire Demo); Master\u0027s Leggings of Shadow Wrath; Incinerate DS Skyshroud",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-26 02:38",
+    "synced":  "2026-11-27 04:54",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

@@ -898,7 +898,8 @@ export function createCombat(opts) {
   const TRK = (WL.equippedTrinkets ? WL.equippedTrinkets(cfg) : []).filter(function (x) { return x.fx.use && TR_KINDS[x.fx.use.kind] && WL.fxOn(cfg, x.fx.use); });   // sim v207: an onlyVs effect is never used where it does nothing
   const TRU = (cfg.options && cfg.options.trinketUse) || {}, trUntil = {};
   // The engine's trUse, once ready and allowed: its cooldown, its buff (Golden Banana's durZones kept for the form), and
-  // for 'dmgOver' its shots, one every `every` s from the use (trShot events, handled by trHit).
+  // for 'dmgOver' its shots, the first `first` s (default `every`) after the use, then one every `every` s (trShot
+  // events, handled by trHit).
   function trUse(x) {
     const u = x.fx.use;
     S.cds['tr:' + x.slot] = S.t + u.cd;
@@ -906,7 +907,8 @@ export function createCombat(opts) {
     emit({ type: 'used', name: x.fx.name });
     if (u.kind === 'dmgOver') {
       row('trinket:' + x.id).casts++;
-      for (let si = 1; si <= u.shots; si++) push({ t: S.t + si * u.every, o: 0, type: 'trShot', slot: x.slot });
+      const f0 = u.first != null ? u.first : u.every;   // sim v222 (its round 258): `first` = when the first shot lands
+      for (let si = 0; si < u.shots; si++) push({ t: S.t + f0 + si * u.every, o: 0, type: 'trShot', slot: x.slot });
     }
   }
   // Sim v191 (its round 219): "Activate trinket" in the priority list uses every ready on-use trinket (not the mana ones)

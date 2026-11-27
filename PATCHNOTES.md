@@ -5,6 +5,14 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-27
+- Zarla's Snack Pouch (Max Pre-BiS), as in the Warlock SIM: its whelp now casts four Fireballs of 213-254 Fire, landing
+  4, 7.3, 10.6 and 13.9 seconds after you use it (was five of 439).
+- New talents and gear from the Warlock SIM: Incinerate Pandemic is 18/0/33, Incinerate DS 8/11/32, Fire Demo has new
+  talent points; Realistic Pre-BiS has new first rings, and Incinerate DS wears Skyshroud Leggings. The build list's
+  numbers are the sim's new ones (Wrack DS 961, Fire Demo 910, Shadow Demo 893, Incinerate Pandemic 882, Incinerate
+  DS 869).
+
 ### 2026-11-25
 - Revelation, as in the Warlock SIM: a Hellfire or Rain of Fire tick can only trigger it when the first target it lands
   on does not take a crit.
