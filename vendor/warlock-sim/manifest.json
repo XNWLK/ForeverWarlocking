@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "f864b7a",
-    "subject":  "v224: What changed link; Bolt\u0027s Charged Eyeball 26%; Kindling Stave proc; Book of the Dead skeleton",
+    "commit":  "eaddb13",
+    "subject":  "v225: Book of the Dead behind a two-hander no longer summons its skeleton in the Web Workers",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-27 06:00",
+    "synced":  "2026-11-27 11:21",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",
