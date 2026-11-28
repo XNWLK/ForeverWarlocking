@@ -1,9 +1,9 @@
 {
     "source":  "Warlock DPS sim (sibling project)",
-    "commit":  "eaddb13",
-    "subject":  "v225: Book of the Dead behind a two-hander no longer summons its skeleton in the Web Workers",
+    "commit":  "42a9e3e",
+    "subject":  "v230: Decimation at any boss health; Green Lenses; Emblem per enemy on Rain of Fire; Blade binary",
     "uncommittedChanges":  false,
-    "synced":  "2026-11-27 11:21",
+    "synced":  "2026-11-28 02:50",
     "files":  [
                   "data/consumables.js",
                   "data/config.js",

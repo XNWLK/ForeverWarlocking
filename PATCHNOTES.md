@@ -5,6 +5,11 @@ the [releases on GitHub](https://github.com/XNWLK/ForeverWarlocking/releases) ma
 
 ## Since v0.9.0
 
+### 2026-11-28
+- Decimation, as in the Warlock SIM: its extra 6% Shadow Bolt and Searing Pain damage now counts at any boss health;
+  only the fast Soul Fire still needs the boss below 35%. The build list's numbers are the sim's new ones (Fire Demo
+  922, Shadow Demo 909).
+
 ### 2026-11-27
 - Zarla's Snack Pouch (Max Pre-BiS), as in the Warlock SIM: its whelp now casts four Fireballs of 213-254 Fire, landing
   4, 7.3, 10.6 and 13.9 seconds after you use it (was five of 439).

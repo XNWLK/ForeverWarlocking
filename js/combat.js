@@ -548,10 +548,13 @@ export function createCombat(opts) {
     }
     let amount = (s.base + s.coef * spNow(e)) * e.directMult * liveMult(key, false, ti) * (eureka ? eurekaMult(key, false) : 1);
     if (key === 'incinerate' && dotLeft('immolate', ti) > 0) amount *= 1 + s.immolateBonusPct / 100;
-    if ((isSB(key) || key === 'searingPain') && executePhase(ti) && tv('decimation')) {
+    // Sim v230 (its round 275): Decimation's +6% at any boss health; only the Soul Fire buff needs the execute phase.
+    if ((isSB(key) || key === 'searingPain') && tv('decimation')) {
       amount *= addOp0(key, tv('decimation', 'dmgPct'));
-      if (!buff('decimation')) emit({ type: 'proc', name: 'decimation' });
-      S.buffs.decimation = S.t + 10;
+      if (executePhase(ti)) {
+        if (!buff('decimation')) emit({ type: 'proc', name: 'decimation' });
+        S.buffs.decimation = S.t + 10;
+      }
     }
     amount *= vulnMult(s.school, ti, false, key);
     // Revelation (sim v209, its round 243; any target): taken at the cast, it adds its crit here; a hit that took
@@ -1585,7 +1588,7 @@ export function createCombat(opts) {
       } else {
         amt = (s.base + s.coef * spNow(e)) * e.directMult * liveMult(k, false, gt(ti));
         if (k === 'incinerate' && !noImmolate && dotLeft('immolate', boss) > 0) amt *= 1 + s.immolateBonusPct / 100;
-        if ((isSB(k) || k === 'searingPain') && T[boss].hpPct < cfg.fight.executePct && tv('decimation')) amt *= addOp0(k, tv('decimation', 'dmgPct'));
+        if ((isSB(k) || k === 'searingPain') && tv('decimation')) amt *= addOp0(k, tv('decimation', 'dmgPct'));   // at any health (sim v230)
       }
       return hitChance() * amt * expVuln(s.school, ti, s.kind === 'channel', k) * expCrit(e.critPct, e.critMult);
     }
